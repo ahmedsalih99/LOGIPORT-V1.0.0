@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="{{ lang or 'en' }}" dir="{{ 'rtl' if (lang or '') == 'ar' else 'ltr' }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title or '' }}</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #111; }
+    h1 { font-size: 18px; margin: 0 0 10px; }
+    h2 { font-size: 14px; margin: 14px 0 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .box { border: 1px solid #333; padding: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; }
+    th { background: #f2f2f2; }
+    .right { text-align: right; }
+    .small { font-size: 11px; opacity: .85; }
+  </style>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="tr" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ doc_title or "Proforma Fatura" }}</title>
+
+  <style>
+    /* ====== Sayfa ve Tipografi ====== */
+    @page {
+      size: A4;
+      margin: 18mm 15mm 20mm 15mm;
+      @top-left   { content: none; }
+      @top-center { content: none; }
+      @top-right  { content: none; }
+      @bottom-center { content: "Sayfa " counter(page) " / " counter(pages); }
+    }
+
+    html { color:#000; background:#fff; }
+    body { font: 11pt/1.6 "Segoe UI", Arial, Helvetica, sans-serif; }
+
+    h1, h2, h3 { margin:0 0 6pt; font-weight:700; }
+    h1 { font-size:16pt; letter-spacing:.2px; }
+    h2 { font-size:12pt; margin-top:8pt; }
+
+    .muted { color:#444; font-weight:600; }
+    .small { font-size:9pt; }
+    .tiny  { font-size:8pt; }
+    .mt-2 { margin-top:2mm; }
+    .mt-4 { margin-top:3mm; }
+    .mb-2 { margin-bottom:2mm; }
+    .mb-4 { margin-bottom:3mm; }
+    .text-right { text-align:right; }
+    .text-center { text-align:center; }
+    .grid { display:grid; gap:6pt; }
+    .grid-2 { grid-template-columns:1fr 1fr; }
+    .grid-3 { grid-template-columns:1fr 1fr 1fr; }
+    .box { border:1px solid #000; padding:6pt; border-radius:2pt; }
+    .nowrap { white-space:nowrap; }
+
+    /* ====== Kalemler Tablosu ====== */
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+
+    /* Sütun genişlikleri (ar/en ile aynı):
+       #:4% | Açıklama:23% | Birim:7% | Miktar:9% | Brüt:13% | Net:12% | Birim Fiyatı:17% | Tutar:15% */
+    col.col-no      { width:4%;  }
+    col.col-desc    { width:23%; }
+    col.col-unit    { width:7%;  }
+    col.col-qty     { width:9%;  }
+    col.col-gross   { width:13%; }
+    col.col-net     { width:12%; }
+    col.col-uprice  { width:17%; }
+    col.col-amount  { width:15%; }
+
+    th, td {
+      border:1px solid #000;
+      padding:4pt 4pt;
+      vertical-align:top;
+      line-height:1.35;
+    }
+    th { background:#f2f2f2; font-weight:700; font-size:9.5pt; }
+
+    td.num, th.num { text-align:right; white-space:nowrap; }
+    td.num {
+      font-size: 9pt;
+      direction:ltr;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-feature-settings:"tnum" 1;
+              font-feature-settings:"tnum" 1;
+    }
+    th.num { font-size:9.25pt; direction:ltr; }
+
+    /* Açıklama sütununda kelime kaydırma */
+    td.desc { word-break: break-word; }
+
+    /* ====== Yazıyla Toplamlar ====== */
+    .totals { width:100%; margin-top:6pt; }
+    .totals td { border:none; padding:2pt 0; }
+    .totals .lbl { text-align:right; padding-right:8pt; }
+    .totals .val { text-align:left; direction:ltr; unicode-bidi:plaintext; width:60%; }
+    .totals .val-num { text-align:right; width:30%; }
+
+    .notice { border:1px dashed #000; padding:6pt; margin-top:6pt; background:#fafafa; }
+
+    tr, td, th { page-break-inside: avoid; }
+  </style>
+</head>
+<body>
+
+  <!-- ====== Üstbilgi ====== -->
+  <table style="width:100%; border:0; margin-bottom:6pt;">
+    <tr>
+      <td style="border:0;">
+        <h1>{{ doc_title or "Proforma Fatura" }}</h1>
+        <div class="small">
+          <span class="muted">PR. IN. NO.:</span>
+          <span>{{ invoice_no }}</span>
+          &nbsp;&nbsp;&nbsp;
+          <span class="muted">Tarih:</span>
+          <span>{{ date }}</span>
+        </div>
+      </td>
+      <td class="text-right" style="border:0;">
+        {% if exporter.name %}
+          <div class="muted">İhracatçı</div>
+          <div><strong>{{ exporter.name }}</strong></div>
+          {% if exporter.address %}<div class="small">{{ exporter.address }}</div>{% endif %}
+          {% if exporter.city or exporter.country %}
+            <div class="small">{{ exporter.city }}{% if exporter.city and exporter.country %}, {% endif %}{{ exporter.country }}</div>
+          {% endif %}
+          {% if exporter.phone %}<div class="small">Tel: {{ exporter.phone }}</div>{% endif %}
+          {% if exporter.email %}<div class="small">E-posta: {{ exporter.email }}</div>{% endif %}
+          {% if exporter.website %}<div class="small">Web: {{ exporter.website }}</div>{% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <!-- ====== Taraflar ====== -->
+  <div class="grid grid-2">
+    <div class="box">
+      <div class="muted mb-2">Alıcı (Consignee)</div>
+      <div><strong>{{ consignee.name }}</strong></div>
+      {% if consignee.address %}<div class="small">{{ consignee.address }}</div>{% endif %}
+      {% if consignee.city or consignee.country %}
+        <div class="small">{{ consignee.city }}{% if consignee.city and consignee.country %}, {% endif %}{{ consignee.country }}</div>
+      {% endif %}
+      {% if consignee.phone %}<div class="small">Tel: {{ consignee.phone }}</div>{% endif %}
+      {% if consignee.email %}<div class="small">E-posta: {{ consignee.email }}</div>{% endif %}
+    </div>
+
+    {% if notify and notify.name %}
+    <div class="box">
+      <div class="muted mb-2">Bildirilecek Taraf (Notify)</div>
+      <div><strong>{{ notify.name }}</strong></div>
+      {% if notify.address %}<div class="small">{{ notify.address }}</div>{% endif %}
+      {% if notify.city or notify.country %}
+        <div class="small">{{ notify.city }}{% if notify.city and notify.country %}, {% endif %}{{ notify.country }}</div>
+      {% endif %}
+      {% if notify.phone %}<div class="small">Tel: {{ notify.phone }}</div>{% endif %}
+      {% if notify.email %}<div class="small">E-posta: {{ notify.email }}</div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ====== Sevkiyat / Şartlar ====== -->
+  <div class="grid grid-3 mt-4">
+    <div class="box">
+      <div class="muted">Teslim Şartları</div>
+      <div class="small">{{ delivery_method }}</div>
+    </div>
+    <div class="box">
+      <div class="muted">Sevkiyat</div>
+      <div class="small">
+        {% if shipment.transport_type %}Taşıma Şekli: {{ shipment.transport_type }}{% endif %}
+        {% if shipment.transport_ref %}<br>Ref: {{ shipment.transport_ref }}{% endif %}
+      </div>
+    </div>
+    <div class="box">
+      <div class="muted">Menşe / Varış</div>
+      <div class="small">
+        Menşe: {{ country_of_origin or origin_country }}<br>
+        Varış: {{ destination_country }}
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Kalemler ====== -->
+  <h2 class="mt-4 mb-2">Kalemler</h2>
+  <table>
+    <colgroup>
+      <col class="col-no">
+      <col class="col-desc">
+      <col class="col-unit">
+      <col class="col-qty">
+      <col class="col-gross">
+      <col class="col-net">
+      <col class="col-uprice">
+      <col class="col-amount">
+    </colgroup>
+
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Açıklama</th>
+        <th class="center">Birim</th>
+        <th class="num">Miktar</th>
+        <th class="num nowrap">Brüt ({{ weight_unit_for_display or "KG" }})</th>
+        <th class="num nowrap">Net ({{ weight_unit_for_display or "KG" }})</th>
+        <th class="num nowrap">Birim Fiyatı ({{ currency.code }})</th>
+        <th class="num nowrap">Tutar ({{ currency.code }})</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td class="center">{{ it.n }}</td>
+        <td class="desc">
+          {{ it.description }}
+          {% if it.packaging %}<div class="tiny muted">Ambalaj: {{ it.packaging }}</div>{% endif %}
+          {% if it.pricing_unit and it.pricing_unit != (it.packaging or '') %}
+            <div class="tiny muted">Fiyat/{{ it.pricing_unit }}</div>
+          {% endif %}
+        </td>
+        <td class="center">{{ it.unit }}</td>
+        <td class="num">{{ '%.0f' % it.qty if it.qty is number else it.qty }}</td>
+        <td class="num">{{ '%.3f' % (it.gross_display if it.gross_display is defined else it.gross) }}</td>
+        <td class="num">{{ '%.3f' % (it.net_display   if it.net_display   is defined else it.net) }}</td>
+        <td class="num">{{ '%.3f' % it.unit_price }}</td>
+        <td class="num">{{ '%.3f' % it.amount }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th colspan="3" class="text-right">Toplam</th>
+        <th class="num">{{ '%.0f' % totals.qty }}</th>
+        <th class="num">{{ '%.3f' % (totals.gross_display if totals.gross_display is defined else totals.gross) }}</th>
+        <th class="num">{{ '%.3f' % (totals.net_display   if totals.net_display   is defined else totals.net) }}</th>
+        <th class="num">—</th>
+        <th class="num">{{ '%.3f' % totals.total }}</th>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- ====== Yazıyla Toplamlar ====== -->
+  <table class="totals">
+    <tr>
+      <td class="lbl">Toplam Tutar (yazıyla):</td>
+      <td class="val"><strong>{{ amount_in_words }}</strong></td>
+    </tr>
+    <tr>
+      <td class="lbl">Toplam Miktar (yazıyla):</td>
+      <td class="val">
+        {% set _qw = (totals_qty_in_words or qty_in_words) %}
+        {% if qty_header_packaging %}
+          {% set _qw = _qw.replace(' birimler','').replace(' birim','').replace(' adet','') %}
+        {% endif %}
+        {{ _qw }}{% if qty_header_packaging %} (Ambalaj: {{ qty_header_packaging }}){% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">Toplam Brüt (yazıyla):</td>
+      <td class="val">{{ totals_gross_in_words or gross_in_words }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Toplam Net (yazıyla):</td>
+      <td class="val">{{ totals_net_in_words or net_in_words }}</td>
+    </tr>
+  </table>
+
+  {% if notes %}
+    <div class="box mt-4">
+      <div class="muted">Notlar</div>
+      <div class="small">{{ notes }}</div>
+    </div>
+  {% endif %}
+
+  {% if flags and flags.non_tax_notice %}
+    <div class="notice small">
+      Bu belge, teklif/ön-sevkiyat amaçlı bir <strong>Proforma Fatura</strong> olup
+      <strong>vergi veya gümrük faturası değildir</strong>.
+    </div>
+  {% endif %}
+
+  {% if flags and flags.show_bank_block and bank_info %}
+    <div class="box mt-4">
+      <div class="muted mb-2">Banka Bilgileri</div>
+      <div class="small">{{ bank_info | safe }}</div>
+    </div>
+  {% endif %}
+
+  <!-- ====== Altbilgi ====== -->
+  <div class="mt-4 small">
+    <strong>Hazırlayan:</strong> {{ exporter.name }}
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <strong>Tarih:</strong> {{ date }}
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<div>{{ consignee.name }}</div>
+{% if consignee.address %}<div>{{ consignee.address }}</div>{% endif %}
+{% if consignee.tax_id %}<div>{{ _("tax_id") }}: {{ consignee.tax_id }}</div>{% endif %}
+</div>
+</section>
+
+
+<!-- بيانات الفاتورة -->
+<section class="meta">
+<div><b>{{ _("invoice_no") }}:</b> {{ invoice.number }}</div>
+<div><b>{{ _("date") }}:</b> {{ invoice.date }}</div>
+{% if invoice.incoterm %}<div><b>{{ _("incoterm") }}:</b> {{ invoice.incoterm }}</div>{% endif %}
+{% if invoice.destination %}<div><b>{{ _("destination") }}:</b> {{ invoice.destination }}</div>{% endif %}
+{% if invoice.port %}<div><b>{{ _("port") }}:</b> {{ invoice.port }}</div>{% endif %}
+{% if invoice.currency %}<div><b>{{ _("currency") }}:</b> {{ invoice.currency }}</div>{% endif %}
+</section>
+
+
+<!-- جدول البنود -->
+<table class="items">
+<thead>
+<tr>
+<th>{{ _("item_desc") }}</th>
+<th>{{ _("unit") }}</th>
+<th class="num">{{ _("qty") }}</th>
+<th class="num">{{ _("net_kg") }}</th>
+<th class="num">{{ _("gross_kg") }}</th>
+<th class="num">{{ _("unit_price") }}</th>
+<th class="num">{{ _("total") }}</th>
+</tr>
+</thead>
+<tbody>
+{% for it in items %}
+<tr>
+<td>{{ it.description }}</td>
+<td>{{ it.unit }}</td>
+<td class="num">{{ it.qty|float|round(2) }}</td>
+<td class="num">{{ it.net_kg|float|round(2) }}</td>
+<td class="num">{{ it.gross_kg|float|round(2) }}</td>
+<td class="num">{{ it.unit_price|float|round(2) }}</td>
+<td class="num">{{ (it.qty|float) * (it.unit_price|float) | round(2) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+<tfoot>
+<tr>
+<th colspan="3">{{ _("totals") }}</th>
+<th class="num">{{ totals.net|float|round(2) }}</th>
+<th class="num">{{ totals.gross|float|round(2) }}</th>
+<th></th>
+<th class="num">{{ totals.value|float|round(2) }}</th>
+</tr>
+</tfoot>
+</table>
+
+
+<!-- إجمالي كتابةً / البنك / ملاحظات -->
+<section class="footer-blocks">
+{% if totals_in_words %}
+<div><b>{{ _("amount_in_words") }}:</b> {{ totals_in_words }}</div>
+{% endif %}
+
+
+{% if bank %}
+<div class="bank">
+<h3>{{ _("bank_details") }}</h3>
+{% if bank.name %}<div>{{ bank.name }}</div>{% endif %}
+{% if bank.branch %}<div>{{ _("branch") }}: {{ bank.branch }}</div>{% endif %}
+{% if bank.account_no %}<div>{{ _("account") }}: {{ bank.account_no }}</div>{% endif %}
+{% if bank.iban %}<div>IBAN: {{ bank.iban }}</div>{% endif %}
+{% if bank.swift %}<div>SWIFT: {{ bank.swift }}</div>{% endif %}
+</div>
+{% endif %}
+
+
+{% if notes %}
+<div class="notes"><b>{{ _("notes") }}:</b> {{ notes }}</div>
+{% endif %}
+</section>
+
+
+<div class="sign">{{ _("signature_and_seal") }}</div>
+
+
+</body>
+</html>

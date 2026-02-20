@@ -1,0 +1,43 @@
+<!-- templates/invoices/normal/ar.html -->
+{% extends "_partials/base.html" %}
+{% block content %}
+<header>
+  <h1>فاتورة</h1>
+  <div>رقم: {{ invoice_no }}</div>
+  <div>التاريخ: {{ date }}</div>
+</header>
+
+<section>
+  <div>المصدّر: {{ exporter.name }}</div>
+  <div>المستلم: {{ consignee.name }}</div>
+</section>
+
+<table>
+  <thead>
+    <tr>
+      <th>البيان</th>
+      <th>الكمية</th>
+      <th>السعر</th>
+      <th>المجموع</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.description }}</td>
+      <td>{{ item.qty }} {{ item.unit }}</td>
+      <td>{{ item.unit_price }}</td>
+      <td>{{ item.amount }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="3">الإجمالي</td>
+      <td>{{ totals.value }} {{ currency.code }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div>{{ amount_in_words }}</div>
+{% endblock %}

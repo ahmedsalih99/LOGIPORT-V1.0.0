@@ -1,0 +1,1 @@
+Templates skeleton. Extract into your TEMPLATES_DIR (e.g., documents/templates).

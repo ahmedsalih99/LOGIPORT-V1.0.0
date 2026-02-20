@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title or "Invoice" }}</title>
+  <style>
+    /* === Page & print === */
+    @page {
+      size: A4;
+      margin: 14mm 14mm 16mm 14mm;
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); }
+    }
+
+    html, body { background:#fff; color:#000; }
+    body { font: 12pt/1.65 'Segoe UI', Arial, sans-serif; }
+
+    /* Repeat table header/footer on each page */
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+
+    /* Avoid breaking rows & important blocks */
+    tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+    .avoid-break, .top, .title-row, .meta-bar, .block, .amount-words, .hr { break-inside: avoid; }
+
+    .top { text-align:center; }
+    .exporter-name { font-weight:800; font-size: 16pt; }
+    .exporter-addr { white-space:pre-line; margin-top:3px; }
+    .divider { height: 3px; background:#000; margin: 8pt 0 10pt; }
+
+    .title-row { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:6pt; }
+    .title { font-weight:800; font-size: 16pt; }
+    .inv-no { font-weight:800; font-size: 14pt; }
+
+    .meta-bar { display:flex; justify-content:flex-start; margin: 6pt 0 4pt; }
+    .meta-left  { font-weight:700; text-align:left; }
+    .meta-sub { font-weight:800; font-size: 11pt; margin-top:3px; }
+
+    .block { margin: 8pt 0; }
+    .name  { font-weight:800; font-size: 13pt; }
+    .addr  { white-space:pre-line; margin-top:3px; opacity:0.95; }
+
+    /* Items table */
+    table.items { width:100%; border-collapse:collapse; direction:ltr; margin-top:8pt; }
+    table.items th, table.items td { border:1px solid #000; padding:6px 8px; vertical-align:top; }
+    table.items th { text-align:center; font-weight:800; }
+    table.items td { font-size: 11pt; }
+    .num { text-align:center; white-space:nowrap; }
+    .sub { font-size: 9.5pt; opacity:0.9; margin-top:3px; }
+    tfoot td { font-weight:800; }
+
+    /* Auto-compact when items are many */
+    table.items.compact th, table.items.compact td { padding: 4px 6px; }
+    table.items.compact th { font-size: 10.5pt; }
+    table.items.compact td { font-size: 10.5pt; }
+
+    .hr { height: 2px; background:#000; margin: 8pt 0; }
+  </style>
+</head>
+<body>
+
+  {# Decide compact mode purely in template #}
+  {% set _rows = (items or []) | length %}
+  {% set _compact = _rows > 22 %}
+
+  <!-- Exporter -->
+  <div class="top">
+    <div class="exporter-name">{{ exporter.name or exporter.name_en or "" }}</div>
+    <div class="exporter-addr">
+      {{ exporter.address or exporter.address_en or "" }}
+      {% if exporter.vat_no %}VAT No: {{ exporter.vat_no }}{% endif %}
+      {% if exporter.cr_no %}CR No: {{ exporter.cr_no }}{% endif %}
+      {% if exporter.city or exporter.country %}
+{{ exporter.city or "" }} {{ exporter.country or "" }}{% endif %}
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Title & No. -->
+  <div class="title-row">
+    <div class="title">INVOICE</div>
+    <div class="inv-no">No: {{ invoice_no or doc_no or "" }}</div>
+  </div>
+
+  <!-- Date + Transit -->
+  <div class="meta-bar">
+    <div class="meta-left">
+      DATE: {{ invoice_date or date or today or "" }}
+      <div class="meta-sub">TRANSIT</div>
+    </div>
+  </div>
+
+  <!-- Intermediary company (no heading) -->
+  {% set _i = transit.intermediary or {} %}
+  <div class="block">
+    <div class="name">{{ _i.intermediary_supplier_name or "—" }}</div>
+    <div class="addr">
+      {{ _i.intermediary_supplier_address or "—" }}
+      {% if _i.intermediary_supplier_country %}{{ _i.intermediary_supplier_country }}{% endif %}
+      {% if _i.intermediary_invoice_no or _i.intermediary_invoice_date %}
+{% if _i.intermediary_invoice_no %} | Intermediary Invoice No: {{ _i.intermediary_invoice_no }}{% endif %}
+{% if _i.intermediary_invoice_date %} | Date: {{ _i.intermediary_invoice_date }}{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Separator -->
+  <div class="hr"></div>
+
+  <!-- Transit to (country) -->
+  <div class="block" style="margin-top: 4pt;">
+    <div class="name" style="font-size:12pt;">{{ transit_to_text_en or ("Transit to " ~ (importer.country or consignee.country or shipment.destination_country or "")) }}</div>
+  </div>
+
+  <!-- Importer (no heading) -->
+  <div class="block">
+    <div class="name">{{ importer.name or importer.name_en or consignee.name or consignee.name_en or "" }}</div>
+    <div class="addr">
+      {{ importer.address or importer.address_en or consignee.address or consignee.address_en or "" }}
+      {% if (importer.city or importer.country) or (consignee.city or consignee.country) %}
+{{ importer.city or consignee.city or "" }} {{ importer.country or consignee.country or "" }}{% endif %}
+      {% if importer.vat_no or consignee.vat_no %} | VAT No: {{ importer.vat_no or consignee.vat_no }}{% endif %}
+      {% if importer.cr_no or consignee.cr_no %} | CR No: {{ importer.cr_no or consignee.cr_no }}{% endif %}
+    </div>
+  </div>
+
+  <!-- Items & Totals -->
+  <table class="items{% if _compact %} compact{% endif %}">
+    <thead>
+      <tr>
+        <th style="width:36%;">Description</th>
+        <th style="width:12%;">Quantity<div class="sub">Packaging</div></th>
+        <th style="width:16%;">Gross Weight<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
+        <th style="width:16%;">Net Weight<div class="sub">{{ net_unit_label or "KG" }}</div></th>
+        <th style="width:10%;">Pricing<div class="sub">{{ pricing_type_header or "USD/KG" }}</div></th>
+        <th style="width:10%;">Total (Amount)
+          <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.description or it.description_en or "" }}</td>
+        <td class="num">
+          <div>{{ it.qty or it.bags or 0 }}</div>
+          <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.gross or it.gross_kg or 0 }}</div>
+          <div class="sub">{{ it.gross_unit_label or gross_unit_label or "KG" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.net or it.net_kg or 0 }}</div>
+          <div class="sub">{{ it.net_unit_label or net_unit_label or "" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.price or it.price_per_ton_usd or it.unit_price or 0 }}</div>
+          <div class="sub">{{ it.pricing_type_label or pricing_type_header or "USD/KG" }}</div>
+        </td>
+        <td class="num"><div>{{ it.total or it.total_usd or 0 }}</div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="num"><b>Totals</b></td>
+        <td class="num"><b>{{ totals.total_qty or totals.qty or totals.total_bags or 0 }}</b></td>
+        <td class="num"><b>{{ totals.total_gross or totals.gross or 0 }}</b></td>
+        <td class="num"><b>{{ totals.total_net or totals.net or 0 }}</b></td>
+        <td class="num">—</td>
+        <td class="num"><b>{{ totals.total_value or totals.value or totals.total_value_usd or 0 }}</b></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Amount in words -->
+  <div class="amount-words avoid-break" style="margin-top:10pt;border:1px solid #000;border-radius:6px;padding:8px;">
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Quantity:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_qty_en or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Gross weight:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_gross_en or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Net weight:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_net_en or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Grand total:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_total_value_en or "" }}</div></div>
+  </div>
+
+</body>
+</html>

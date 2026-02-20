@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="tr" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title or "Fatura" }}</title>
+  <style>
+    @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+    html, body { background:#fff; color:#000; }
+    body { font: 12pt/1.65 'Segoe UI', Arial, sans-serif; }
+
+    .top { text-align:center; }
+    .exporter-name { font-weight:800; font-size: 16pt; }
+    .exporter-addr { white-space:pre-line; margin-top:3px; }
+    .divider { height: 3px; background:#000; margin: 8pt 0 10pt; }
+
+    .title-row { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:6pt; }
+    .title { font-weight:800; font-size: 16pt; }
+    .inv-no { font-weight:800; font-size: 14pt; }
+
+    .meta-bar { display:flex; justify-content:flex-end; margin: 6pt 0 4pt; }
+    .meta-left  { font-weight:700; text-align:right; }
+    .meta-sub { font-weight:800; font-size: 11pt; margin-top:3px; }
+
+    .importer-block { margin: 6pt 0 10pt; text-align:left; }
+    .importer-name { font-weight:800; font-size: 13pt; }
+    .importer-addr { white-space:pre-line; margin-top:3px; opacity:0.95; }
+
+    table.items { width:100%; border-collapse:collapse; }
+    table.items th, table.items td { border:1px solid #000; padding:6px 8px; vertical-align:top; }
+    table.items th { text-align:center; font-weight:800; }
+    table.items td { font-size: 11pt; }
+    .num { text-align:center; white-space:nowrap; }
+    .sub { font-size: 9.5pt; opacity:0.9; margin-top:3px; }
+
+    tfoot td { font-weight:800; }
+
+    @media print { .no-print { display:none !important; } }
+  </style>
+</head>
+<body>
+
+  <div class="top">
+    <div class="exporter-name">{{ exporter.name or exporter.name_tr or "" }}</div>
+    <div class="exporter-addr">
+      {{ exporter.address or exporter.address_tr or "" }}
+      {% if exporter.vat_no %}
+Vergi No: {{ exporter.vat_no }}{% endif %}
+      {% if exporter.cr_no %}
+Ticaret Sicil No: {{ exporter.cr_no }}{% endif %}
+      {% if exporter.city or exporter.country %}
+{{ exporter.city or "" }} {{ exporter.country or "" }}{% endif %}
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="title-row">
+    <div class="title">FATURA</div>
+    <div class="inv-no">No: {{ invoice_no or doc_no or "" }}</div>
+  </div>
+
+  <div class="meta-bar">
+    <div class="meta-left">
+      TARİH: {{ invoice_date or date or today or "" }}
+      <!-- Transit etiketi -->
+      <div class="meta-sub">{{ transit_label or "TRANSİT" }}</div>
+    </div>
+  </div>
+
+  <div class="importer-block">
+    <div class="importer-name">{{ importer.name or importer.name_tr or "" }}</div>
+    <div class="importer-addr">
+      {{ importer.address or importer.address_tr or "" }}
+      {% if importer.vat_no %}
+Vergi No: {{ importer.vat_no }}{% endif %}
+      {% if importer.cr_no %}
+Ticaret Sicil No: {{ importer.cr_no }}{% endif %}
+      {% if importer.city or importer.country %}
+{{ importer.city or "" }} {{ importer.country or "" }}{% endif %}
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:36%;">Açıklama</th>
+        <th style="width:12%;">Miktar<div class="sub">Ambalaj</div></th>
+        <th style="width:16%;">Brüt Ağırlık<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
+        <th style="width:16%;">Net Ağırlık<div class="sub">{{ net_unit_label or "KG" }}</div></th>
+        <th style="width:10%;">Fiyatlandırma<div class="sub">{{ pricing_type_header or "USD/KG" }}</div></th>
+        <th style="width:10%;">Toplam (Tutar)
+  <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
+</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.description or it.description_tr or "" }}</td>
+        <td class="num">
+          <div>{{ it.qty or it.bags or 0 }}</div>
+          <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.gross or it.gross_kg or 0 }}</div>
+          <div class="sub">{{ it.gross_unit_label or gross_unit_label or "KG" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.net or it.net_kg or 0 }}</div>
+          <div class="sub">{{ it.net_unit_label or net_unit_label or "KG" }}</div>
+        </td>
+        <td class="num">
+          <div>{{ it.price or it.price_per_ton_usd or it.unit_price or 0 }}</div>
+          <div class="sub">{{ it.pricing_type_label or pricing_type_header or "USD/KG" }}</div>
+        </td>
+        <td class="num"><div>{{ it.total or it.total_usd or 0 }}</div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="num"><b>Toplamlar</b></td>
+        <td class="num"><b>{{ totals.total_qty or totals.total_bags or 0 }}</b></td>
+        <td class="num"><b>{{ totals.total_gross or 0 }}</b></td>
+        <td class="num"><b>{{ totals.total_net or 0 }}</b></td>
+        <td class="num">—</td>
+        <td class="num"><b>{{ totals.total_value or totals.total_value_usd or 0 }}</b></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="tafqit" style="margin-top:10pt;border:1px solid #000;border-radius:6px;padding:8px;">
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Miktar:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_qty_tr or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Brüt ağırlık:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_gross_tr or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Net ağırlık:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_net_tr or "" }}</div></div>
+    <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Genel toplam:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_total_value_tr or "" }}</div></div>
+  </div>
+
+</body>
+</html>

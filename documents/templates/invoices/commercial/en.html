@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>Commercial Invoice</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    html { color: #000; background: #fff; }
+    body { font: 12pt/1.5 Segoe UI, Arial, sans-serif; }
+    h1, h2, h3 { margin: 0 0 8pt; font-weight: 700; }
+    h1 { font-size: 18pt; letter-spacing: .5px; }
+    .small { font-size: 10pt; }
+    .mono { font-family: ui-monospace, "Courier New", monospace; }
+    .row { display: flex; gap: 10pt; }
+    .col { flex: 1 1 0; }
+    .right { text-align: right; }
+    .hr-thin { border: 0; border-top: .5pt solid #000; margin: 6pt 0; }
+    .hr-double { border: 0; border-top: 3px double #000; margin: 8pt 0; }
+    .box { border: .5pt solid #000; padding: 8pt; border-radius: 0; }
+    .meta { padding: 8pt; border: .5pt solid #000; }
+    .label { font-weight: 700; }
+    .kv { display: grid; grid-template-columns: 130px 1fr; column-gap: 8pt; row-gap: 4pt; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table thead th {
+      font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+      border-bottom: 1pt solid #000; padding: 6pt 4pt; text-align: left;
+    }
+    .table tbody td { padding: 5pt 4pt; vertical-align: top; border-top: .5pt solid #000; }
+    .table tfoot td { padding: 6pt 4pt; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .panel-totals { border-top: 1pt solid #000; padding-top: 6pt; margin-top: 6pt; }
+    .muted { opacity: .8; }
+  </style>
+</head>
+<body>
+  {# ==== Safe aliases ==== #}
+  {% set exp = exporter or {} %}
+  {% set imp = consignee or importer or {} %}
+  {% set bro = broker or third_party or notify or {} %}
+  {% set cur = (currency.code if currency and currency.code else (currency or '')) %}
+  {% set tots = totals or {} %}
+  {% set items_list = items or [] %}
+
+  {# ==== Bank text selection ==== #}
+  {% set use_company_bank = include_bank_from_company|default(true) %}
+  {% set bank_text = (bank_info|default('')) or (use_company_bank and (exp.bank_info or '')) %}
+
+  {# ==== Quantity header packaging (dedup + &) ==== #}
+  {% set packs_label_provided = qty_header_packaging %}
+  {% set ns = namespace(packs=[]) %}
+  {% for it in items_list %}
+    {% set pk = (it.packaging or '') %}
+    {% if pk and pk not in ns.packs %}
+      {% set ns.packs = ns.packs + [pk] %}
+    {% endif %}
+  {% endfor %}
+  {% set packs_label = packs_label_provided or (' & '.join(ns.packs)) %}
+
+  {# ==== Unit-Price label: prefer builder value; else build (dedup + &) ==== #}
+  {% set up_label = unit_price_label %}
+  {% if not up_label %}
+    {% set _nsu = namespace(units=[]) %}
+    {% for it in items_list %}
+      {% set u = (it.unit or '').strip() %}
+      {% if u and u not in _nsu.units %}
+        {% set _nsu.units = _nsu.units + [u] %}
+      {% endif %}
+    {% endfor %}
+    {% set up_label = (_nsu.units | length) and (' & '.join(_nsu.units)) or (unit_price_per or '') %}
+  {% endif %}
+
+  <header class="row" style="align-items:flex-start;">
+    <div class="col">
+      <h1>COMMERCIAL INVOICE</h1>
+      <div class="kv small" style="margin-top:6pt;">
+        <div class="label">Invoice No.</div><div class="mono">{{ invoice_no or doc_no or '' }}</div>
+        <div class="label">Date</div><div>{{ issue_date or doc_date or date or '' }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="meta">
+        <div class="label">Exporter</div>
+        <div class="small">
+          <div>{{ exp.name or exp.name_en or '' }}</div>
+          <div>{{ exp.addr or exp.address or '' }}</div>
+          <div>{{ exp.city or '' }}{% if exp.city and exp.country %}, {% endif %}{{ exp.country or '' }}</div>
+          {% if exp.vat_no %}<div>VAT: {{ exp.vat_no }}</div>{% endif %}
+          {% if exp.tax_no %}<div>Tax No: {{ exp.tax_no }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <hr class="hr-double"/>
+
+  <section class="row" style="margin-top:6pt;">
+    <div class="col box">
+      <h3>Importer</h3>
+      <div class="small">
+        <div>{{ imp.name or imp.name_en or '' }}</div>
+        <div>{{ imp.addr or imp.address or '' }}</div>
+        <div>{{ imp.city or '' }}{% if imp.city and imp.country %}, {% endif %}{{ imp.country or '' }}</div>
+        {% if imp.vat_no %}<div>VAT: {{ imp.vat_no }}</div>{% endif %}
+        {% if imp.tax_no %}<div>Tax No: {{ imp.tax_no }}</div>{% endif %}
+      </div>
+    </div>
+
+    {% if bro %}
+    <div class="col box">
+      <h3>Third Party / Notify</h3>
+      <div class="small">
+        <div>{{ bro.name or bro.name_en or '' }}</div>
+        <div>{{ bro.addr or bro.address or '' }}</div>
+        <div>{{ bro.city or '' }}{% if bro.city and bro.country %}, {% endif %}{{ bro.country or '' }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if incoterms or delivery_method or country_of_origin or port_of_loading or port_of_discharge %}
+  <section class="box" style="margin-top:8pt;">
+    <div class="kv small">
+      {% if incoterms %}<div class="label">Incoterms</div><div>{{ incoterms }}</div>{% endif %}
+      {% if delivery_method %}<div class="label">Delivery</div><div>{{ delivery_method }}</div>{% endif %}
+      {% if country_of_origin %}<div class="label">Country of Origin</div><div>{{ country_of_origin }}</div>{% endif %}
+      {% if port_of_loading %}<div class="label">Port of Loading</div><div>{{ port_of_loading }}</div>{% endif %}
+      {% if port_of_discharge %}<div class="label">Port of Discharge</div><div>{{ port_of_discharge }}</div>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section style="margin-top:10pt;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:44%">Item Description</th>
+          <th class="num" style="width:12%">
+            Qty
+            {% if packs_label %}<div class="muted small">{{ packs_label }}</div>{% endif %}
+          </th>
+          <th class="num" style="width:12%">
+            Gross
+            <div class="muted small">{{ weight_unit_for_display }}</div>
+          </th>
+          <th class="num" style="width:12%">
+            Net
+            <div class="muted small">{{ weight_unit_for_display }}</div>
+          </th>
+          <th class="num" style="width:10%">
+            Unit Price
+            <div class="muted small">{{ cur }}{% if up_label %}/{{ up_label }}{% endif %}</div>
+          </th>
+          <th class="num" style="width:10%">
+            Amount
+            <div class="muted small">{{ cur }}</div>  {# ✅ رمز عملة الفاتورة تحت العنوان #}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items_list %}
+        <tr>
+          <td>
+            {{ it.description or it.name or '' }}
+            {% if it.hs_code %}<div class="small muted">HS: {{ it.hs_code }}</div>{% endif %}
+          </td>
+          <td class="num">{{ it.qty or it.quantity or 0 }}</td>
+          <td class="num">{{ it.gross_display if it.gross_display is not none else (it.gross_kg or it.gross or 0) }}</td>
+          <td class="num">{{ it.net_display   if it.net_display   is not none else (it.net_kg   or it.net   or 0) }}</td>
+          <td class="num">{{ it.unit_price or it.price_per_unit or 0 }}</td>
+          <td class="num">{{ it.amount or it.total or 0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="panel-totals">
+      <div class="row">
+        <div class="col small">
+          <div><span class="label">Amount in words:</span>
+            {{ totals_in_words or value_in_words or amount_in_words or '' }}
+          </div>
+          {% if tots.qty %}<div class="small"><span class="label">Quantity in words:</span> {{ qty_in_words or totals_qty_in_words or '' }}</div>{% endif %}
+          {% if tots.gross %}<div class="small"><span class="label">Gross ({{ weight_unit_for_display }}) in words:</span> {{ gross_in_words or totals_gross_in_words or '' }}</div>{% endif %}
+          {% if tots.net %}<div class="small"><span class="label">Net ({{ weight_unit_for_display }}) in words:</span> {{ net_in_words or totals_net_in_words or '' }}</div>{% endif %}
+          {% if notes %}<div style="margin-top:6pt;" class="small"><span class="label">Notes:</span> {{ notes }}</div>{% endif %}
+        </div>
+        <div class="col">
+          <table class="table" style="margin-top:0;">
+            <tbody>
+              <tr>
+                <td class="label">Total Qty{% if packs_label %} ({{ packs_label }}){% endif %}</td>
+                <td class="num">{{ tots.qty or tots.total_qty or 0 }}</td>
+              </tr>
+              <tr>
+                <td class="label">Total Gross ({{ weight_unit_for_display }})</td>
+                <td class="num">{{ tots.gross_display if tots.gross_display is not none else (tots.gross or tots.total_gross or 0) }}</td>
+              </tr>
+              <tr>
+                <td class="label">Total Net ({{ weight_unit_for_display }})</td>
+                <td class="num">{{ tots.net_display   if tots.net_display   is not none else (tots.net   or tots.total_net   or 0) }}</td>
+              </tr>
+              <tr><td class="label">Subtotal</td><td class="num">{{ tots.subtotal or tots.value or 0 }} {{ cur }}</td></tr>
+              {% if tots.tax %}<tr><td class="label">Tax</td><td class="num">{{ tots.tax }} {{ cur }}</td></tr>{% endif %}
+              <tr><td class="label">Grand Total</td><td class="num"><strong>{{ tots.total or tots.grand_total or tots.value or 0 }} {{ cur }}</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ==== Bank Details ==== #}
+  {% if bank_text %}
+  <section class="box" style="margin-top:10pt;">
+    <h3>Bank Details</h3>
+    <div class="small" style="white-space: pre-line;">{{ bank_text }}</div>
+  </section>
+  {% endif %}
+
+  <section style="margin-top:12pt;">
+    <div class="row">
+      <div class="col">
+        <div class="small muted">Currency: {{ cur }}</div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

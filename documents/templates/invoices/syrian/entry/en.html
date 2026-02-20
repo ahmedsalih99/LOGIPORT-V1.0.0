@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title or "Invoice" }}</title>
+  <style>
+    /* === Page & print === */
+    @page {
+      size: A4;
+      margin: 14mm 14mm 16mm 14mm;
+      /* Page numbers at bottom-right */
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); }
+    }
+
+    html, body { background:#fff; color:#000; }
+    body { font: 12pt/1.65 'Segoe UI', Arial, sans-serif; }
+
+    /* Repeat table header/footer on each page */
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+
+    /* Avoid breaking rows & sensitive blocks across pages */
+    tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+    .avoid-break, .top, .title-row, .importer-block, .amount-words { break-inside: avoid; }
+
+    .top { text-align:center; }
+    .exporter-name { font-weight:800; font-size: 16pt; letter-spacing:.2px; }
+    .exporter-addr { white-space:pre-line; margin-top:3px; }
+    .divider { height: 2px; background:#000; margin: 8pt 0 8pt; }
+
+    .title-row { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:6pt; }
+    .title { font-weight:800; font-size: 16pt; }
+    .inv-no { font-weight:800; font-size: 14pt; }
+
+    .meta-bar { display:flex; justify-content:flex-end; margin: 6pt 0 4pt; }
+    .meta-left  { font-weight:700; }
+
+    .importer-block { margin: 6pt 0 8pt; text-align:left; }
+    .importer-name { font-weight:800; font-size: 13pt; }
+    .importer-addr { white-space:pre-line; margin-top:3px; opacity:0.95; }
+
+    /* Items table */
+    table.items { width:100%; border-collapse:collapse; }
+    table.items th, table.items td { border:1px solid #000; padding:6px 8px; vertical-align:top; }
+    table.items th { text-align:center; font-weight:800; background:#f5f5f5; }
+    table.items td { font-size: 11pt; }
+    tbody tr:nth-child(odd) td { background:#fcfcfc; }
+    .num { text-align:center; white-space:nowrap; }
+    .ltr { direction:ltr; unicode-bidi:embed; }
+    .sub { font-size: 9.5pt; opacity:.9; margin-top:3px; white-space: normal; line-height:1.3; }
+
+    tfoot td { font-weight:800; }
+
+    /* Auto-compact mode for long invoices (enabled from inside template) */
+    table.items.compact th, table.items.compact td { padding: 4px 6px; }
+    table.items.compact th { font-size: 10.5pt; }
+    table.items.compact td { font-size: 10.5pt; }
+
+    /* Amount in words */
+    .amount-words { margin-top:10pt; border:1px solid #000; border-radius:6px; padding:8px; }
+    .line { display:flex; gap:10px; margin:3px 0; }
+    .lbl { min-width:160px; font-weight:800; }
+    .val { flex:1; border-bottom:1px dotted #000; min-height:18px; }
+
+    @media print { .no-print { display:none !important; } }
+  </style>
+</head>
+<body>
+
+  {# Decide compact mode purely in template (no builder changes) #}
+  {% set _rows = (items or []) | length %}
+  {% set _compact = _rows > 22 %}
+
+  <!-- Exporter -->
+  <div class="top">
+    <div class="exporter-name">{{ exporter.name or exporter.name_en or "" }}</div>
+    <div class="exporter-addr">
+      {{ exporter.address or exporter.address_en or "" }}
+      {% if exporter.vat_no %}VAT No: {{ exporter.vat_no }}{% endif %}
+      {% if exporter.cr_no %} | CR No: {{ exporter.cr_no }}{% endif %}
+      {% if exporter.city or exporter.country %}
+{{ exporter.city or "" }} {{ exporter.country or "" }}{% endif %}
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Title & No. -->
+  <div class="title-row">
+    <div class="title">INVOICE</div>
+    <div class="inv-no">No: {{ invoice_no or doc_no or "" }}</div>
+  </div>
+
+  <!-- Date -->
+  <div class="meta-bar">
+    <div class="meta-left">DATE: {{ invoice_date or date or today or "" }}</div>
+  </div>
+
+  <!-- Importer (below title, above table) -->
+  <div class="importer-block">
+    <div class="importer-name">{{ importer.name or importer.name_en or "" }}</div>
+    <div class="importer-addr">
+      {{ importer.address or importer.address_en or "" }}
+      {% if importer.vat_no %}VAT No: {{ importer.vat_no }}{% endif %}
+      {% if importer.cr_no %} | CR No: {{ importer.cr_no }}{% endif %}
+      {% if importer.city or importer.country %}
+{{ importer.city or "" }} {{ importer.country or "" }}{% endif %}
+    </div>
+  </div>
+
+  <!-- Items & Totals -->
+  <table class="items{% if _compact %} compact{% endif %}">
+    <thead>
+      <tr>
+        <th style="width:36%;">Description</th>
+        <th style="width:12%;">Quantity<div class="sub">Packaging</div></th>
+        <th style="width:16%;">Gross Weight<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
+        <th style="width:16%;">Net Weight<div class="sub">{{ net_unit_label or "KG" }}</div></th>
+        <th style="width:10%;">Pricing<div class="sub">{{ pricing_type_header or "USD/KG" }}</div></th>
+        <th style="width:10%;">Total (Amount)
+          <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.description or it.description_en or "" }}</td>
+        <td class="num">
+          <div>{{ it.qty or it.bags or 0 }}</div>
+          <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
+        </td>
+        <td class="num ltr">
+          <div>{{ it.gross or it.gross_kg or 0 }}</div>
+          <div class="sub">{{ it.gross_unit_label or gross_unit_label or "KG" }}</div>
+        </td>
+        <td class="num ltr">
+          <div>{{ it.net or it.net_kg or 0 }}</div>
+          <div class="sub">{{ it.net_unit_label or net_unit_label or "KG" }}</div>
+        </td>
+        <td class="num ltr">
+          <div>{{ it.price or it.price_per_ton_usd or it.unit_price or 0 }}</div>
+          <div class="sub">{{ it.pricing_type_label or pricing_type_header or "USD/KG" }}</div>
+        </td>
+        <td class="num ltr"><div>{{ it.total or it.total_usd or 0 }}</div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="num"><b>Totals</b></td>
+        <td class="num"><b>{{ totals.total_qty or totals.total_bags or totals.qty or 0 }}</b></td>
+        <td class="num ltr"><b>{{ totals.total_gross or totals.gross or 0 }}</b></td>
+        <td class="num ltr"><b>{{ totals.total_net or totals.net or 0 }}</b></td>
+        <td class="num">—</td>
+        <td class="num ltr"><b>{{ totals.total_value or totals.total_value_usd or totals.value or 0 }}</b></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Amount in words (single block kept on one page) -->
+  <div class="amount-words avoid-break">
+    <div class="line"><div class="lbl">Quantity:</div><div class="val">{{ tafqit_qty_en or totals.total_qty_words_en or totals.total_bags_words_en or "" }}</div></div>
+    <div class="line"><div class="lbl">Gross weight:</div><div class="val">{{ tafqit_gross_en or totals.total_gross_words_en or "" }}</div></div>
+    <div class="line"><div class="lbl">Net weight:</div><div class="val">{{ tafqit_net_en or totals.total_net_words_en or "" }}</div></div>
+    <div class="line"><div class="lbl">Grand total:</div><div class="val">{{ tafqit_total_value_en or totals.total_value_words_en or "" }}</div></div>
+  </div>
+
+</body>
+</html>

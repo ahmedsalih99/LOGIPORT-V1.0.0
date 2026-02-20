@@ -1,0 +1,32 @@
+
+/* ---------- Windows Fallback CSS (no @font-face, no downloads) ---------- */
+/* Use built-in system fonts that support Arabic on Windows.                 */
+/* Place this file at: documents/static/css/print.css                        */
+
+@page { size: A4; margin: 12mm; }
+
+/* Prefer Tahoma/Segoe UI/Times New Roman for Arabic shaping on Windows */
+html { font-family: Tahoma, "Segoe UI", "Times New Roman", Arial, sans-serif; font-size: 12px; }
+
+/* RTL for Arabic, keep same family to avoid missing-font warnings */
+html[lang="ar"] body { direction: rtl; font-family: Tahoma, "Segoe UI", "Times New Roman", Arial, sans-serif; }
+html[lang="tr"] body { direction: ltr; }
+html[lang="en"] body { direction: ltr; }
+
+h1 { font-size: 18px; margin: 0 0 8px; font-weight: 700; }
+.small { font-size: 11px; color: #333; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.box { border: 1px solid #555; padding: 8px; border-radius: 4px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { border: 1px solid #444; padding: 4px 6px; vertical-align: top; }
+th { background: #f2f2f2; }
+.right { text-align: right; }
+.center { text-align: center; }
+
+tfoot th, tfoot td { font-weight: bold; }

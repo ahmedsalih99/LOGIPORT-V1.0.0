@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>Packing List (With Line ID)</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    html { color:#000; background:#fff; }
+    body { font: 11pt/1.5 "Segoe UI", Arial, sans-serif; }
+    .row { display: flex; gap: 10pt; } .col { flex: 1 1 0; }
+    .small { font-size: 9pt; } .label { font-weight: 700; }
+    .box { border: .5pt solid #000; padding: 8pt; }
+    .kv { display: grid; grid-template-columns: 120px 1fr; column-gap: 8pt; row-gap: 4pt; }
+    .hr-double { border: 0; border-top: 3px double #000; margin: 8pt 0; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { font-weight: 700; text-transform: uppercase; letter-spacing: .3px; border-bottom: 1pt solid #000; padding: 5pt 3pt; text-align: left; font-size: 9.5pt; }
+    tbody td { padding: 4pt 3pt; vertical-align: top; border-top: .5pt solid #000; font-size: 9.5pt; }
+    tfoot td { padding: 5pt 3pt; border-top: 1pt solid #000; font-weight: 700; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .center { text-align: center; }
+  </style>
+</head>
+<body>
+  {% set exp = exporter or {} %} {% set imp = importer or consignee or {} %}
+  {% set trx = transaction or {} %} {% set tots = totals or {} %} {% set list = rows or [] %}
+  <header class="row" style="align-items:flex-start;">
+    <div class="col">
+      <h1 style="margin:0 0 6pt; font-size:17pt;">PACKING LIST</h1>
+      <div class="kv small">
+        <div class="label">PL No.</div><div style="font-family:monospace">{{ trx.no or '' }}</div>
+        <div class="label">Date</div><div>{{ trx.issue_date or '' }}</div>
+        {% if incoterms %}<div class="label">Incoterms</div><div>{{ incoterms }}</div>{% endif %}
+        {% if delivery_method %}<div class="label">Delivery</div><div>{{ delivery_method }}</div>{% endif %}
+        {% if country_of_origin %}<div class="label">Origin</div><div>{{ country_of_origin }}</div>{% endif %}
+        {% if port_of_loading %}<div class="label">POL</div><div>{{ port_of_loading }}</div>{% endif %}
+        {% if port_of_discharge %}<div class="label">POD</div><div>{{ port_of_discharge }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="col">
+      <div class="box"><div class="label">Exporter</div>
+        <div class="small">
+          <div>{{ exp.name or '' }}</div>
+          {% if exp.address %}<div>{{ exp.address }}</div>{% endif %}
+          {% if exp.city or exp.country %}<div>{{ exp.city or '' }}{% if exp.city and exp.country %}, {% endif %}{{ exp.country or '' }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </header>
+  <section class="row" style="margin-top:6pt;">
+    <div class="col box"><div class="label">Importer</div>
+      <div class="small">
+        <div>{{ imp.name or '' }}</div>
+        {% if imp.address %}<div>{{ imp.address }}</div>{% endif %}
+        {% if imp.city or imp.country %}<div>{{ imp.city or '' }}{% if imp.city and imp.country %}, {% endif %}{{ imp.country or '' }}</div>{% endif %}
+      </div>
+    </div>
+  </section>
+  <hr class="hr-double"/>
+  <section style="margin-top:6pt;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:7%" class="center">Line ID</th>
+          <th style="width:5%">No.</th>
+          <th style="width:18%">Container / Truck</th>
+          <th>Description</th>
+          <th class="num" style="width:10%">Qty</th>
+          <th class="num" style="width:12%">Gross (kg)</th>
+          <th class="num" style="width:12%">Net (kg)</th>
+          <th style="width:12%">Packaging</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in list %}
+        <tr>
+          <td class="center">{{ r.entry_item_id or r.line_id or '' }}</td>
+          <td class="num">{{ r.line_no }}</td>
+          <td>{{ r.container_no or '-' }}</td>
+          <td>{{ r.description or '' }}</td>
+          <td class="num">{{ "%.2f"|format(r.quantity or 0) }}</td>
+          <td class="num">{{ "%.2f"|format(r.gross_kg or 0) }}</td>
+          <td class="num">{{ "%.2f"|format(r.net_kg or 0) }}</td>
+          <td>{{ r.packaging_type or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td></td><td></td><td></td>
+          <td class="label">TOTALS</td>
+          <td class="num">{{ "%.2f"|format((tots or {}).quantity or 0) }}</td>
+          <td class="num">{{ "%.2f"|format((tots or {}).gross_kg or 0) }}</td>
+          <td class="num">{{ "%.2f"|format((tots or {}).net_kg or 0) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    {% set qty_num = "%.2f"|format((tots or {}).quantity or 0) %}
+    {% set gross_num = "%.2f"|format((tots or {}).gross_kg or 0) %}
+    {% set net_num = "%.2f"|format((tots or {}).net_kg or 0) %}
+    <div style="border-top:1pt solid #000; padding-top:8pt; margin-top:8pt;" class="small">
+      <div style="margin:2pt 0;"><strong>Total Quantity:</strong> {{ tafqit_qty or qty_num }} ({{ qty_num }})</div>
+      <div style="margin:2pt 0;"><strong>Total Gross (kg):</strong> {{ tafqit_gross or gross_num ~ " kilograms" }} ({{ gross_num }} KG)</div>
+      <div style="margin:2pt 0;"><strong>Total Net (kg):</strong> {{ tafqit_net or net_num ~ " kilograms" }} ({{ net_num }} KG)</div>
+    </div>
+    {% if notes %}<div class="small" style="margin-top:8pt;"><span class="label">Notes:</span> {{ notes }}</div>{% endif %}
+  </section>
+</body>
+</html>

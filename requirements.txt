@@ -1,0 +1,33 @@
+# ============================================================
+# LOGIPORT — Python Dependencies
+# ============================================================
+# التثبيت:
+#   pip install -r requirements.txt
+#
+# ملاحظة لنظام Linux / macOS:
+#   WeasyPrint يحتاج Cairo + Pango مثبَّتَين على المستوى النظام:
+#   Ubuntu/Debian: sudo apt install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
+#   macOS (Homebrew): brew install cairo pango gdk-pixbuf
+#
+# ملاحظة لنظام Windows:
+#   حمّل GTK3 runtime من https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
+# ============================================================
+
+# ── واجهة المستخدم ──────────────────────────────────────────
+PySide6>=6.6.0
+
+# ── قاعدة البيانات ──────────────────────────────────────────
+SQLAlchemy>=2.0.0
+
+# ── كلمات المرور ────────────────────────────────────────────
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
+
+# ── ملفات Excel ─────────────────────────────────────────────
+openpyxl>=3.1.0
+
+# ── قوالب HTML للمستندات ────────────────────────────────────
+Jinja2>=3.1.0
+
+# ── توليد PDF (يحتاج Cairo/Pango/GTK على المستوى النظام) ──
+weasyprint>=62.0

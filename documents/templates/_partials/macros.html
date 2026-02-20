@@ -1,0 +1,125 @@
+{# =========================
+   _partials/macros.html
+   ========================= #}
+
+{# --- رأس الفاتورة (المصدّر/المستورد/الشحن) --- #}
+{% macro header_blocks(exporter, consignee, shipment, invoice_no, date, title_text) -%}
+  <h1>{{ title_text or '' }}</h1>
+  <div class="small" style="margin-bottom:6px">
+    <b>{{ 'Invoice No' if (lang!='ar') else 'رقم الفاتورة' }}:</b> {{ invoice_no or '' }} &nbsp;&nbsp;
+    <b>{{ 'Date' if (lang!='ar') else 'التاريخ' }}:</b> {{ date or '' }}
+  </div>
+  <div class="grid">
+    <div class="box">
+      <b>{{ 'Exporter' if (lang!='ar') else 'المصدّر' }}</b><br/>
+      <div>{{ exporter.name or '' }}</div>
+      <div>{{ exporter.address or '' }}</div>
+      {% if exporter.city %}<div>{{ exporter.city }}</div>{% endif %}
+      {% if exporter.country %}<div>{{ exporter.country }}</div>{% endif %}
+      {% if exporter.phone %}<div>{{ exporter.phone }}</div>{% endif %}
+      {% if exporter.email %}<div>{{ exporter.email }}</div>{% endif %}
+      {% if exporter.website %}<div>{{ exporter.website }}</div>{% endif %}
+      {% if exporter.tax_id %}<div><b>{{ 'Tax ID' if (lang!='ar') else 'الرقم الضريبي' }}:</b> {{ exporter.tax_id }}</div>{% endif %}
+      {% if exporter.registration_number %}<div><b>{{ 'Reg. No' if (lang!='ar') else 'رقم السجل' }}:</b> {{ exporter.registration_number }}</div>{% endif %}
+    </div>
+    <div class="box">
+      <b>{{ 'Consignee' if (lang!='ar') else 'المستورد' }}</b><br/>
+      <div>{{ consignee.name or '' }}</div>
+      <div>{{ consignee.address or '' }}</div>
+      {% if consignee.city %}<div>{{ consignee.city }}</div>{% endif %}
+      {% if consignee.country %}<div>{{ consignee.country }}</div>{% endif %}
+      {% if consignee.phone %}<div>{{ consignee.phone }}</div>{% endif %}
+      {% if consignee.email %}<div>{{ consignee.email }}</div>{% endif %}
+      {% if consignee.website %}<div>{{ consignee.website }}</div>{% endif %}
+      {% if consignee.tax_id %}<div><b>{{ 'Tax ID' if (lang!='ar') else 'الرقم الضريبي' }}:</b> {{ consignee.tax_id }}</div>{% endif %}
+      {% if consignee.registration_number %}<div><b>{{ 'Reg. No' if (lang!='ar') else 'رقم السجل' }}:</b> {{ consignee.registration_number }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="box" style="margin-top:10px">
+    <b>{{ 'Shipment' if (lang!='ar') else 'بيانات الشحن' }}</b><br/>
+    <div class="small">
+      <b>Incoterm:</b> {{ shipment.delivery_method or '' }} &nbsp;&nbsp;
+      <b>{{ 'Port' if (lang!='ar') else 'ميناء الشحن' }}:</b> {{ shipment.transport_ref or '' }} &nbsp;&nbsp;
+      <b>{{ 'Destination' if (lang!='ar') else 'الوجهة' }}:</b> {{ shipment.destination_country or '' }} &nbsp;&nbsp;
+      <b>{{ 'Currency' if (lang!='ar') else 'العملة' }}:</b> {{ shipment.currency_code or '' }}
+    </div>
+  </div>
+{%- endmacro %}
+
+{# --- جدول عناصر الفاتورة --- #}
+{% macro items_table(items, totals) -%}
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>{{ 'Description' if (lang!='ar') else 'الوصف' }}</th>
+      <th>{{ 'Unit' if (lang!='ar') else 'الوحدة' }}</th>
+      <th class="right">{{ 'Qty' if (lang!='ar') else 'الكمية' }}</th>
+      <th class="right">{{ 'Net (kg)' if (lang!='ar') else 'الصافي (كغ)' }}</th>
+      <th class="right">{{ 'Gross (kg)' if (lang!='ar') else 'الإجمالي (كغ)' }}</th>
+      <th class="right">{{ 'Unit Price' if (lang!='ar') else 'سعر الوحدة' }}</th>
+      <th class="right">{{ 'Amount' if (lang!='ar') else 'القيمة' }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in items or [] %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ it.description or it.desc or it.material_name or '' }}</td>
+      <td>{{ it.unit or it.unit_label or '' }}</td>
+      <td class="right">{{ it.qty or '' }}</td>
+      <td class="right">{{ it.net_kg or it.net or '' }}</td>
+      <td class="right">{{ it.gross_kg or it.gross or '' }}</td>
+      <td class="right">{{ it.unit_price or '' }}</td>
+      <td class="right">{{ it.amount or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th colspan="3" class="right">{{ 'Totals' if (lang!='ar') else 'الإجمالي' }}</th>
+      <th class="right">{{ totals.qty if totals else '' }}</th>
+      <th class="right">{{ totals.net if totals else '' }}</th>
+      <th class="right">{{ totals.gross if totals else '' }}</th>
+      <th></th>
+      <th class="right">{{ totals.value if totals else '' }}</th>
+    </tr>
+  </tfoot>
+</table>
+{%- endmacro %}
+
+{# --- جدول التعبئة (مع أعمدة اختيارية) --- #}
+{% macro packing_table(items, show_dates=False, show_line_id=False) -%}
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Description</th><th>Unit</th><th class="right">Qty</th>
+      {% if show_line_id %}<th>Container/Truck</th>{% endif %}
+      {% if show_dates %}<th>Prod. Date</th><th>Exp. Date</th>{% endif %}
+      <th class="right">Net (kg)</th><th class="right">Gross (kg)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in items or [] %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ it.description or it.desc or it.material_name or '' }}</td>
+      <td>{{ it.unit or it.unit_label or '' }}</td>
+      <td class="right">{{ it.qty or '' }}</td>
+      {% if show_line_id %}<td>{{ it.line_tag or it.container_no or it.truck_no or '' }}</td>{% endif %}
+      {% if show_dates %}<td>{{ it.prod_date or '' }}</td><td>{{ it.exp_date or '' }}</td>{% endif %}
+      <td class="right">{{ it.net_kg or it.net or '' }}</td>
+      <td class="right">{{ it.gross_kg or it.gross or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{%- endmacro %}
+
+{# --- ذيل الفاتورة (تفقيط/ملاحظات) --- #}
+{% macro footer_section(amount_in_words, notes) -%}
+  <div class="box" style="margin-top:10px">
+    <div><b>{{ 'Amount in words' if (lang!='ar') else 'القيمة كتابةً' }}:</b> {{ amount_in_words or '' }}</div>
+    {% if notes %}<div style="margin-top:6px"><b>{{ 'Notes' if (lang!='ar') else 'ملاحظات' }}:</b> {{ notes }}</div>{% endif %}
+  </div>
+{%- endmacro %}
