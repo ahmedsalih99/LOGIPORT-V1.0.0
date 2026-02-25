@@ -157,62 +157,8 @@ class DeliveryMethodsTab(BaseTab):
     # Display with action buttons
     # -----------------------------
     def display_data(self):
-        can_edit = has_perm(self.current_user, "edit_delivery_method")
-        can_delete = has_perm(self.current_user, "delete_delivery_method")
-        show_actions = (can_edit or can_delete)
+        self._display_with_actions("edit_delivery_method", "delete_delivery_method")
 
-        self.table.setRowCount(0)
-
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    dm = row["actions"]
-                    action_layout = QHBoxLayout()
-                    action_layout.setContentsMargins(0, 0, 0, 0)
-                    action_layout.setSpacing(12)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("primary-btn")
-                        btn_edit.clicked.connect(lambda _=False, obj=dm: self._open_edit_dialog(obj))
-                        action_layout.addWidget(btn_edit)
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("danger-btn")
-                        btn_delete.clicked.connect(lambda _=False, obj=dm: self._delete_single(obj))
-                        action_layout.addWidget(btn_delete)
-
-                    w = QWidget()
-                    w.setLayout(action_layout)
-                    self.table.setCellWidget(row_idx, col_idx, w)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        # أخفِ عمود الإجراءات إن لم توجد صلاحيات
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        # ✅ أعمدة الأدمن فقط
-        self._apply_admin_columns()
-
-        self.update_pagination_label()
-
-    # -----------------------------
-    # Actions
-    # -----------------------------
     def add_new_item(self):
         dlg = AddDeliveryMethodDialog(self)
         if dlg.exec():

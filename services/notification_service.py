@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from PySide6.QtCore import QObject, Signal, QTimer
+from core.singleton import QObjectSingletonMixin
 from core.translator import TranslationManager
 
 logger = logging.getLogger(__name__)
@@ -106,20 +107,13 @@ class Notification:
         return self._t("time_ago_days").format(n=secs // 86400)
 
 
-class NotificationService(QObject):
+class NotificationService(QObject, QObjectSingletonMixin):
     """Singleton: polls AuditLog and emits Qt signals."""
 
     new_notification      = Signal(object)
     notifications_updated = Signal()
     unread_count_changed  = Signal(int)
 
-    _instance: Optional["NotificationService"] = None
-
-    @classmethod
-    def get_instance(cls) -> "NotificationService":
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -34,6 +34,24 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QTabWidget
 
 
+class _NoHoverTable(QTableWidget):
+    """
+    QTableWidget لا يغير الـ current row عند hover —
+    يمنع تلوين السطر بمجرد مرور الماوس فوق cellWidget (combo/date).
+    """
+    def mouseMoveEvent(self, event):
+        # نتجاهل mouseMoveEvent تماماً → لا تغيير للـ current item عند الـ hover
+        # المستخدم يحدد السطر فقط بالنقر
+        event.ignore()
+
+    def viewportEvent(self, event):
+        from PySide6.QtCore import QEvent
+        # نمنع HoverMove من الوصول للـ viewport
+        if event.type() == QEvent.Type.HoverMove:
+            return False
+        return super().viewportEvent(event)
+
+
 class ItemsTabMixin:
     """
     جدول المواد للمعاملة — مع تحسينات UX و Context Menu
@@ -151,7 +169,7 @@ class ItemsTabMixin:
         bl.setSpacing(16)
 
         # ================= Table =================
-        self.tbl = QTableWidget(0, 13, self.tab_items)
+        self.tbl = _NoHoverTable(0, 13, self.tab_items)
         self.tbl.setObjectName("items-table")
         self.tbl.setHorizontalHeaderLabels([
             self._("source"), self._("truck_or_container_no"), self._("material"), self._("packaging_type"),
@@ -164,7 +182,13 @@ class ItemsTabMixin:
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.tbl.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        # DoubleClicked | SelectedClicked | EditKeyPressed فقط — بدون CurrentChanged
+        # AllEditTriggers كانت تُحدِّد السطر بمجرد مرور الماوس
+        self.tbl.setEditTriggers(
+            QAbstractItemView.DoubleClicked |
+            QAbstractItemView.SelectedClicked |
+            QAbstractItemView.EditKeyPressed
+        )
         self.tbl.setAlternatingRowColors(True)
 
         # Header + row height (ثيم)
@@ -172,7 +196,7 @@ class ItemsTabMixin:
         hdr.setStretchLastSection(True)
         hdr.setDefaultAlignment(Qt.AlignCenter)
         hdr.setSectionResizeMode(QHeaderView.Interactive)
-        self.tbl.verticalHeader().setDefaultSectionSize(36)
+        self.tbl.verticalHeader().setDefaultSectionSize(46)
 
         # Context menu
         self.tbl.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -307,12 +331,14 @@ class ItemsTabMixin:
                 orig_widget = self.tbl.cellWidget(row, col)
                 if isinstance(orig_widget, QComboBox):
                     new_combo = QComboBox()
+                    new_combo.setFocusPolicy(Qt.ClickFocus)
                     for i in range(orig_widget.count()):
                         new_combo.addItem(orig_widget.itemText(i), orig_widget.itemData(i))
                     new_combo.setCurrentIndex(orig_widget.currentIndex())
                     self.tbl.setCellWidget(new_row, col, new_combo)
                 elif isinstance(orig_widget, QDateEdit):
                     new_date = QDateEdit()
+                    new_date.setFocusPolicy(Qt.ClickFocus)
                     new_date.setDate(orig_widget.date())
                     self.tbl.setCellWidget(new_row, col, new_date)
 
@@ -814,7 +840,8 @@ class ItemsTabMixin:
     def _set_combo(self, row: int, col: int, items: List[tuple], selected_id: Any) -> None:
         combo = QComboBox()
         combo.setObjectName("table-combo")
-        combo.setMinimumHeight(30)
+        combo.setMinimumHeight(38)
+        combo.setFocusPolicy(Qt.ClickFocus)  # لا يأخذ focus بالـ hover → يمنع تحديد السطر
 
         for label, rid in items:
             combo.addItem(str(label), rid)
@@ -836,7 +863,8 @@ class ItemsTabMixin:
     def _set_date(self, row: int, col: int, date: QDate) -> None:
         de = QDateEdit()
         de.setObjectName("table-date")
-        de.setMinimumHeight(30)
+        de.setMinimumHeight(38)
+        de.setFocusPolicy(Qt.ClickFocus)  # نفس السبب — لا يأخذ focus بالـ hover
         de.setDisplayFormat("yyyy-MM-dd")
         de.setCalendarPopup(True)
         de.setDate(date)

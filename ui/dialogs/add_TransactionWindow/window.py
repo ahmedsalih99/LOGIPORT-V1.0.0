@@ -65,14 +65,26 @@ except Exception:
         def get_items_data(self) -> list: return []
 
 try:
+    from ui.dialogs.mixins.transport_tab import TransportTabMixin
+except Exception:
+    class TransportTabMixin:
+        def _build_transport_tab(self): pass
+        def get_transport_data(self) -> dict: return {}
+        def prefill_transport(self, *_): pass
+
+try:
     from ui.dialogs.mixins.documents_tab import DocumentsTabMixin
 except Exception:
     class DocumentsTabMixin:
         def _build_documents_tab(self): pass
-
+        def build_documents_panel(self):
+            from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+            w = QWidget(); lay = QVBoxLayout(w)
+            lay.addWidget(QLabel("⚠ docs panel unavailable"))
+            return w
         def prefill_documents(self, *_): pass
-
         def get_documents_data(self) -> list: return []
+        def get_documents_codes(self) -> list: return []
 
 
 
@@ -82,7 +94,7 @@ import re
 
 
 # ---- Window --------------------------------------------------------------
-class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, BaseWindow):
+class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, TransportTabMixin, BaseWindow):
     saved = Signal(int)
 
     def __init__(self, parent=None, current_user=None, transaction=None):
@@ -128,8 +140,8 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         bottom = QWidget()
         bottom.setObjectName("bottom-section")
         bottom_layout = QVBoxLayout(bottom)
-        # ✨ تحسين: margins أكبر
-        bottom_layout.setContentsMargins(20, 20, 20, 20)
+        bottom_layout.setContentsMargins(8, 8, 8, 8)
+        bottom_layout.setSpacing(0)
 
         # Top actions
         actions = QHBoxLayout()
@@ -226,8 +238,12 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         form.addRow(self._("notes"), self.txt_notes)
         top_layout.addWidget(card)
 
-        # Tabs
-        self.tabs = QTabWidget(bottom)
+        # ── Horizontal splitter: tabs (يسار/وسط) + docs panel (يمين) ──────────
+        h_splitter = QSplitter(Qt.Horizontal)
+        h_splitter.setObjectName("content-splitter")
+
+        # التبويبات (Parties, Pricing, Items)
+        self.tabs = QTabWidget()
         self.tabs.setObjectName("transaction-tabs")
         try:
             self._build_parties_geo_tab()
@@ -242,10 +258,25 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         except Exception:
             pass
         try:
-            self._build_documents_tab()
+            self._build_transport_tab()
         except Exception:
             pass
-        bottom_layout.addWidget(self.tabs)
+
+        h_splitter.addWidget(self.tabs)
+
+        # ── Docs side panel ──────────────────────────────────────────────────
+        try:
+            self._docs_side_panel = self.build_documents_panel()
+            h_splitter.addWidget(self._docs_side_panel)
+        except Exception:
+            pass
+
+        # نسب: التبويبات تأخذ ~75% والـ panel ~25%
+        h_splitter.setStretchFactor(0, 3)
+        h_splitter.setStretchFactor(1, 1)
+        h_splitter.setSizes([900, 260])
+
+        bottom_layout.addWidget(h_splitter)
 
         splitter.addWidget(top)
         splitter.addWidget(bottom)
@@ -352,6 +383,10 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
             self.prefill_documents(self.transaction)
         except Exception:
             pass
+        try:
+            self.prefill_transport(self.transaction)
+        except Exception:
+            pass
 
     @staticmethod
     def _load_transaction_by_id(trx_id):
@@ -455,6 +490,11 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
             data.update(self.get_geography_data() or {})
         if hasattr(self, "get_pricing_data"):
             data.update(self.get_pricing_data() or {})
+        transport_data = {}
+        if hasattr(self, "get_transport_data"):
+            transport_data = self.get_transport_data().get("transport", {})
+        if transport_data:
+            data["transport"] = transport_data
 
         if hasattr(self, "dt_trx_date") and self.dt_trx_date:
             qd = self.dt_trx_date.date()
@@ -521,52 +561,52 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
                     number_prefix=prefix,
                 )
 
+            trx_id_saved = int(getattr(trx, "id", 0) or 0)
+            trx_no_saved = str(getattr(trx, "transaction_no", "") or "").strip()
+
             self._show_status(self._("transaction_saved_successfully"), "success")
 
-            # جمع المستندات المختارة من تاب المستندات
-            selected_doc_ids = []
-            if hasattr(self, "get_documents_data"):
-                try:
-                    selected_doc_ids = list(self.get_documents_data() or [])
-                except Exception:
-                    selected_doc_ids = []
-            # codes المدعومة للتمرير لـ GenerateDocumentDialog
+            # جمع المستندات المختارة من الـ side panel
+            selected_doc_ids: List[int] = []
             selected_doc_codes: List[str] = []
-            if hasattr(self, "get_documents_codes"):
-                try:
-                    selected_doc_codes = list(self.get_documents_codes() or [])
-                except Exception:
-                    selected_doc_codes = []
-
-            trx_id_saved  = int(getattr(trx, "id", 0) or 0)
-            trx_no_saved  = str(getattr(trx, "transaction_no", "") or "").strip()
-
-            # إذا في مستندات مختارة → افتح GenerateDocumentDialog تلقائياً
-            if selected_doc_ids:
-                try:
-                    from ui.dialogs.generate_document_dialog import GenerateDocumentDialog
-                    dlg = GenerateDocumentDialog(
-                        transaction_id=trx_id_saved,
-                        transaction_no=trx_no_saved,
-                        parent=self,
-                        preselected_doc_types=selected_doc_ids,   # IDs للحفظ
-                        preselected_doc_codes=selected_doc_codes,  # codes للربط مع generator
-                    )
-                    dlg.exec()
-                except Exception as doc_err:
-                    QMessageBox.warning(
-                        self,
-                        self._("warning"),
-                        f"{self._('transaction_saved_successfully')}\n"
-                        f"(توليد المستندات: {doc_err})",
-                    )
-            else:
-                QMessageBox.information(self, self._("success"), self._("transaction_saved_successfully"))
+            try:
+                selected_doc_ids   = list(self.get_documents_data() or [])
+                selected_doc_codes = list(self.get_documents_codes() or [])
+            except Exception:
+                pass
 
             try:
                 self.saved.emit(trx_id_saved)
             except Exception:
                 pass
+
+            # إذا اختار المستخدم مستندات → اسأله مباشرة (بدون dialog مفاجئ)
+            if selected_doc_ids:
+                answer = QMessageBox.question(
+                    self,
+                    self._("generate_documents"),
+                    f"{self._('transaction_saved_successfully')}: {trx_no_saved}\n\n"
+                    f"{self._('generate_selected_documents_now') if self._('generate_selected_documents_now') != 'generate_selected_documents_now' else 'هل تريد توليد المستندات المختارة الآن؟'}",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes,
+                )
+                if answer == QMessageBox.Yes:
+                    try:
+                        from ui.dialogs.generate_document_dialog import GenerateDocumentDialog
+                        dlg = GenerateDocumentDialog(
+                            transaction_id=trx_id_saved,
+                            transaction_no=trx_no_saved,
+                            parent=self,
+                            preselected_doc_types=selected_doc_ids,
+                            preselected_doc_codes=selected_doc_codes,
+                        )
+                        dlg.exec()
+                    except Exception as doc_err:
+                        QMessageBox.warning(self, self._("warning"),
+                                            f"(توليد المستندات: {doc_err})")
+            else:
+                QMessageBox.information(self, self._("success"), self._("transaction_saved_successfully"))
+
             self.close()
 
         except Exception as e:

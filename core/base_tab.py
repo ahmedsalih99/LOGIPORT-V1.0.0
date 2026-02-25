@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QSpacerItem, QSizePolicy, QLabel, QComboBox, QLineEdit, QFileDialog, QMessageBox, QTableWidgetItem, QHeaderView,
     QCheckBox
 )
-from PySide6.QtCore import Qt, QModelIndex, Signal
+from PySide6.QtCore import Qt, QModelIndex, Signal, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
@@ -158,8 +158,7 @@ class BaseTab(QWidget):
             # allow both raw text and i18n key
             headers.append(self._(label) if label else "")
         self.table.setHorizontalHeaderLabels(headers)
-        for i in range(len(self.columns)):
-            self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
+        # عرض الأعمدة يُضبط لاحقاً في stretch_all_columns بعد تحميل البيانات
 
     def set_columns_for_role(self, base_columns, admin_columns=None):
         self._base_columns = base_columns or []
@@ -248,25 +247,30 @@ class BaseTab(QWidget):
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.setSortingEnabled(True)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.horizontalHeader().setSectionsMovable(True)
+        self.table.horizontalHeader().setSectionsMovable(False)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
         self.table.doubleClicked.connect(self.on_row_double_clicked)
 
         # ✅ ضبط ارتفاع الصفوف - CRITICAL للأزرار
-        self.table.verticalHeader().setDefaultSectionSize(34)  # ارتفاع موحد
-        self.table.verticalHeader().setMinimumSectionSize(30)  # أقل ارتفاع
+        self.table.verticalHeader().setDefaultSectionSize(44)  # ارتفاع مريح للقراءة
+        self.table.verticalHeader().setMinimumSectionSize(40)
 
-        # ✅ ضبط ارتفاع الهيدر
-        self.table.horizontalHeader().setMinimumHeight(38)
+        # ضبط ارتفاع الهيدر
+        self.table.horizontalHeader().setMinimumHeight(44)
 
         def stretch_all_columns():
             col_count = self.table.columnCount()
-            if col_count:
-                for i in range(col_count):
-                    self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
+            if not col_count:
+                return
+            hdr = self.table.horizontalHeader()
+            hdr.setSectionResizeMode(QHeaderView.Interactive)
 
         self.stretch_all_columns = stretch_all_columns
+
+    def _apply_table_direction(self):
+        """الجدول يبقى LTR دائماً — Qt يتولى عكس المحتوى تلقائياً عبر QApplication."""
+        pass
 
     def setup_pagination_controls(self):
         self.cmb_rows_per_page.currentTextChanged.connect(self.on_rows_per_page_changed)
@@ -304,6 +308,26 @@ class BaseTab(QWidget):
         self.btn_refresh.clicked.connect(self.refresh_data)
         self.btn_print.clicked.connect(self.print_table)
 
+        # debounce للـ search_bar — ينتظر 350ms بعد آخر حرف قبل الاستعلام
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(350)
+        self._search_timer.timeout.connect(self._on_search_changed)
+        self.search_bar.textChanged.connect(lambda _: self._search_timer.start())
+
+        # filter_box — يعيد التحميل عند تغيير الترتيب
+        self.filter_box.currentIndexChanged.connect(self._on_filter_box_changed)
+
+    def _on_search_changed(self):
+        """يُستدعى بعد انتهاء الـ debounce — يعيد تحميل البيانات."""
+        self.current_page = 1
+        self.reload_data()
+
+    def _on_filter_box_changed(self, _index: int):
+        """يُستدعى عند تغيير ترتيب العرض — يعيد تحميل البيانات."""
+        self.current_page = 1
+        self.reload_data()
+
     # -----------------------------
     # Pagination helpers
     # -----------------------------
@@ -327,25 +351,254 @@ class BaseTab(QWidget):
             self.current_page += 1
             self.reload_data()
 
+    def select_record_by_id(self, record_id: int):
+        """
+        يبحث عن السجل بالـ ID في self.data ويحدده في الجدول.
+        يُستدعى من البحث العام عند الانتقال لنتيجة.
+        """
+        # تأكد أن البيانات محملة
+        if not self.data:
+            self.reload_data()
+
+        # ابحث عن الصف
+        for row_idx, row in enumerate(self.data):
+            row_id = row.get("id")
+            if row_id is not None and int(row_id) == int(record_id):
+                self.table.setCurrentCell(row_idx, 0)
+                self.table.scrollTo(
+                    self.table.model().index(row_idx, 0),
+                    self.table.PositionAtCenter
+                )
+                self.table.selectRow(row_idx)
+                return
+
+        # إذا ما لقيناه — ممكن مفلتر، نرجع للكل ونعيد البحث
+        try:
+            self._reset_filters()
+            self.reload_data()
+            for row_idx, row in enumerate(self.data):
+                if row.get("id") is not None and int(row.get("id")) == int(record_id):
+                    self.table.setCurrentCell(row_idx, 0)
+                    self.table.scrollTo(
+                        self.table.model().index(row_idx, 0),
+                        self.table.PositionAtCenter
+                    )
+                    self.table.selectRow(row_idx)
+                    return
+        except Exception:
+            pass
+
+    def _reset_filters(self):
+        """يصفّر الفلاتر — يُعاد تعريفه في التابات التي لديها فلاتر."""
+        if hasattr(self, "search_bar"):
+            self.search_bar.clear()
+
     def reload_data(self):
         self.display_data()
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Search / Sort / Status helpers
+    # ─────────────────────────────────────────────────────────────────────
+    def _get_search_keys(self) -> list:
+        skip = {"id", "actions", "created_at", "updated_at", "created_by_name", "updated_by_name"}
+        return [c.get("key", "") for c in self.columns if c.get("key") and c.get("key") not in skip]
+
+    def _apply_base_search(self, rows: list) -> list:
+        q = (self.search_bar.text() or "").strip().casefold()
+        if not q:
+            return rows
+        keys = self._get_search_keys()
+        result = []
+        for row in rows:
+            for k in keys:
+                if q in str(row.get(k, "") or "").casefold():
+                    result.append(row)
+                    break
+        return result
+
+    def _apply_base_sort(self, rows: list) -> list:
+        order = self.filter_box.currentData() or "date_desc"
+        try:
+            if order == "name_asc":
+                for k in ("name_local", "name_ar", "name_en", "name", "full_name"):
+                    if any(k in r for r in rows):
+                        return sorted(rows, key=lambda r: str(r.get(k, "") or "").casefold())
+            elif order == "name_desc":
+                for k in ("name_local", "name_ar", "name_en", "name", "full_name"):
+                    if any(k in r for r in rows):
+                        return sorted(rows, key=lambda r: str(r.get(k, "") or "").casefold(), reverse=True)
+            elif order == "date_asc":
+                for k in ("transaction_date", "entry_date", "created_at", "date"):
+                    if any(k in r for r in rows):
+                        return sorted(rows, key=lambda r: str(r.get(k, "") or ""))
+        except Exception:
+            pass
+        return rows
+
+    def _update_status_bar(self, displayed: int, total: int):
+        if not hasattr(self, "_lbl_count"):
+            return
+        q = (self.search_bar.text() or "").strip()
+        if q and displayed < total:
+            self._lbl_count.setText(f"🔍 {displayed} {self._('of')} {total} {self._('total_rows')}")
+        else:
+            self._lbl_count.setText(f"{displayed} {self._('total_rows')}")
+        order_label = self.filter_box.currentText() if self.filter_box.count() else ""
+        self._lbl_sort.setText(f"↕ {order_label}" if order_label else "")
+
+    def _show_empty_state(self, empty: bool, searched: bool = False):
+        if not hasattr(self, "_empty_widget"):
+            return
+        if empty:
+            self._lbl_empty_icon.setText("🔍" if searched else "📋")
+            self._lbl_empty_text.setText(
+                self._("no_search_results") if searched else self._("no_data_available")
+            )
+            self._empty_widget.setGeometry(0, 40, self.table.width(), max(self.table.height() - 40, 100))
+            self._empty_widget.show()
+            self._empty_widget.raise_()
+        else:
+            self._empty_widget.hide()
 
     # -----------------------------
     # Data display
     # -----------------------------
     def display_data(self):
+        rows = list(self.data) if self.data else []
+        total_before = len(rows)
+        searched = bool((self.search_bar.text() or "").strip())
+
+        if not getattr(self, "_skip_base_search", False):
+            rows = self._apply_base_search(rows)
+        if not getattr(self, "_skip_base_sort", False):
+            rows = self._apply_base_sort(rows)
+
+        self.total_rows  = len(rows)
+        self.total_pages = max(1, (self.total_rows + self.rows_per_page - 1) // self.rows_per_page)
+        self.current_page = max(1, min(self.current_page, self.total_pages))
+        start = (self.current_page - 1) * self.rows_per_page
+        page_rows = rows[start: start + self.rows_per_page]
+
         self.update_pagination_label()
-        if not self.columns or not self.data:
+        self._update_status_bar(len(rows), total_before)
+        self._show_empty_state(len(rows) == 0, searched=searched)
+
+        if not self.columns:
             self.table.setRowCount(0)
             return
-        self.table.setRowCount(len(self.data))
-        for i, row in enumerate(self.data):
+
+        self.table.setRowCount(len(page_rows))
+        for i, row in enumerate(page_rows):
             for j, col in enumerate(self.columns):
-                value = row.get(col.get("key"), "")
-                item = QTableWidgetItem(str(value))
+                key   = col.get("key", "")
+                value = row.get(key, "")
+                item  = QTableWidgetItem(str(value) if value is not None else "")
                 item.setTextAlignment(col.get("align", Qt.AlignCenter))
                 self.table.setItem(i, j, item)
         self.stretch_all_columns()
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Shared display_data with actions  (تستخدمها التابات بدل display_data)
+    # ─────────────────────────────────────────────────────────────────────
+    def _display_with_actions(self, edit_perm: str, delete_perm: str):
+        """
+        عرض self.data مع:
+          - بحث + ترتيب + pagination (من display_data في البيس)
+          - أزرار Edit/Delete موحدة في عمود actions
+          - إخفاء عمود actions إذا لا صلاحية
+          - إخفاء أعمدة الأدمن للمستخدمين العاديين
+
+        الشرط: التاب يجب أن يعرّف:
+          self._open_edit_dialog(obj)
+          self._delete_single(obj)
+        """
+        from database.crud.permissions_crud import has_permission as _hp
+
+        can_edit   = _hp(self.current_user, edit_perm)   if edit_perm   else False
+        can_delete = _hp(self.current_user, delete_perm) if delete_perm else False
+        show_actions = can_edit or can_delete
+
+        # ── تطبيق البحث / الترتيب / pagination من البيس ─────────────────
+        rows = list(self.data) if self.data else []
+        total_before = len(rows)
+        searched = bool((self.search_bar.text() or "").strip())
+
+        if not getattr(self, "_skip_base_search", False):
+            rows = self._apply_base_search(rows)
+        if not getattr(self, "_skip_base_sort", False):
+            rows = self._apply_base_sort(rows)
+
+        self.total_rows  = len(rows)
+        self.total_pages = max(1, (self.total_rows + self.rows_per_page - 1) // self.rows_per_page)
+        self.current_page = max(1, min(self.current_page, self.total_pages))
+        start = (self.current_page - 1) * self.rows_per_page
+        page_rows = rows[start: start + self.rows_per_page]
+
+        self.update_pagination_label()
+        self._update_status_bar(len(rows), total_before)
+        self._show_empty_state(len(rows) == 0, searched=searched)
+
+        # ── رسم الجدول ───────────────────────────────────────────────────
+        self.table.setRowCount(0)
+        for row_idx, row in enumerate(page_rows):
+            self.table.insertRow(row_idx)
+            for col_idx, col in enumerate(self.columns):
+                key = col.get("key", "")
+                if key == "actions":
+                    if not show_actions:
+                        continue
+                    obj = row.get("actions")
+                    if can_edit and can_delete:
+                        # زران: نضعهما في widget بسيط جداً
+                        w = QWidget()
+                        lay = QHBoxLayout(w)
+                        lay.setContentsMargins(2, 2, 2, 2)
+                        lay.setSpacing(3)
+                        btn_e = QPushButton(self._("edit"))
+                        btn_e.setObjectName("primary-btn")
+                        btn_e.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
+                        btn_d = QPushButton(self._("delete"))
+                        btn_d.setObjectName("danger-btn")
+                        btn_d.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
+                        lay.addWidget(btn_e)
+                        lay.addWidget(btn_d)
+                        self.table.setCellWidget(row_idx, col_idx, w)
+                    elif can_edit:
+                        btn = QPushButton(self._("edit"))
+                        btn.setObjectName("primary-btn")
+                        btn.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
+                        self.table.setCellWidget(row_idx, col_idx, btn)
+                    elif can_delete:
+                        btn = QPushButton(self._("delete"))
+                        btn.setObjectName("danger-btn")
+                        btn.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
+                        self.table.setCellWidget(row_idx, col_idx, btn)
+                else:
+                    val = row.get(key, "")
+                    item = QTableWidgetItem(str(val) if val is not None else "")
+                    item.setTextAlignment(col.get("align", Qt.AlignCenter))
+                    self.table.setItem(row_idx, col_idx, item)
+
+        # ── إخفاء عمود actions إذا لا صلاحية ───────────────────────────
+        try:
+            ai = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
+            if ai is not None:
+                self.table.setColumnHidden(ai, not show_actions)
+        except Exception:
+            pass
+
+        self._apply_admin_columns()
+        self.stretch_all_columns()
+
+    def _apply_admin_columns(self):
+        """يخفي أعمدة الأدمن (id, created_by, ...) للمستخدمين العاديين."""
+        admin_keys = {"id", "created_by_name", "updated_by_name", "created_at", "updated_at"}
+        for idx, col in enumerate(self.columns):
+            if col.get("key") in admin_keys:
+                try:
+                    self.table.setColumnHidden(idx, not self.is_admin)
+                except Exception:
+                    pass
 
     def on_row_double_clicked(self, index: QModelIndex):
         row = index.row()
@@ -712,8 +965,12 @@ class BaseTab(QWidget):
             self.btn_print.setText(self._("print"))
             self.chk_admin_cols.setText(self._("show_admin_columns"))
             self.search_bar.setPlaceholderText(self._("Search..."))
-            if self.filter_box.count() > 0:
-                self.filter_box.setItemText(0, self._("Order by creation date"))
+            _sort_keys = ["sort_by_date_desc", "sort_by_date_asc", "sort_by_name_asc", "sort_by_name_desc"]
+            for i, key in enumerate(_sort_keys):
+                if i < self.filter_box.count():
+                    self.filter_box.setItemText(i, self._(key))
+            if hasattr(self, "_lbl_empty_text"):
+                self._lbl_empty_text.setText(self._("no_results_found"))
             # label on pagination bar
             for i in range(self.pagination_bar.count()):
                 w = self.pagination_bar.itemAt(i).widget()
@@ -728,6 +985,9 @@ class BaseTab(QWidget):
                     translated = self._(header_key) if header_key else ""
                     if self.table.horizontalHeaderItem(i):
                         self.table.horizontalHeaderItem(i).setText(translated)
+            # ── اتجاه الجدول والهيدر ──────────────────────────────────
+            self._apply_table_direction()
+
         except Exception as e:
             logging.warning(f"BaseTab retranslate_ui failed: {e}")
 

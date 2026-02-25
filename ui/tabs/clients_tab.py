@@ -79,6 +79,8 @@ class ClientsTab(BaseTab):
         self._init_done = True
 
     def reload_data(self):
+        self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
+        self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
         admin = is_admin(self.current_user)
 
         # 1) اجلب السجلات
@@ -371,7 +373,7 @@ class ClientsTab(BaseTab):
                     return str(getattr(self, attr)() or "").strip()
                 except Exception:
                     pass
-        for name in ("search_input", "txt_search", "search_line_edit"):
+        for name in ("search_bar", "search_input", "txt_search", "search_line_edit"):
             w = getattr(self, name, None)
             if w is not None and hasattr(w, "text"):
                 try:

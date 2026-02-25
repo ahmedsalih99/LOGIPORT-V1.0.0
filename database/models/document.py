@@ -31,7 +31,7 @@ class Document(Base):
     data_json = Column(Text, nullable=True)
 
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, server_default=func.datetime("now"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, nullable=True)
 

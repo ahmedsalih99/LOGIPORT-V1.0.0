@@ -1,27 +1,30 @@
 # -*- coding: utf-8 -*-
 """
-documents_tab.py — v2 (UX محسّن + ربط مع GenerateDocumentDialog)
+documents_tab.py — v3 (Side Panel دائم بدل تبويب)
 
-التطويرات:
-- كاردات بدل checkboxes عادية (اسم + وصف + أيقونة)
-- تصنيف المستندات: فواتير / قوائم تعبئة
-- تمييز المستندات المدعومة من غير المدعومة
-- get_documents_data() تُرجع list[int] كما كانت
-- get_documents_codes() جديدة: تُرجع dict {id: code} للربط مع GenerateDocumentDialog
+بدلاً من تبويب رابع مخفي، المستندات تظهر الآن كـ side panel
+على يمين التبويبات، دائمة الظهور ومتاحة في أي وقت.
 
-API:
-    * _build_documents_tab()
-    * get_documents_data() -> list[int]          — للحفظ في DB
-    * get_documents_codes() -> list[str]          — للتمرير لـ GenerateDocumentDialog
+التغييرات من v2:
+- _build_documents_panel() بدل _build_documents_tab()
+- يُرجع QWidget مباشرة (يضعه window.py في splitter أفقي)
+- نفس API الداخلية: get_documents_data(), get_documents_codes(), prefill_documents()
+- تصميم أكثر كثافة (compact) يناسب المساحة الجانبية الضيقة
+- badge عداد المختارين مدمج في header الـ panel
+
+API الخارجية (لـ window.py):
+    * build_documents_panel() -> QWidget   ← جديد
+    * get_documents_data()    -> list[int]
+    * get_documents_codes()   -> list[str]
     * prefill_documents(transaction)
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QFrame, QCheckBox,
-    QPushButton, QHBoxLayout, QLabel, QGridLayout, QSizePolicy,
+    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QFrame,
+    QCheckBox, QPushButton, QLabel, QSizePolicy,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -31,21 +34,17 @@ try:
 except Exception:
     DocumentTypesCRUD = None  # type: ignore
 
-# Codes that have a working generator
+# ── كودات تملك generator فعلي ───────────────────────────────────────────────
 _SUPPORTED_CODES = {
     "INV_EXT", "INV_NORMAL", "INV_PROFORMA", "INV_PRO",
     "INV_SYR_TRANS", "INV_SYR_INTERM", "invoice.syrian.entry",
     "PL_EXPORT_SIMPLE", "PL_EXPORT_WITH_DATES", "PL_EXPORT_WITH_LINE_ID",
 }
 
-_INVOICE_PREFIXES  = ("INV_", "invoice.")
-_PACKING_PREFIXES  = ("PL_",  "PACKING", "packing")
+_INVOICE_PREFIXES = ("INV_", "invoice.")
+_PACKING_PREFIXES = ("PL_", "PACKING", "packing")
 
-_DOC_ICONS = {
-    "invoice":  "🧾",
-    "packing":  "📦",
-    "other":    "📄",
-}
+_DOC_ICONS = {"invoice": "🧾", "packing": "📦", "other": "📄"}
 
 
 def _classify(code: str) -> str:
@@ -58,132 +57,153 @@ def _classify(code: str) -> str:
 
 
 class DocumentsTabMixin:
-    """Mixin لتبويب المستندات — نسخة v2 مع UX محسّن."""
+    """
+    Mixin لـ side panel المستندات — نسخة v3.
+    يُبنى عبر build_documents_panel() ويُدمج في window.py كـ QWidget جانبي.
+    """
 
-    # ─────────────────────────────── build ──────────────────────────────────
-    def _build_documents_tab(self) -> None:
-        self.tab_docs = QWidget()
-        self.tab_docs.setObjectName("documents-tab")
-        self.tabs.addTab(self.tab_docs, self._("documents"))
+    # ─────────────────────────────── build panel ────────────────────────────
+    def build_documents_panel(self) -> QWidget:
+        """
+        يبني الـ side panel ويرجعه كـ QWidget.
+        يستدعيه window.py ويضعه في QSplitter أفقي بجانب التبويبات.
+        """
+        self._docs_panel = QWidget()
+        self._docs_panel.setObjectName("documents-side-panel")
+        self._docs_panel.setMinimumWidth(200)
+        self._docs_panel.setMaximumWidth(300)
+        self._docs_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
-        root = QVBoxLayout(self.tab_docs)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
+        root = QVBoxLayout(self._docs_panel)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(6)
 
-        # ── header ──────────────────────────────────────────────────────────
-        header = QLabel(self._("select_documents_to_generate"))
-        header.setObjectName("tab-header")
-        header.setAlignment(Qt.AlignCenter)
-        root.addWidget(header)
+        # ── Header ──────────────────────────────────────────────────────────
+        header_row = QHBoxLayout()
+        header_row.setSpacing(6)
 
-        # ── toolbar ─────────────────────────────────────────────────────────
-        tools = QHBoxLayout()
-        tools.setSpacing(8)
-        self.btn_select_all_docs = QPushButton("✔  " + self._("select_all"))
-        self.btn_select_all_docs.setObjectName("primary-btn")
-        self.btn_clear_all_docs  = QPushButton("✕  " + self._("clear_all"))
-        self.btn_clear_all_docs.setObjectName("secondary-btn")
-        self.lbl_selected_count = QLabel("")
-        self.lbl_selected_count.setObjectName("selected-count-label")
-        tools.addWidget(self.btn_select_all_docs)
-        tools.addWidget(self.btn_clear_all_docs)
-        tools.addStretch()
-        tools.addWidget(self.lbl_selected_count)
-        root.addLayout(tools)
+        lbl_title = QLabel("📄 " + self._get_tr("documents"))
+        lbl_title.setObjectName("docs-panel-title")
+        f = QFont()
+        f.setBold(True)
+        lbl_title.setFont(f)
 
-        # ── scroll area ──────────────────────────────────────────────────────
+        self.lbl_selected_count = QLabel("0/0")
+        self.lbl_selected_count.setObjectName("docs-count-badge")
+        self.lbl_selected_count.setAlignment(Qt.AlignCenter)
+        self.lbl_selected_count.setFixedSize(42, 20)
+
+        header_row.addWidget(lbl_title)
+        header_row.addStretch()
+        header_row.addWidget(self.lbl_selected_count)
+        root.addLayout(header_row)
+
+        # ── separator ───────────────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setObjectName("docs-separator")
+        root.addWidget(sep)
+
+        # ── Select All / Clear ───────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(4)
+        self.btn_select_all_docs = QPushButton("✔ " + self._get_tr("select_all"))
+        self.btn_select_all_docs.setObjectName("topbar-btn")
+        self.btn_select_all_docs.setMinimumHeight(26)
+        self.btn_clear_all_docs = QPushButton("✕ " + self._get_tr("clear_all"))
+        self.btn_clear_all_docs.setObjectName("topbar-btn")
+        self.btn_clear_all_docs.setMinimumHeight(26)
+        btn_row.addWidget(self.btn_select_all_docs)
+        btn_row.addWidget(self.btn_clear_all_docs)
+        root.addLayout(btn_row)
+
+        # ── Scroll area للـ checkboxes ────────────────────────────────────────
         scroll = QScrollArea()
         scroll.setObjectName("docs-scroll-area")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         cont = QWidget()
         cont.setObjectName("docs-scroll-content")
-        vlay = QVBoxLayout(cont)
-        vlay.setContentsMargins(4, 4, 4, 4)
-        vlay.setSpacing(6)
+        self._docs_vlay = QVBoxLayout(cont)
+        self._docs_vlay.setContentsMargins(2, 2, 2, 2)
+        self._docs_vlay.setSpacing(4)
 
         # ── load & render ────────────────────────────────────────────────────
         self.doc_checkboxes: List[QCheckBox] = []
-        self._doc_code_map: Dict[int, str]   = {}  # id → code
+        self._doc_code_map: Dict[int, str] = {}
         documents = self._load_document_types()
 
-        # تصنيف
         invoices = [d for d in documents if d.get("_cat") == "invoice"]
         packings = [d for d in documents if d.get("_cat") == "packing"]
         others   = [d for d in documents if d.get("_cat") == "other"]
 
         for group_label, group_icon, group_docs in [
-            (self._("invoice"),      "🧾", invoices),
-            (self._("packing_list"), "📦", packings),
-            (self._("other") if self._("other") != "other" else "أخرى", "📄", others),
+            (self._get_tr("invoice"),      "🧾", invoices),
+            (self._get_tr("packing_list"), "📦", packings),
+            (self._get_tr("other") if self._get_tr("other") != "other" else "أخرى", "📄", others),
         ]:
             if not group_docs:
                 continue
 
-            # group header
-            g_hdr = QLabel(f"{group_icon}  {group_label}")
+            g_hdr = QLabel(f"{group_icon} {group_label}")
             g_hdr.setObjectName("doc-group-header")
-            g_hdr_font = QFont()
-            g_hdr_font.setBold(True)
-            g_hdr.setFont(g_hdr_font)
-            vlay.addWidget(g_hdr)
-
-            # grid: 2 columns
-            grid_w  = QWidget()
-            grid_lay = QGridLayout(grid_w)
-            grid_lay.setContentsMargins(0, 0, 0, 0)
-            grid_lay.setSpacing(6)
-            row = col = 0
+            gf = QFont()
+            gf.setBold(True)
+            gf.setPointSize(8)
+            g_hdr.setFont(gf)
+            self._docs_vlay.addWidget(g_hdr)
 
             for d in group_docs:
-                cb = self._make_doc_card(d)
-                grid_lay.addWidget(cb, row, col)
-                col += 1
-                if col >= 2:
-                    col = 0
-                    row += 1
+                cb = self._make_doc_checkbox(d)
+                self._docs_vlay.addWidget(cb)
 
-            grid_lay.setRowStretch(row + 1, 1)
-            vlay.addWidget(grid_w)
-
-        vlay.addStretch()
+        self._docs_vlay.addStretch()
         scroll.setWidget(cont)
         root.addWidget(scroll)
 
-        # ── connect ──────────────────────────────────────────────────────────
+        # ── hint ────────────────────────────────────────────────────────────
+        hint = QLabel(self._get_tr("docs_panel_hint") if self._get_tr("docs_panel_hint") != "docs_panel_hint"
+                      else "✓ اختر المستندات\nثم اضغط حفظ")
+        hint.setObjectName("docs-hint-label")
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignCenter)
+        root.addWidget(hint)
+
+        # ── Connect ──────────────────────────────────────────────────────────
         self.btn_select_all_docs.clicked.connect(lambda: self._toggle_all_docs(True))
         self.btn_clear_all_docs.clicked.connect(lambda: self._toggle_all_docs(False))
         self._update_selected_count()
 
-    # ─────────────────────────────── card widget ────────────────────────────
-    def _make_doc_card(self, d: Dict[str, Any]) -> QCheckBox:
-        """يصنع card-style checkbox لنوع مستند."""
-        doc_id   = d.get("id")
-        code     = d.get("code", "") or ""
-        label    = self._doc_label(d)
+        return self._docs_panel
+
+    # ─────────────────────────────── checkbox widget ────────────────────────
+    def _make_doc_checkbox(self, d: Dict[str, Any]) -> QCheckBox:
+        doc_id    = d.get("id")
+        code      = d.get("code", "") or ""
+        label     = self._doc_label(d)
         supported = code in _SUPPORTED_CODES
 
-        # أيقونة + حالة الدعم
         if supported:
-            display_label = f"{_DOC_ICONS.get(d.get('_cat','other'), '📄')}  {label}"
+            display_label = f"{_DOC_ICONS.get(d.get('_cat', 'other'), '📄')} {label}"
         else:
-            display_label = f"⚠  {label}"
+            display_label = f"⚠ {label}"
 
         cb = QCheckBox(display_label)
         cb.setObjectName("doc-checkbox-card")
         cb.setProperty("doc_id",   doc_id)
         cb.setProperty("doc_code", code)
         cb.setProperty("supported", supported)
-        cb.setMinimumHeight(38)
+        cb.setMinimumHeight(32)
         cb.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        cb.setWordWrap(True)
 
         if not supported:
             cb.setEnabled(False)
-            cb.setToolTip(
-                self._("doc_not_supported_yet") if self._("doc_not_supported_yet") != "doc_not_supported_yet"
-                else "⚠ هذا النوع غير مدعوم للتوليد حالياً"
-            )
+            fallback = "⚠ هذا النوع غير مدعوم للتوليد حالياً"
+            tip = self._get_tr("doc_not_supported_yet")
+            cb.setToolTip(tip if tip != "doc_not_supported_yet" else fallback)
 
         if doc_id is not None:
             self._doc_code_map[doc_id] = code
@@ -194,7 +214,6 @@ class DocumentsTabMixin:
 
     # ─────────────────────────────── Data API ───────────────────────────────
     def get_documents_data(self) -> List[int]:
-        """يعيد IDs المستندات المختارة (للحفظ في DB)."""
         out: List[int] = []
         for cb in getattr(self, "doc_checkboxes", []) or []:
             try:
@@ -207,10 +226,6 @@ class DocumentsTabMixin:
         return out
 
     def get_documents_codes(self) -> List[str]:
-        """
-        يعيد codes المستندات المختارة المدعومة.
-        يُستخدم لتمريرها لـ GenerateDocumentDialog كـ preselected_doc_types.
-        """
         codes: List[str] = []
         for cb in getattr(self, "doc_checkboxes", []) or []:
             try:
@@ -223,7 +238,6 @@ class DocumentsTabMixin:
         return codes
 
     def prefill_documents(self, transaction: Any) -> None:
-        """يملأ التحديدات من معاملة موجودة."""
         if not transaction:
             return
         ids: List[int] = []
@@ -273,7 +287,7 @@ class DocumentsTabMixin:
         enabled = [cb for cb in (getattr(self, "doc_checkboxes", []) or []) if cb.isEnabled()]
         count = sum(1 for cb in enabled if cb.isChecked())
         total = len(enabled)
-        self.lbl_selected_count.setText(f"{self._('selected')}: {count}/{total}")
+        self.lbl_selected_count.setText(f"{count}/{total}")
         if hasattr(self.lbl_selected_count, "setProperty"):
             state = "none" if count == 0 else ("all" if count == total else "some")
             self.lbl_selected_count.setProperty("count_state", state)
@@ -281,7 +295,6 @@ class DocumentsTabMixin:
             self.lbl_selected_count.style().polish(self.lbl_selected_count)
 
     def _load_document_types(self) -> List[Dict[str, Any]]:
-        """يحمل أنواع المستندات من DB ويضيف تصنيف _cat."""
         try:
             if DocumentTypesCRUD:
                 docs = (DocumentTypesCRUD()).get_all_types() or []
@@ -289,29 +302,27 @@ class DocumentsTabMixin:
                 for d in docs:
                     code = getattr(d, "code", "") or ""
                     result.append({
-                        "id":       getattr(d, "id",       None),
-                        "code":     code,
-                        "name_en":  getattr(d, "name_en",  None),
-                        "name_ar":  getattr(d, "name_ar",  None),
-                        "name_tr":  getattr(d, "name_tr",  None),
+                        "id":        getattr(d, "id",       None),
+                        "code":      code,
+                        "name_en":   getattr(d, "name_en",  None),
+                        "name_ar":   getattr(d, "name_ar",  None),
+                        "name_tr":   getattr(d, "name_tr",  None),
                         "is_active": getattr(d, "is_active", 1),
-                        "_cat":     _classify(code),
+                        "_cat":      _classify(code),
                     })
-                # فلتر النشطة فقط
                 return [r for r in result if r.get("is_active", 1)]
         except Exception:
             pass
-        # Fallback
         return [
-            {"id": 1,  "code": "INV_EXT",               "name_ar": "فاتورة خارجية",         "name_en": "External Invoice",        "_cat": "invoice", "is_active": 1},
-            {"id": 16, "code": "INV_NORMAL",             "name_ar": "فاتورة عادية",           "name_en": "Normal Invoice",          "_cat": "invoice", "is_active": 1},
-            {"id": 9,  "code": "INV_PRO",                "name_ar": "بروفورما إنفويس",         "name_en": "Proforma Invoice",        "_cat": "invoice", "is_active": 1},
-            {"id": 11, "code": "INV_SYR_TRANS",          "name_ar": "فاتورة سورية – عبور",     "name_en": "Syrian Transit Invoice",  "_cat": "invoice", "is_active": 1},
-            {"id": 12, "code": "INV_SYR_INTERM",         "name_ar": "فاتورة سورية – وسيط",     "name_en": "Syrian Intermediary Inv", "_cat": "invoice", "is_active": 1},
-            {"id": 10, "code": "invoice.syrian.entry",   "name_ar": "فاتورة سورية – إدخال",    "name_en": "Syrian Entry Invoice",    "_cat": "invoice", "is_active": 1},
-            {"id": 13, "code": "PL_EXPORT_SIMPLE",       "name_ar": "قائمة تعبئة – بسيطة",    "name_en": "Packing List – Simple",   "_cat": "packing", "is_active": 1},
-            {"id": 14, "code": "PL_EXPORT_WITH_DATES",   "name_ar": "قائمة تعبئة – مع تواريخ","name_en": "Packing List – With Dates","_cat": "packing", "is_active": 1},
-            {"id": 17, "code": "PL_EXPORT_WITH_LINE_ID", "name_ar": "قائمة تعبئة مع رقم سطر", "name_en": "Packing List – Line ID",  "_cat": "packing", "is_active": 1},
+            {"id": 1,  "code": "INV_EXT",               "name_ar": "فاتورة خارجية",          "name_en": "External Invoice",        "_cat": "invoice", "is_active": 1},
+            {"id": 16, "code": "INV_NORMAL",             "name_ar": "فاتورة عادية",            "name_en": "Normal Invoice",          "_cat": "invoice", "is_active": 1},
+            {"id": 9,  "code": "INV_PRO",                "name_ar": "بروفورما إنفويس",          "name_en": "Proforma Invoice",        "_cat": "invoice", "is_active": 1},
+            {"id": 11, "code": "INV_SYR_TRANS",          "name_ar": "فاتورة سورية – عبور",      "name_en": "Syrian Transit Invoice",  "_cat": "invoice", "is_active": 1},
+            {"id": 12, "code": "INV_SYR_INTERM",         "name_ar": "فاتورة سورية – وسيط",      "name_en": "Syrian Intermediary Inv", "_cat": "invoice", "is_active": 1},
+            {"id": 10, "code": "invoice.syrian.entry",   "name_ar": "فاتورة سورية – إدخال",     "name_en": "Syrian Entry Invoice",    "_cat": "invoice", "is_active": 1},
+            {"id": 13, "code": "PL_EXPORT_SIMPLE",       "name_ar": "قائمة تعبئة – بسيطة",     "name_en": "Packing List – Simple",   "_cat": "packing", "is_active": 1},
+            {"id": 14, "code": "PL_EXPORT_WITH_DATES",   "name_ar": "قائمة تعبئة – مع تواريخ", "name_en": "Packing List – With Dates","_cat": "packing", "is_active": 1},
+            {"id": 17, "code": "PL_EXPORT_WITH_LINE_ID", "name_ar": "قائمة تعبئة مع رقم سطر",  "name_en": "Packing List – Line ID",  "_cat": "packing", "is_active": 1},
         ]
 
     def _doc_label(self, d: Dict[str, Any]) -> str:
@@ -322,12 +333,60 @@ class DocumentsTabMixin:
                 return str(val)
         return str(d.get("code") or d.get("id", ""))
 
-    def refresh_language_documents(self) -> None:
-        if not hasattr(self, "tab_docs"):
+    def _get_tr(self, key: str) -> str:
+        """مترجم آمن — يستخدم self._ لو موجود."""
+        try:
+            return self._(key)  # type: ignore[attr-defined]
+        except Exception:
+            return key
+
+    # ─────────────────────────────── backward compat ────────────────────────
+    def _build_documents_tab(self) -> None:
+        """
+        متوافق مع الكود القديم — لو نُودي عليه يبني الـ panel مكان التبويب.
+        window.py الجديد يستخدم build_documents_panel() مباشرة.
+        """
+        if not hasattr(self, "tabs"):
             return
-        idx = self.tabs.indexOf(self.tab_docs)
-        if idx != -1:
-            self.tabs.removeTab(idx)
+        panel = self.build_documents_panel()
+        self.tab_docs = panel
+        try:
+            self.tabs.addTab(panel, self._get_tr("documents"))
+        except Exception:
+            pass
+
+    def refresh_language_documents(self) -> None:
+        """إعادة بناء المحتوى عند تغيير اللغة."""
+        if not hasattr(self, "_docs_panel"):
+            return
+        # امسح الـ checkboxes وأعد البناء
         self.doc_checkboxes = []
-        self._doc_code_map  = {}
-        self._build_documents_tab()
+        self._doc_code_map = {}
+        if hasattr(self, "_docs_vlay"):
+            while self._docs_vlay.count():
+                item = self._docs_vlay.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.deleteLater()
+        # أعد تحميل المستندات
+        documents = self._load_document_types()
+        invoices = [d for d in documents if d.get("_cat") == "invoice"]
+        packings = [d for d in documents if d.get("_cat") == "packing"]
+        others   = [d for d in documents if d.get("_cat") == "other"]
+        for group_label, group_icon, group_docs in [
+            (self._get_tr("invoice"),      "🧾", invoices),
+            (self._get_tr("packing_list"), "📦", packings),
+            (self._get_tr("other") if self._get_tr("other") != "other" else "أخرى", "📄", others),
+        ]:
+            if not group_docs:
+                continue
+            g_hdr = QLabel(f"{group_icon} {group_label}")
+            g_hdr.setObjectName("doc-group-header")
+            gf = QFont(); gf.setBold(True); gf.setPointSize(8)
+            g_hdr.setFont(gf)
+            self._docs_vlay.addWidget(g_hdr)
+            for d in group_docs:
+                cb = self._make_doc_checkbox(d)
+                self._docs_vlay.addWidget(cb)
+        self._docs_vlay.addStretch()
+        self._update_selected_count()

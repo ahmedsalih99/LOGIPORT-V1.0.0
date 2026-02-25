@@ -1,6 +1,7 @@
 """
-DashboardTab - LOGIPORT v3.1
+DashboardTab - LOGIPORT v3.2
 ==============================
+Clean, theme-aware dashboard with stat cards, activities, and transactions.
 """
 
 from PySide6.QtWidgets import (
@@ -14,6 +15,7 @@ from PySide6.QtGui import QFont, QColor
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from database.models import get_session_local
+from database.db_utils import format_local_dt
 from database.models import Transaction, Material, Client, AuditLog, User, Document, Entry
 from config.themes.semantic_colors import SemanticColors
 from sqlalchemy import func, desc
@@ -21,11 +23,11 @@ from datetime import datetime
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# StatCard
+# StatCard — بطاقة إحصائية ملونة
 # ─────────────────────────────────────────────────────────────────────────────
 
 class StatCard(QFrame):
-    CARD_PALETTES = {
+    PALETTES = {
         "transactions": ("#4A7EC8", "#2C5AA0"),
         "value":        ("#2ECC71", "#1A9A50"),
         "clients":      ("#9B59B6", "#6C3483"),
@@ -38,59 +40,102 @@ class StatCard(QFrame):
 
     def __init__(self, title, value, subtitle, card_key="transactions", icon="📊", parent=None):
         super().__init__(parent)
+        c1, c2 = self.PALETTES.get(card_key, ("#4A7EC8", "#2C5AA0"))
         self.setObjectName("stat-card-gradient")
-        colors = self.CARD_PALETTES.get(card_key, ("#4A7EC8", "#2C5AA0"))
-        c1, c2 = colors
         self.setStyleSheet(f"""
             QFrame#stat-card-gradient {{
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {c1}, stop:1 {c2}
-                );
-                border-radius: 14px;
-                min-height: 130px;
-                border: 1px solid rgba(255,255,255,0.15);
+                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {c1},stop:1 {c2});
+                border-radius: 16px;
+                min-height: 120px;
+                border: none;
             }}
             QLabel {{ color: white; background: transparent; }}
         """)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(8)
 
-        header = QHBoxLayout()
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 14, 18, 14)
+        lay.setSpacing(6)
+
+        # ── الصف العلوي: أيقونة + عنوان ──
+        top = QHBoxLayout()
         icon_lbl = QLabel(icon)
-        icon_lbl.setFont(QFont("Segoe UI Emoji", 26))
-        header.addWidget(icon_lbl)
-        header.addStretch()
+        icon_lbl.setFixedSize(36, 36)
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        icon_lbl.setStyleSheet(
+            "background: rgba(255,255,255,0.2); border-radius: 18px; font-size: 18px;"
+        )
+        top.addWidget(icon_lbl)
+        top.addSpacing(8)
         self._title_lbl = QLabel(title)
-        self._title_lbl.setFont(QFont("Tajawal", 11))
-        self._title_lbl.setStyleSheet("color: rgba(255,255,255,0.92); background: transparent;")
-        header.addWidget(self._title_lbl)
-        layout.addLayout(header)
-        layout.addSpacing(4)
+        self._title_lbl.setFont(QFont("Tajawal", 11, QFont.DemiBold))
+        self._title_lbl.setStyleSheet("color: rgba(255,255,255,0.9);")
+        top.addWidget(self._title_lbl)
+        top.addStretch()
+        lay.addLayout(top)
 
+        # ── القيمة الرئيسية ──
         self.value_lbl = QLabel(str(value))
-        self.value_lbl.setFont(QFont("Tajawal", 34, QFont.Bold))
-        self.value_lbl.setStyleSheet("color: white; background: transparent;")
-        layout.addWidget(self.value_lbl)
+        self.value_lbl.setFont(QFont("Tajawal", 30, QFont.Bold))
+        lay.addWidget(self.value_lbl)
 
-        self._sub_lbl = QLabel(subtitle) if subtitle else None
-        if self._sub_lbl:
-            self._sub_lbl.setFont(QFont("Tajawal", 9))
-            self._sub_lbl.setStyleSheet("color: rgba(255,255,255,0.82); background: transparent;")
-            layout.addWidget(self._sub_lbl)
+        # ── الـ subtitle ──
+        self._sub_lbl = QLabel(subtitle)
+        self._sub_lbl.setFont(QFont("Tajawal", 9))
+        self._sub_lbl.setStyleSheet("color: rgba(255,255,255,0.75);")
+        lay.addWidget(self._sub_lbl)
 
-        layout.addStretch()
+    def update_value(self, v):    self.value_lbl.setText(str(v))
+    def update_title(self, t):    self._title_lbl.setText(t)
+    def update_subtitle(self, s): self._sub_lbl.setText(s)
 
-    def update_value(self, value):
-        self.value_lbl.setText(str(value))
 
-    def update_title(self, title: str):
-        self._title_lbl.setText(title)
+# ─────────────────────────────────────────────────────────────────────────────
+# ActivityItem — عنصر نشاط واحد
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def update_subtitle(self, subtitle: str):
-        if self._sub_lbl:
-            self._sub_lbl.setText(subtitle)
+class ActivityItem(QFrame):
+    ICONS = {
+        "create": ("➕", "#2ECC71"),
+        "insert": ("➕", "#2ECC71"),
+        "update": ("✏️", "#F39C12"),
+        "delete": ("🗑️", "#E74C3C"),
+    }
+
+    def __init__(self, action: str, message: str, timestamp: str, parent=None):
+        super().__init__(parent)
+        self.setObjectName("activity-item")
+        icon, color = self.ICONS.get(action.lower(), ("📝", "#3498DB"))
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(10)
+
+        # دائرة الأيقونة
+        ico = QLabel(icon)
+        ico.setFixedSize(30, 30)
+        ico.setAlignment(Qt.AlignCenter)
+        ico.setStyleSheet(
+            f"background: {color}; border-radius: 15px; color: white; font-size: 13px;"
+        )
+        lay.addWidget(ico)
+
+        # النص والوقت
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        msg_lbl = QLabel(message)
+        msg_lbl.setFont(QFont("Tajawal", 9, QFont.DemiBold))
+        msg_lbl.setObjectName("activity-msg")
+        col.addWidget(msg_lbl)
+
+        ts_lbl = QLabel(f"🕒 {timestamp}")
+        ts_lbl.setFont(QFont("Tajawal", 8))
+        ts_lbl.setObjectName("activity-ts")
+        col.addWidget(ts_lbl)
+
+        lay.addLayout(col, 1)
+
+        # خط ملون على الجانب
+        self._color = color
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,19 +144,17 @@ class StatCard(QFrame):
 
 class DashboardTab(QWidget):
 
-    # تعريف البطاقات كـ class-level لإعادة الاستخدام في retranslate
     _ROW1_DEFS = [
-        # (stat_key,            title_key,              sub_key,                  card_key,      icon)
-        ("total_transactions", "total_transactions",   "active_transactions_fmt", "transactions","📦"),
-        ("total_value",        "total_value",          "active_transactions_lbl", "value",       "💰"),
-        ("total_clients",      "clients",              "registered_client",       "clients",     "👥"),
-        ("total_materials",    "materials",            "available_material",      "materials",   "📋"),
+        ("total_transactions", "total_transactions",  "active_transactions_fmt", "transactions", "📦"),
+        ("total_value",        "total_value",         "active_transactions_lbl", "value",        "💰"),
+        ("total_clients",      "clients",             "registered_client",       "clients",      "👥"),
+        ("total_materials",    "materials",           "available_material",      "materials",    "📋"),
     ]
     _ROW2_DEFS = [
-        ("import_count",    "transaction_type.import",  "import_value_fmt",  "import",    "📥"),
-        ("export_count",    "transaction_type.export",  "export_value_fmt",  "export",    "📤"),
-        ("transit_count",   "transit_type",             "transit_value_fmt", "transit",   "🚚"),
-        ("total_documents", "documents",                "stat_documents",    "documents", "📄"),
+        ("import_count",    "transaction_type.import", "import_value_fmt",  "import",    "📥"),
+        ("export_count",    "transaction_type.export", "export_value_fmt",  "export",    "📤"),
+        ("transit_count",   "transit_type",            "transit_value_fmt", "transit",   "🚚"),
+        ("total_documents", "documents",               "stat_documents",    "documents", "📄"),
     ]
 
     def __init__(self, parent=None):
@@ -119,8 +162,8 @@ class DashboardTab(QWidget):
         self._tm = TranslationManager.get_instance()
         self._ = self._tm.translate
         self.setObjectName("dashboard-tab")
-        self._stat_cards = {}       # stat_key → StatCard
-        self._cached_stats = {}     # آخر إحصاء لاستخدامه في retranslate
+        self._stat_cards  = {}
+        self._cached_stats = {}
         self._tm.language_changed.connect(self.retranslate_ui)
 
         scroll = QScrollArea(self)
@@ -132,18 +175,17 @@ class DashboardTab(QWidget):
         container.setObjectName("dashboard-container")
 
         main = QVBoxLayout(container)
-        main.setContentsMargins(24, 24, 24, 24)
+        main.setContentsMargins(28, 24, 28, 24)
         main.setSpacing(20)
 
         main.addWidget(self._build_header())
-        main.addLayout(self._build_stat_row1())
-        main.addLayout(self._build_stat_row2())
+        main.addLayout(self._build_stat_grid())
 
-        content = QHBoxLayout()
-        content.setSpacing(18)
-        content.addWidget(self._build_activities_panel(), stretch=2)
-        content.addWidget(self._build_transactions_panel(), stretch=3)
-        main.addLayout(content, stretch=1)
+        bottom = QHBoxLayout()
+        bottom.setSpacing(18)
+        bottom.addWidget(self._build_activities_panel(), stretch=2)
+        bottom.addWidget(self._build_transactions_panel(), stretch=3)
+        main.addLayout(bottom, stretch=1)
 
         scroll.setWidget(container)
         outer = QVBoxLayout(self)
@@ -152,94 +194,72 @@ class DashboardTab(QWidget):
 
         self._refresh_timer = QTimer(self)
         self._refresh_timer.timeout.connect(self.refresh_all_data)
-        self._refresh_timer.start(30000)
+        self._refresh_timer.start(30_000)
 
-    # ─── builders ─────────────────────────────────────────────────────────────
+    # ── builders ──────────────────────────────────────────────────────────────
 
-    def _build_header(self) -> QFrame:
-        header = QFrame()
-        header.setObjectName("dashboard-header")
-        lay = QHBoxLayout(header)
-        lay.setContentsMargins(0, 0, 0, 0)
+    def _build_header(self) -> QWidget:
+        w = QWidget()
+        w.setObjectName("dashboard-header-bar")
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 4)
 
         self._title_lbl = QLabel(self._("dashboard_main_title"))
-        self._title_lbl.setFont(QFont("Tajawal", 24, QFont.Bold))
+        self._title_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
         self._title_lbl.setObjectName("dashboard-title")
         lay.addWidget(self._title_lbl)
         lay.addStretch()
 
         self._update_lbl = QLabel()
         self._update_lbl.setObjectName("text-muted")
-        self._update_lbl.setFont(QFont("Tajawal", 9))
         self._set_update_time()
         lay.addWidget(self._update_lbl)
 
-        self._refresh_btn_ref = QPushButton(self._("refresh"))
-        self._refresh_btn_ref.setObjectName("btn-primary")
-        self._refresh_btn_ref.setFont(QFont("Tajawal", 10))
-        self._refresh_btn_ref.setMinimumHeight(34)
-        self._refresh_btn_ref.setCursor(Qt.PointingHandCursor)
-        self._refresh_btn_ref.clicked.connect(self.refresh_all_data)
-        lay.addWidget(self._refresh_btn_ref)
+        lay.addSpacing(12)
 
-        return header
+        self._refresh_btn = QPushButton(self._("refresh"))
+        self._refresh_btn.setObjectName("primary-btn")
+        self._refresh_btn.setMinimumHeight(36)
+        self._refresh_btn.setMinimumWidth(100)
+        self._refresh_btn.setCursor(Qt.PointingHandCursor)
+        self._refresh_btn.clicked.connect(self.refresh_all_data)
+        lay.addWidget(self._refresh_btn)
 
-    def _build_stat_row1(self) -> QGridLayout:
+        return w
+
+    def _build_stat_grid(self) -> QGridLayout:
         grid = QGridLayout()
         grid.setSpacing(14)
         stats = self._get_stats()
         self._cached_stats.update(stats)
 
-        for i, (stat_key, title_key, sub_key, card_key, icon) in enumerate(self._ROW1_DEFS):
-            title = self._(title_key)
-            sub   = self._resolve_sub(sub_key, stats)
-            card  = StatCard(title, stats.get(stat_key, 0), sub, card_key, icon)
+        all_defs = self._ROW1_DEFS + self._ROW2_DEFS
+        for idx, (stat_key, title_key, sub_key, card_key, icon) in enumerate(all_defs):
+            card = StatCard(
+                self._(title_key),
+                stats.get(stat_key, 0),
+                self._resolve_sub(sub_key, stats),
+                card_key, icon
+            )
             self._stat_cards[stat_key] = card
-            grid.addWidget(card, 0, i)
+            row, col = divmod(idx, 4)
+            grid.addWidget(card, row, col)
 
         return grid
-
-    def _build_stat_row2(self) -> QGridLayout:
-        grid = QGridLayout()
-        grid.setSpacing(14)
-        stats = self._get_stats()
-        self._cached_stats.update(stats)
-
-        for i, (stat_key, title_key, sub_key, card_key, icon) in enumerate(self._ROW2_DEFS):
-            title = self._(title_key)
-            sub   = self._resolve_sub(sub_key, stats)
-            card  = StatCard(title, stats.get(stat_key, 0), sub, card_key, icon)
-            self._stat_cards[stat_key] = card
-            grid.addWidget(card, 0, i)
-
-        return grid
-
-    def _resolve_sub(self, sub_key: str, stats: dict) -> str:
-        """يحوّل مفتاح الـ subtitle إلى نص مترجم مع دعم القيم الديناميكية."""
-        if sub_key == "active_transactions_fmt":
-            return self._("active_transactions").format(count=stats.get("active_transactions", 0))
-        if sub_key == "import_value_fmt":
-            return f"${stats.get('import_value', 0):,.0f}"
-        if sub_key == "export_value_fmt":
-            return f"${stats.get('export_value', 0):,.0f}"
-        if sub_key == "transit_value_fmt":
-            return f"${stats.get('transit_value', 0):,.0f}"
-        return self._(sub_key)
 
     def _build_activities_panel(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("card")
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(18, 16, 18, 16)
-        lay.setSpacing(12)
+        lay.setSpacing(10)
 
-        self._activities_title = QLabel(self._("recent_activities_title"))
-        self._activities_title.setFont(QFont("Tajawal", 14, QFont.Bold))
-        lay.addWidget(self._activities_title)
+        self._act_title = QLabel(self._("recent_activities_title"))
+        self._act_title.setFont(QFont("Tajawal", 13, QFont.Bold))
+        self._act_title.setObjectName("panel-title")
+        lay.addWidget(self._act_title)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setObjectName("separator")
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("separator")
         lay.addWidget(sep)
 
         scroll = QScrollArea()
@@ -247,14 +267,14 @@ class DashboardTab(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
 
-        self._activities_container = QWidget()
-        self._activities_container.setStyleSheet("background: transparent;")
-        self._activities_layout = QVBoxLayout(self._activities_container)
-        self._activities_layout.setSpacing(6)
-        self._activities_layout.setContentsMargins(0, 0, 0, 0)
-
+        self._act_container = QWidget()
+        self._act_container.setObjectName("activities-container")
+        self._act_layout = QVBoxLayout(self._act_container)
+        self._act_layout.setSpacing(5)
+        self._act_layout.setContentsMargins(0, 0, 0, 0)
         self._load_activities()
-        scroll.setWidget(self._activities_container)
+
+        scroll.setWidget(self._act_container)
         lay.addWidget(scroll)
         return frame
 
@@ -263,74 +283,80 @@ class DashboardTab(QWidget):
         frame.setObjectName("card")
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(18, 16, 18, 16)
-        lay.setSpacing(12)
+        lay.setSpacing(10)
 
-        self._transactions_title = QLabel(self._("latest_transactions_title"))
-        self._transactions_title.setFont(QFont("Tajawal", 14, QFont.Bold))
-        lay.addWidget(self._transactions_title)
+        self._trx_title = QLabel(self._("latest_transactions_title"))
+        self._trx_title.setFont(QFont("Tajawal", 13, QFont.Bold))
+        self._trx_title.setObjectName("panel-title")
+        lay.addWidget(self._trx_title)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setObjectName("separator")
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("separator")
         lay.addWidget(sep)
 
         self._trans_table = QTableWidget()
         self._trans_table.setObjectName("data-table")
         self._trans_table.setColumnCount(7)
-        self._trans_table.setHorizontalHeaderLabels([
-            self._("col_number"), self._("transaction_date"), self._("col_type"),
-            self._("col_client"), self._("col_weight_kg"), self._("col_value_usd"),
-            self._("col_status"),
-        ])
-        self._trans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self._trans_table.verticalHeader().setVisible(False)
         self._trans_table.setSelectionBehavior(QTableWidget.SelectRows)
         self._trans_table.setAlternatingRowColors(True)
         self._trans_table.setEditTriggers(QTableWidget.NoEditTriggers)
-
+        self._trans_table.setShowGrid(False)
+        self._trans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._trans_table.verticalHeader().setDefaultSectionSize(38)
+        self._update_trans_headers()
         self._load_transactions()
+
         lay.addWidget(self._trans_table)
         return frame
 
-    # ─── data loaders ─────────────────────────────────────────────────────────
+    # ── data ──────────────────────────────────────────────────────────────────
 
     def _get_stats(self) -> dict:
-        stats = {
-            "total_transactions": 0, "active_transactions": 0,
-            "total_value": 0, "total_clients": 0, "total_materials": 0,
-            "import_count": 0, "import_value": 0,
-            "export_count": 0, "export_value": 0,
-            "transit_count": 0, "transit_value": 0,
-            "total_documents": 0,
-        }
+        s = {k: 0 for k in [
+            "total_transactions", "active_transactions", "total_value",
+            "total_clients", "total_materials",
+            "import_count", "import_value", "export_count", "export_value",
+            "transit_count", "transit_value", "total_documents",
+        ]}
         try:
             with get_session_local()() as session:
-                stats["total_transactions"] = session.query(Transaction).count()
-                stats["active_transactions"] = (
+                s["total_transactions"]  = session.query(Transaction).count()
+                s["active_transactions"] = (
                     session.query(Transaction)
                     .filter(Transaction.status == "active").count()
                 )
-                v = (session.query(func.sum(Transaction.totals_value))
-                     .filter(Transaction.status == "active").scalar() or 0)
-                stats["total_value"] = f"${float(v):,.0f}"
+                v = session.query(func.sum(Transaction.totals_value)).scalar() or 0
+                s["total_value"] = f"${float(v):,.0f}"
 
-                for t in ["import", "export", "transit"]:
-                    c = session.query(Transaction).filter(Transaction.transaction_type == t).count()
-                    v2 = (session.query(func.sum(Transaction.totals_value))
-                          .filter(Transaction.transaction_type == t).scalar() or 0)
-                    stats[f"{t}_count"] = c
-                    stats[f"{t}_value"] = float(v2)
+                for t in ("import", "export", "transit"):
+                    s[f"{t}_count"] = (
+                        session.query(Transaction)
+                        .filter(Transaction.transaction_type == t).count()
+                    )
+                    s[f"{t}_value"] = float(
+                        session.query(func.sum(Transaction.totals_value))
+                        .filter(Transaction.transaction_type == t).scalar() or 0
+                    )
 
-                stats["total_clients"]   = session.query(Client).count()
-                stats["total_materials"] = session.query(Material).count()
-                stats["total_documents"] = session.query(Document).count()
+                s["total_clients"]   = session.query(Client).count()
+                s["total_materials"] = session.query(Material).count()
+                s["total_documents"] = session.query(Document).count()
         except Exception as e:
             print(f"Dashboard stats error: {e}")
-        return stats
+        return s
+
+    def _resolve_sub(self, sub_key: str, stats: dict) -> str:
+        if sub_key == "active_transactions_fmt":
+            return self._("active_transactions").format(count=stats.get("active_transactions", 0))
+        if sub_key == "import_value_fmt":  return f"${stats.get('import_value', 0):,.0f}"
+        if sub_key == "export_value_fmt":  return f"${stats.get('export_value', 0):,.0f}"
+        if sub_key == "transit_value_fmt": return f"${stats.get('transit_value', 0):,.0f}"
+        return self._(sub_key)
 
     def _load_activities(self):
-        while self._activities_layout.count():
-            item = self._activities_layout.takeAt(0)
+        # مسح العناصر القديمة
+        while self._act_layout.count():
+            item = self._act_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
@@ -344,10 +370,6 @@ class DashboardTab(QWidget):
             "create": "action_create", "insert": "action_insert",
             "update": "action_update", "delete": "action_delete",
         }
-        ICONS = {
-            "create": ("➕", "#2ECC71"), "insert": ("➕", "#2ECC71"),
-            "update": ("✏️", "#F39C12"), "delete": ("🗑️", "#E74C3C"),
-        }
 
         try:
             from sqlalchemy.orm import joinedload as jl
@@ -359,55 +381,31 @@ class DashboardTab(QWidget):
 
             for row in rows:
                 action = (row.action or "update").lower()
-                icon, color = ICONS.get(action, ("📝", "#3498DB"))
-                tbl_key = TABLE_KEYS.get(row.table_name)
-                tbl = self._(tbl_key) if tbl_key else (row.table_name or "—")
-                act_key = ACTION_KEYS.get(action)
-                act = self._(act_key) if act_key else action
-                uname = ""
+                tbl    = self._(TABLE_KEYS[row.table_name]) if row.table_name in TABLE_KEYS else (row.table_name or "—")
+                act    = self._(ACTION_KEYS[action]) if action in ACTION_KEYS else action
+                uname  = ""
                 if row.user:
-                    uname = (getattr(row.user, "full_name", None) or
-                             getattr(row.user, "username", None) or self._("system_user"))
-                ts = row.timestamp.strftime("%Y-%m-%d %H:%M") if row.timestamp else "—"
+                    uname = getattr(row.user, "full_name", None) or getattr(row.user, "username", None) or self._("system_user")
+                msg = self._("activity_message").format(user=uname, action=act, table=tbl)
+                ts  = format_local_dt(row.timestamp)
 
-                item = QFrame()
-                item.setStyleSheet(f"""
-                    QFrame {{
-                        background: rgba(0,0,0,0.02);
-                        border-radius: 8px;
-                        border-right: 3px solid {color};
-                    }}
-                    QFrame:hover {{ background: rgba(74,126,200,0.06); }}
-                """)
-                row_lay = QHBoxLayout(item)
-                row_lay.setContentsMargins(8, 6, 8, 6)
-
-                ico_lbl = QLabel(icon)
-                ico_lbl.setFont(QFont("Segoe UI Emoji", 14))
-                ico_lbl.setFixedSize(28, 28)
-                ico_lbl.setAlignment(Qt.AlignCenter)
-                ico_lbl.setStyleSheet(f"background: {color}; border-radius: 14px; color: white;")
-                row_lay.addWidget(ico_lbl)
-
-                col = QVBoxLayout()
-                col.setSpacing(1)
-                msg = QLabel(self._("activity_message").format(user=uname, action=act, table=tbl))
-                msg.setFont(QFont("Tajawal", 9, QFont.DemiBold))
-                col.addWidget(msg)
-                ts_lbl = QLabel(f"🕒 {ts}")
-                ts_lbl.setFont(QFont("Tajawal", 8))
-                ts_lbl.setStyleSheet("color: #9CA3AF;")
-                col.addWidget(ts_lbl)
-                row_lay.addLayout(col, 1)
-
-                self._activities_layout.addWidget(item)
+                item = ActivityItem(action, msg, ts)
+                item.setObjectName("activity-item")
+                self._act_layout.addWidget(item)
 
         except Exception as e:
             err = QLabel(f"⚠️ {e}")
-            err.setStyleSheet("color: #E74C3C;")
-            self._activities_layout.addWidget(err)
+            err.setObjectName("activity-ts")
+            self._act_layout.addWidget(err)
 
-        self._activities_layout.addStretch()
+        self._act_layout.addStretch()
+
+    def _update_trans_headers(self):
+        self._trans_table.setHorizontalHeaderLabels([
+            self._("col_number"), self._("transaction_date"), self._("col_type"),
+            self._("col_client"), self._("col_weight_kg"), self._("col_value_usd"),
+            self._("col_status"),
+        ])
 
     def _load_transactions(self):
         self._trans_table.setRowCount(0)
@@ -415,6 +413,12 @@ class DashboardTab(QWidget):
             "import":  self._("import_type"),
             "export":  self._("export_type"),
             "transit": self._("transit_type"),
+        }
+        STATUS_COLORS = {
+            "active":   "#2ECC71",
+            "draft":    "#F39C12",
+            "closed":   "#95A5A6",
+            "archived": "#7F8C8D",
         }
         try:
             from sqlalchemy.orm import joinedload as jl
@@ -428,43 +432,40 @@ class DashboardTab(QWidget):
             for r, t in enumerate(rows):
                 def cell(txt, right=False):
                     i = QTableWidgetItem(txt)
-                    i.setFont(QFont("Tajawal", 9))
-                    i.setTextAlignment(
-                        (Qt.AlignRight if right else Qt.AlignCenter) | Qt.AlignVCenter
-                    )
+                    i.setTextAlignment((Qt.AlignRight if right else Qt.AlignCenter) | Qt.AlignVCenter)
                     return i
 
-                self._trans_table.setItem(r, 0, cell(t.transaction_no or "—"))
-                ds = t.transaction_date.strftime("%Y-%m-%d") if t.transaction_date else "—"
-                self._trans_table.setItem(r, 1, cell(ds))
-                self._trans_table.setItem(r, 2, cell(TYPE_MAP.get(t.transaction_type, t.transaction_type or "—")))
-                cname = t.client.name_ar if t.client else "—"
-                self._trans_table.setItem(r, 3, cell(cname))
+                date_str = t.transaction_date.strftime("%Y-%m-%d") if t.transaction_date else "—"
+                status_txt = self._(f"status_{t.status}") if t.status else "—"
                 wt = f"{t.totals_net_kg:,.1f}" if t.totals_net_kg else "—"
+                vl = f"{t.totals_value:,.2f}"  if t.totals_value  else "—"
+
+                self._trans_table.setItem(r, 0, cell(t.transaction_no or "—"))
+                self._trans_table.setItem(r, 1, cell(date_str))
+                self._trans_table.setItem(r, 2, cell(TYPE_MAP.get(t.transaction_type, t.transaction_type or "—")))
+                self._trans_table.setItem(r, 3, cell(t.client.name_ar if t.client else "—"))
                 self._trans_table.setItem(r, 4, cell(wt, right=True))
-                vl = f"{t.totals_value:,.2f}" if t.totals_value else "—"
                 self._trans_table.setItem(r, 5, cell(vl, right=True))
-                status_txt = self._("status_active") if t.status == "active" else (t.status or "—")
+
                 si = cell(status_txt)
-                if t.status == "active":
-                    si.setForeground(QColor("#2ECC71"))
+                color = STATUS_COLORS.get(t.status or "", "#95A5A6")
+                si.setForeground(QColor(color))
                 self._trans_table.setItem(r, 6, si)
 
         except Exception as e:
             print(f"Dashboard transactions error: {e}")
 
-    # ─── refresh ──────────────────────────────────────────────────────────────
+    # ── refresh ───────────────────────────────────────────────────────────────
 
     def refresh_all_data(self):
-        if hasattr(self, "_refresh_btn_ref"):
-            self._refresh_btn_ref.setEnabled(False)
-            self._refresh_btn_ref.setText(self._("refreshing"))
-
+        self._refresh_btn.setEnabled(False)
+        self._refresh_btn.setText(self._("refreshing"))
         self._set_update_time()
+
         stats = self._get_stats()
         self._cached_stats.update(stats)
 
-        updates = {
+        for key, val in {
             "total_transactions": stats["total_transactions"],
             "total_value":        stats["total_value"],
             "total_clients":      stats["total_clients"],
@@ -473,26 +474,21 @@ class DashboardTab(QWidget):
             "export_count":       stats["export_count"],
             "transit_count":      stats["transit_count"],
             "total_documents":    stats["total_documents"],
-        }
-        for key, val in updates.items():
-            card = self._stat_cards.get(key)
-            if card:
+        }.items():
+            if card := self._stat_cards.get(key):
                 card.update_value(val)
 
-        # تحديث subtitles الديناميكية
-        active_count = stats.get("active_transactions", 0)
         card = self._stat_cards.get("total_transactions")
         if card:
-            card.update_subtitle(self._("active_transactions").format(count=active_count))
+            card.update_subtitle(
+                self._("active_transactions").format(count=stats.get("active_transactions", 0))
+            )
 
         self._load_activities()
         self._load_transactions()
 
-        if hasattr(self, "_refresh_btn_ref"):
-            self._refresh_btn_ref.setEnabled(True)
-            self._refresh_btn_ref.setText(self._("refresh"))
-
-        print(f"Dashboard refreshed at {datetime.now().strftime('%H:%M:%S')}")
+        self._refresh_btn.setEnabled(True)
+        self._refresh_btn.setText(self._("refresh"))
 
     def _set_update_time(self):
         self._update_lbl.setText(
@@ -500,35 +496,20 @@ class DashboardTab(QWidget):
         )
 
     def retranslate_ui(self):
-        """يُستدعى عند تغيير اللغة — يُحدّث جميع نصوص الواجهة."""
         self._ = TranslationManager.get_instance().translate
-
-        # Header
         self._title_lbl.setText(self._("dashboard_main_title"))
-        self._refresh_btn_ref.setText(self._("refresh"))
+        self._refresh_btn.setText(self._("refresh"))
+        self._act_title.setText(self._("recent_activities_title"))
+        self._trx_title.setText(self._("latest_transactions_title"))
         self._set_update_time()
+        self._update_trans_headers()
 
-        # Panel titles
-        self._activities_title.setText(self._("recent_activities_title"))
-        self._transactions_title.setText(self._("latest_transactions_title"))
-
-        # Table headers
-        self._trans_table.setHorizontalHeaderLabels([
-            self._("col_number"), self._("transaction_date"), self._("col_type"),
-            self._("col_client"), self._("col_weight_kg"), self._("col_value_usd"),
-            self._("col_status"),
-        ])
-
-        # Stat card titles وsubtitles (بدون إعادة بناء البطاقات)
         stats = self._cached_stats
-        all_defs = self._ROW1_DEFS + self._ROW2_DEFS
-        for stat_key, title_key, sub_key, _, _ in all_defs:
-            card = self._stat_cards.get(stat_key)
-            if card:
+        for stat_key, title_key, sub_key, _, _ in self._ROW1_DEFS + self._ROW2_DEFS:
+            if card := self._stat_cards.get(stat_key):
                 card.update_title(self._(title_key))
                 card.update_subtitle(self._resolve_sub(sub_key, stats))
 
-        # إعادة تحميل البيانات لترجمة المحتوى
         self._load_activities()
         self._load_transactions()
 

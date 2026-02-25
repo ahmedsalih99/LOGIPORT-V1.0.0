@@ -33,7 +33,8 @@ def get_styles(theme):
     }}
 
     QTableWidget:focus {{
-        border: 1px solid {c["primary_light"]};
+        border: none;
+        outline: none;
     }}
 
     /* ---------- Items ---------- */
@@ -41,6 +42,7 @@ def get_styles(theme):
     QTableWidget::item {{
         padding: {Spacing.SM} {Spacing.MD};
         border: none;
+        font-weight: 600;
     }}
 
     QTableWidget::item:hover {{
@@ -71,7 +73,7 @@ def get_styles(theme):
         color: {c["text_primary"]};
         padding: {Spacing.SM} {Spacing.MD};
         border: none;
-        font-weight: 600;
+        font-weight: 700;
         font-size: {s["sm"]}px;
     }}
 
@@ -134,5 +136,63 @@ def get_styles(theme):
     QTableWidget QScrollBar::add-line:horizontal,
     QTableWidget QScrollBar::sub-line:horizontal {{
         width: 0px;
+    }}
+
+    /* ── Base Tab: Status Bar ──────────────────────────────────────────── */
+
+    QWidget#base-tab-status-bar {{
+        background: {c["bg_secondary"]};
+        border-top: 1px solid {c["border_subtle"]};
+        min-height: 28px;
+        max-height: 28px;
+    }}
+
+    QLabel#base-tab-count-label {{
+        color: {c["text_secondary"]};
+        font-size: 11px;
+        font-weight: 500;
+    }}
+
+    QLabel#base-tab-sort-label {{
+        color: {c["text_secondary"]};
+        font-size: 11px;
+    }}
+
+    /* ── Base Tab: Empty State ─────────────────────────────────────────── */
+
+    QWidget#empty-state-widget {{
+        background: transparent;
+    }}
+
+    QLabel#empty-state-icon {{
+        color: {c["text_secondary"]};
+        margin-bottom: 8px;
+    }}
+
+    QLabel#empty-state-text {{
+        color: {c["text_secondary"]};
+        font-size: 14px;
+        font-weight: 500;
+    }}
+
+    /* ── Sort Combo ────────────────────────────────────────────────────── */
+
+    QComboBox#sort-combo {{
+        background: {c["bg_card"]};
+        color: {c["text_primary"]};
+        border: 1px solid {c["border"]};
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+        min-height: 30px;
+    }}
+
+    QComboBox#sort-combo:hover {{
+        border-color: {c["primary"]};
+    }}
+
+    QComboBox#sort-combo::drop-down {{
+        border: none;
+        width: 20px;
     }}
     """

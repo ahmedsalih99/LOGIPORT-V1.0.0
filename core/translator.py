@@ -3,15 +3,15 @@ import importlib
 import pkgutil
 from typing import Dict, Optional, Set
 from PySide6.QtCore import QObject, Signal
+from core.singleton import QObjectSingletonMixin
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_LANGUAGE = "ar"
 
 
-class TranslationManager(QObject):
+class TranslationManager(QObject, QObjectSingletonMixin):
 
-    _instance = None
     language_changed = Signal()
 
     def __init__(self):
@@ -21,16 +21,6 @@ class TranslationManager(QObject):
         self._loading = False
         self._supported_languages = self._discover_languages()
         self._load_translations()
-
-    # ==============================
-    # Singleton
-    # ==============================
-
-    @classmethod
-    def get_instance(cls) -> "TranslationManager":
-        if cls._instance is None:
-            cls._instance = TranslationManager()
-        return cls._instance
 
     # ==============================
     # Public API

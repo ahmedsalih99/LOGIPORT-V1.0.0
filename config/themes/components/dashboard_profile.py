@@ -107,4 +107,70 @@ def get_styles(theme):
     QPushButton#btn-danger:pressed {{
         background: {c["danger_active"]};
     }}
+
+    /* ===== DASHBOARD HEADER ===== */
+
+    QWidget#dashboard-header-bar {{
+        background: transparent;
+    }}
+
+    QLabel#panel-title {{
+        color: {c["text_primary"]};
+        font-weight: 700;
+        background: transparent;
+    }}
+
+    /* ===== ACTIVITIES ===== */
+
+    QWidget#activities-container {{
+        background: transparent;
+    }}
+
+    QFrame#activity-item {{
+        background: {c["bg_hover"]};
+        border-radius: 10px;
+        border: none;
+    }}
+
+    QFrame#activity-item:hover {{
+        background: {c["bg_active"]};
+    }}
+
+    QLabel#activity-msg {{
+        color: {c["text_primary"]};
+        background: transparent;
+    }}
+
+    QLabel#activity-ts {{
+        color: {c["text_muted"]};
+        background: transparent;
+    }}
+
+    /* ===== TRANSACTIONS TABLE ===== */
+
+    QTableWidget#data-table {{
+        background: {c["bg_card"]};
+        border: none;
+        gridline-color: transparent;
+        alternate-background-color: {c["bg_hover"]};
+        selection-background-color: {c["primary_light"]};
+        selection-color: {c["primary"]};
+        outline: none;
+        font-size: 12px;
+    }}
+
+    QTableWidget#data-table::item {{
+        padding: 6px 10px;
+        border: none;
+    }}
+
+    QTableWidget#data-table QHeaderView::section {{
+        background: {c["bg_hover"]};
+        color: {c["text_secondary"]};
+        font-weight: 700;
+        font-size: 11px;
+        padding: 8px 10px;
+        border: none;
+    }}
+
     """

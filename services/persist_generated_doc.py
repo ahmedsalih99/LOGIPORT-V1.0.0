@@ -32,6 +32,13 @@ DOC_TYPE_MAP: dict[str, str] = {
     "packing_list.export.simple":       "PL_EXPORT_SIMPLE",
     "packing_list.export.with_dates":   "PL_EXPORT_WITH_DATES",
     "packing_list.export.with_line_id": "PL_EXPORT_WITH_LINE_ID",
+
+    # CMR
+    "cmr": "cmr",
+
+    #form a
+    "form_a": "form_a",
+    "form.a": "form_a",
 }
 
 

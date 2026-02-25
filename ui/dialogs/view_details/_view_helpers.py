@@ -17,8 +17,12 @@ def _get(obj: Any, key: str, default=None):
 
 
 def _fmt_dt(dt) -> str:
-    """يحوّل datetime أو نص لصيغة موحدة."""
+    """يحوّل datetime أو نص لصيغة موحدة — بالتوقيت المحلي."""
+    from database.db_utils import format_local_dt
     try:
+        import datetime
+        if isinstance(dt, datetime.datetime):
+            return format_local_dt(dt)
         return dt.strftime("%Y-%m-%d %H:%M")
     except Exception:
         return str(dt or "")

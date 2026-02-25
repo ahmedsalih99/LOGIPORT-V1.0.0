@@ -13,6 +13,7 @@ services/updater_service.py — LOGIPORT
 """
 
 from __future__ import annotations
+from core.singleton import SingletonMeta
 
 import logging
 import os
@@ -65,7 +66,7 @@ class UpdateInfo:
         return f"UpdateInfo(version={self.version})"
 
 
-class UpdaterService:
+class UpdaterService(metaclass=SingletonMeta):
     """
     خدمة التحديثات — Singleton.
 
@@ -73,14 +74,6 @@ class UpdaterService:
         svc = UpdaterService.get_instance()
         svc.check_async(on_update_found=my_callback)
     """
-
-    _instance: Optional["UpdaterService"] = None
-
-    @classmethod
-    def get_instance(cls) -> "UpdaterService":
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
 
     def __init__(self):
         self._checking = False

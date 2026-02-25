@@ -119,6 +119,8 @@ _DOCUMENT_TYPES = [
     (15, "INV_PROFORMA",         "بروفورما إنفويس",             "Proforma Invoice",          "Proforma Fatura",            1, "INVPL",            None,                                 0),
     (16, "INV_NORMAL",           "فاتورة عادية",               "Normal Invoice",            "Normal Fatura",              1, None,              None,                                  0),
     (17, "PL_EXPORT_WITH_LINE_ID","قائمة تعبئة مع رقم السطر",  "Packing List with Line ID", "Hat No'lu Paketleme Listesi",1, None,             None,                                  0),
+    (18, "cmr",                   "بوليصة شحن CMR",             "CMR Consignment Note",      "CMR Taşıma Senedi",          1, "cmr",            "cmr",                                 20),
+    (19, "form_a",                "شهادة المنشأ نموذج أ",       "Form A Certificate of Origin","Form A Menşe Şahadetnamesi", 1, "form_a",         "form_a",                              21),
 ]
 
 _PRICING_TYPES = [
@@ -169,6 +171,38 @@ def _run_migrations(conn) -> None:
     logger.info("Bootstrap: migrations تمت بنجاح")
 
 
+
+def _run_alembic_upgrade() -> None:
+    """
+    يُشغّل alembic upgrade head تلقائياً عند كل بداية تشغيل.
+    - آمن: إذا كانت DB على آخر migration، لا يفعل شيء
+    - إذا كانت DB جديدة، يُطبّق كل الـ migrations
+    - إذا كانت DB قديمة (بدون alembic_version)، يُنشئ الـ stamp ويُكمل
+    """
+    try:
+        from pathlib import Path
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+
+        # مسار alembic.ini بالنسبة لجذر المشروع
+        project_root = Path(__file__).resolve().parent.parent
+        ini_path = project_root / "alembic.ini"
+
+        if not ini_path.exists():
+            logger.warning(f"Bootstrap: alembic.ini غير موجود في {ini_path} — تخطّي Alembic")
+            return
+
+        alembic_cfg = AlembicConfig(str(ini_path))
+        alembic_cfg.set_main_option("script_location", str(project_root / "migrations"))
+
+        alembic_command.upgrade(alembic_cfg, "head")
+        logger.info("Bootstrap: Alembic upgrade head تم بنجاح")
+
+    except Exception as exc:
+        # لا نوقف التطبيق — نُسجّل الخطأ فقط
+        logger.error(f"Bootstrap: فشل تشغيل Alembic migrations: {exc}", exc_info=True)
+
+
 def run_bootstrap() -> bool:
 
     try:
@@ -177,7 +211,10 @@ def run_bootstrap() -> bool:
         init_db()
         logger.info("Bootstrap: جداول قاعدة البيانات جاهزة")
 
-        # ① ب) migrations للـ DB الموجودة (تعمل بأمان مع أي DB)
+        # ① ب) تشغيل Alembic migrations تلقائياً
+        _run_alembic_upgrade()
+
+        # ① ج) الـ migrations اليدوية القديمة (app_settings — للتوافق الخلفي)
         from database.db_utils import get_db_path
         import sqlite3 as _sqlite3
         with _sqlite3.connect(get_db_path()) as _conn:

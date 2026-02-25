@@ -14,8 +14,10 @@ BaseCRUD — الصنف الأساسي لجميع عمليات CRUD.
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from contextlib import contextmanager
-from typing import Any, Callable, List, Optional, Dict, Union
-from datetime import datetime
+from typing import Any, Callable, List, Optional, Dict, Union, TypeVar, Generic
+
+T = TypeVar("T")
+from database.db_utils import utc_now
 import json
 import logging
 
@@ -117,7 +119,7 @@ class BaseCRUD:
             return False
 
     def _stamp_create(self, obj: Any, user):
-        now = datetime.utcnow()
+        now = utc_now()
         if hasattr(obj, "created_at") and getattr(obj, "created_at", None) is None:
             setattr(obj, "created_at", now)
         if hasattr(obj, "updated_at"):
@@ -136,7 +138,7 @@ class BaseCRUD:
 
     def _stamp_update(self, obj: Any, user):
         if hasattr(obj, "updated_at"):
-            setattr(obj, "updated_at", datetime.utcnow())
+            setattr(obj, "updated_at", utc_now())
         uid = self._get_user_id(user)
         if uid is None:
             return
@@ -302,30 +304,38 @@ class BaseCRUD:
             }
 
     def delete_many(self, ids: List[Any], *, current_user=None) -> int:
+        """
+        حذف سجلات متعددة في transaction واحد.
+        إذا فشل أي حذف، يتم rollback للكل — لا حذف جزئي.
+        """
         if not ids:
             return 0
         deleted = 0
         with self.get_session() as session:
-            for _id in ids:
-                obj = session.get(self.model, _id)
-                if not obj:
-                    continue
-                self._audit(session,
+            try:
+                for _id in ids:
+                    obj = session.get(self.model, _id)
+                    if not obj:
+                        continue
+                    self._audit(session,
+                                user_id=self._get_user_id(current_user),
+                                action="delete", before=self._to_dict(obj), after=None)
+                    session.delete(obj)
+                    deleted += 1
+                if deleted and AuditLog is not None:
+                    try:
+                        session.add(AuditLog(
                             user_id=self._get_user_id(current_user),
-                            action="delete", before=self._to_dict(obj), after=None)
-                session.delete(obj)
-                deleted += 1
-            if deleted and AuditLog is not None:
-                try:
-                    session.add(AuditLog(
-                        user_id=self._get_user_id(current_user),
-                        action="bulk_delete", table_name=self.table_name,
-                        record_id=None,
-                        details=json.dumps({"count": deleted}, ensure_ascii=False),
-                    ))
-                except Exception:
-                    pass
-            session.commit()
+                            action="bulk_delete", table_name=self.table_name,
+                            record_id=None,
+                            details=json.dumps({"count": deleted}, ensure_ascii=False),
+                        ))
+                    except Exception:
+                        pass
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
             return deleted
 
     def bulk_insert(self, objs: List[Any], *, current_user=None):

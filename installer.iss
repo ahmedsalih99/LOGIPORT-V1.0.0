@@ -3,8 +3,8 @@
 
 #define AppName      "LOGIPORT"
 #define AppVersion   "1.0.0"
-#define AppPublisher "Ahmed Sidra"
-#define AppURL       "https://github.com/YOUR_GITHUB_USERNAME/LOGIPORT"
+#define AppPublisher "Ahmedsalih99"
+#define AppURL = "https://github.com/ahmedsalih99/LOGIPORT-V1.0.0"
 #define AppExeName   "LOGIPORT.exe"
 #define SourceDir    "dist\LOGIPORT"
 

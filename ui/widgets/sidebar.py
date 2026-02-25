@@ -19,6 +19,7 @@ from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from database.crud.permissions_crud import allowed_tabs
 from core.paths import resource_path
+from ui.utils.svg_icons import get_sidebar_icon, refresh_sidebar_icons, get_icon, QSize as _QSize
 
 ICON_PATHS = {
     "dashboard": "icons/dashboard.png",
@@ -62,7 +63,6 @@ class Sidebar(QFrame):
 
         # لياوت رئيسي
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setAlignment(Qt.AlignTop)
         self.main_layout.setSpacing(0)
 
         # ✅ Margins proportional
@@ -73,14 +73,24 @@ class Sidebar(QFrame):
         self._build_header()
 
         # الأزرار حسب الصلاحيات
+        self.main_layout.addStretch(1)   # مسافة مرنة فوق الأزرار
         self._build_buttons_from_permissions()
+        self.main_layout.addStretch(1)   # مسافة مرنة تحت الأزرار
 
-        self.main_layout.addStretch()
         self._build_footer_toggle()
 
         # إشعارات الترجمة/الإعدادات
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
         self.settings.setting_changed.connect(self._on_setting_changed)
+
+        # Theme change → أعد رسم أيقونات السايدبار فور تطبيق الثيم الجديد
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(
+                lambda _: refresh_sidebar_icons(self)
+            )
+        except Exception:
+            pass
 
         # اتجاه أولي حسب اللغة
         self.retranslate_ui()
@@ -180,12 +190,14 @@ class Sidebar(QFrame):
         self.toggle_btn.setFixedSize(toggle_size, toggle_size)
 
         self.toggle_btn.setCursor(Qt.PointingHandCursor)
-        self.toggle_btn.setIcon(
-            QIcon(resource_path("icons", "menu_burger.png"))
-        )
 
-        # ✅ Icon size proportional
+        # ✅ Icon size proportional — يجب تعريفها قبل الاستخدام
         icon_size = max(20, int(toggle_size * 0.6))  # 60% of button size
+        _toggle_svg = get_icon("menu_burger", icon_size)
+        if not _toggle_svg.isNull():
+            self.toggle_btn.setIcon(_toggle_svg)
+        else:
+            self.toggle_btn.setIcon(QIcon(resource_path("icons", "menu_burger.png")))
         self.toggle_btn.setIconSize(QSize(icon_size, icon_size))
 
         self.toggle_btn.setToolTip(self._("toggle_sidebar"))
@@ -204,12 +216,12 @@ class Sidebar(QFrame):
         btn.setObjectName("sidebar-btn")
         btn.setCheckable(True)
         btn.setAutoRaise(True)
-        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolTip(label)
 
         # ✅ Button height proportional
-        btn_height = max(32, int(self.expanded_width * 0.16))  # 16% of width
+        btn_height = max(38, int(self.expanded_width * 0.18))  # 18% of width
         btn.setMinimumHeight(btn_height)
 
         # ✅ Icon size proportional
@@ -219,10 +231,12 @@ class Sidebar(QFrame):
         if self.expanded:
             btn.setText(label)
 
-        if icon_path:
-            btn.setIcon(
-                QIcon(resource_path(*icon_path.split("/")))
-            )
+        # SVG icon — fallback to PNG if not available
+        svg_icon = get_sidebar_icon(key, icon_size)
+        if not svg_icon.isNull():
+            btn.setIcon(svg_icon)
+        elif icon_path:
+            btn.setIcon(QIcon(resource_path(*icon_path.split("/"))))
 
         lang = self.settings.get("language", "ar")
         is_rtl = (lang == "ar")
@@ -329,6 +343,9 @@ class Sidebar(QFrame):
         self.setLayoutDirection(Qt.RightToLeft if lang == "ar" else Qt.LeftToRight)
 
         self._apply_expand_state_to_buttons()
+
+        # Refresh icons with current theme color
+        refresh_sidebar_icons(self)
 
         # Refresh stylesheet
         self.refresh_stylesheet()

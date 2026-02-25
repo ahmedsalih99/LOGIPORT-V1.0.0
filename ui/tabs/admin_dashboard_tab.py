@@ -9,6 +9,7 @@ from PySide6.QtGui import QFont, QColor
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from database.db_utils import format_local_dt
 from database.models import get_session_local, User, AuditLog, Transaction, Client, Material, Document
 from sqlalchemy import func, desc
 from datetime import datetime
@@ -388,7 +389,7 @@ class AdminDashboardTab(QWidget):
                 act_label = self._(act_trans_key) if act_trans_key else action
                 act_icon  = _ACTION_ICONS.get(action, "")
                 act    = f"{act_icon} {act_label}".strip() if act_icon else act_label
-                ts     = row.timestamp.strftime("%Y-%m-%d %H:%M") if row.timestamp else "—"
+                ts     = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
                 rid    = str(row.record_id) if row.record_id else "—"
                 color  = COLOR_MAP.get(action, "#3498DB")
 
@@ -472,7 +473,7 @@ class AdminDashboardTab(QWidget):
         try:
             report = check_pdf_runtime()
             checks = [
-                ("WeasyPrint (PDF)", report.weasyprint),
+                ("WeasyPrint (PDF)", report.weasyprint_stack),
                 ("Cairo",            report.cairo),
                 ("Pango",            report.pango),
                 ("GDK Pixbuf",       report.gdk_pixbuf),

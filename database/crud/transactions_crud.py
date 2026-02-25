@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from services.numbering_service import NumberingService
 
 from database.models import get_session_local
+from database.models.transport_details import TransportDetails
 from database.crud.base_crud_v5 import BaseCRUD_V5 as BaseCRUD
 
 # Models (import robustly for runtime)
@@ -135,6 +136,32 @@ class TransactionsCRUD(BaseCRUD):
             user_id=kwargs.get("user_id"),
             number_prefix=kwargs.get("number_prefix", "T"),
         )
+
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Transport Details helpers
+    # ─────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _save_transport_details(session, transaction_id: int, transport: dict):
+        """
+        يحفظ أو يُحدِّث TransportDetails لمعاملة.
+        إذا كانت كل القيم None → لا يفعل شيئاً.
+        """
+        if not transport or not any(transport.values()):
+            return
+
+        td = session.query(TransportDetails).filter_by(
+            transaction_id=transaction_id
+        ).first()
+
+        if td is None:
+            td = TransportDetails(transaction_id=transaction_id)
+            session.add(td)
+
+        for field, value in transport.items():
+            if hasattr(td, field):
+                setattr(td, field, value)
 
     def create_transaction(
             self,
@@ -317,6 +344,10 @@ class TransactionsCRUD(BaseCRUD):
             trx.totals_gross_kg = total_gross
             trx.totals_net_kg = total_net
             trx.totals_value = total_val
+
+            # 6) Transport details (CMR / Form A) — اختياري
+            if data.get("transport"):
+                self._save_transport_details(s, trx.id, data["transport"])
 
             s.commit()
             s.refresh(trx)
@@ -509,6 +540,10 @@ class TransactionsCRUD(BaseCRUD):
             t.totals_gross_kg = total_gross
             t.totals_net_kg = total_net
             t.totals_value = total_val
+
+            # --- 5) Transport details (CMR / Form A) ---
+            if data.get("transport"):
+                self._save_transport_details(s, trx_id, data["transport"])
 
             s.commit()
             s.refresh(t)
@@ -752,19 +787,31 @@ class TransactionsCRUD(BaseCRUD):
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         status: Optional[str] = None,
+        transaction_type: Optional[str] = None,
+        search: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Transaction]:
+        """
+        server-side filters:
+          transaction_type : "export" | "import" | "transit"
+          search           : يبحث في transaction_no (LIKE %search%)
+        """
         with self._SessionLocal() as s:
             q = select(Transaction)
             if client_id:
                 q = q.where(Transaction.client_id == client_id)
             if status:
                 q = q.where(Transaction.status == status)
+            if transaction_type:
+                q = q.where(Transaction.transaction_type == transaction_type)
             if date_from:
                 q = q.where(Transaction.transaction_date >= date_from)
             if date_to:
                 q = q.where(Transaction.transaction_date <= date_to)
+            if search:
+                pattern = f"%{search}%"
+                q = q.where(Transaction.transaction_no.ilike(pattern))
             q = q.order_by(Transaction.transaction_date.desc(), Transaction.id.desc()).limit(limit).offset(offset)
             return list(s.execute(q).scalars().all())
 
@@ -781,6 +828,70 @@ class TransactionsCRUD(BaseCRUD):
             items = list(trx.items)  # يُحمَّل داخل الـ session — آمن
             s.expunge_all()  # فصل الكائنات بأمان
             return trx, items
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Workflow — Status Management
+    # ─────────────────────────────────────────────────────────────────────
+
+    # الحالات المسموح بها + الانتقالات القانونية
+    VALID_STATUSES = {"draft", "active", "closed", "archived"}
+
+    ALLOWED_TRANSITIONS = {
+        "draft":    {"active"},                 # مسودة → نشطة
+        "active":   {"closed", "draft"},        # نشطة → مغلقة أو إرجاع لمسودة
+        "closed":   {"active", "archived"},     # مغلقة → إعادة فتح أو أرشفة
+        "archived": set(),                      # مؤرشفة → نهائية (لا رجوع)
+    }
+
+    def change_status(
+        self,
+        trx_id: int,
+        new_status: str,
+        current_user=None,
+    ) -> tuple[bool, str]:
+        """
+        يغيّر حالة المعاملة مع التحقق من الانتقال القانوني.
+        يعيد (True, "") عند النجاح أو (False, error_message) عند الفشل.
+        """
+        if new_status not in self.VALID_STATUSES:
+            return False, f"invalid_status: {new_status}"
+
+        with self._SessionLocal() as s:
+            t = s.get(Transaction, trx_id)
+            if not t:
+                return False, "transaction_not_found"
+
+            current = t.status or "active"
+            allowed = self.ALLOWED_TRANSITIONS.get(current, set())
+
+            if new_status not in allowed:
+                return False, f"transition_not_allowed:{current}→{new_status}"
+
+            t.status = new_status
+            if current_user:
+                uid = (
+                    current_user.get("id")
+                    if isinstance(current_user, dict)
+                    else getattr(current_user, "id", None)
+                )
+                if uid:
+                    t.updated_by_id = uid
+
+            s.commit()
+            return True, ""
+
+    def close_transaction(self, trx_id: int, current_user=None) -> tuple[bool, str]:
+        return self.change_status(trx_id, "closed", current_user)
+
+    def reopen_transaction(self, trx_id: int, current_user=None) -> tuple[bool, str]:
+        return self.change_status(trx_id, "active", current_user)
+
+    def archive_transaction(self, trx_id: int, current_user=None) -> tuple[bool, str]:
+        return self.change_status(trx_id, "archived", current_user)
+
+    def activate_draft(self, trx_id: int, current_user=None) -> tuple[bool, str]:
+        """ترقية مسودة إلى نشطة."""
+        return self.change_status(trx_id, "active", current_user)
 
     def recalc_totals(self, trx_id: int) -> bool:
         """Recompute and cache totals on the transaction head from its items."""

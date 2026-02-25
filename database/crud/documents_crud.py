@@ -5,6 +5,7 @@ Simplified and enhanced with logging and comprehensive error handling
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from database.db_utils import utc_now
 
 from database.models import get_session_local
 from database.models.document import Document
@@ -125,7 +126,7 @@ class DocumentsCRUD(BaseCRUD):
                 document_type_id=document_type_id,
                 document_group_id=document_group_id,
                 transaction_id=transaction_id,
-                issue_date=issue_date or datetime.now(),
+                issue_date=issue_date or utc_now(),
                 notes=notes,
             )
 

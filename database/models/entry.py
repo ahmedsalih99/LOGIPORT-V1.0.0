@@ -24,9 +24,9 @@ class Entry(Base):
     notes = Column(Text, nullable=True)
 
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at    = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at    = Column(DateTime, server_default=func.now(), nullable=False)
     updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    updated_at    = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at    = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     owner_client = relationship("Client", lazy="joined")
     created_by   = relationship("User", foreign_keys=[created_by_id], lazy="joined")

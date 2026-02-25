@@ -8,12 +8,13 @@ import logging
 from typing import Any, Optional, Dict
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Qt
+from core.singleton import QObjectSingletonMixin
 from PySide6.QtWidgets import QApplication
 
 logger = logging.getLogger(__name__)
 
 
-class SettingsManager(QObject):
+class SettingsManager(QObject, QObjectSingletonMixin):
     """
     Centralized settings management for LOGIPORT.
 
@@ -37,8 +38,6 @@ class SettingsManager(QObject):
     settings_loaded = Signal(dict)
     settings_exported = Signal(str)
     settings_imported = Signal(str)
-
-    _instance = None
 
     # Default settings
     DEFAULT_SETTINGS = {
@@ -96,18 +95,6 @@ class SettingsManager(QObject):
         self.settings: Dict[str, Any] = self.DEFAULT_SETTINGS.copy()
         self._pending_theme_apply = False
         self.load()
-
-    @classmethod
-    def get_instance(cls) -> 'SettingsManager':
-        """
-        Get singleton instance of SettingsManager.
-
-        Returns:
-            SettingsManager instance
-        """
-        if cls._instance is None:
-            cls._instance = SettingsManager()
-        return cls._instance
 
     def load(self) -> bool:
         """
@@ -388,7 +375,15 @@ class SettingsManager(QObject):
 
         try:
             # Apply language
-            self._apply_language(self.get("language"))
+            lang = self.get("language", "ar")
+            self._apply_language(lang)
+
+            # تصحيح direction بناءً على اللغة الفعلية — تجاهل القيمة المحفوظة
+            correct_direction = "rtl" if lang == "ar" else "ltr"
+            if self.settings.get("direction") != correct_direction:
+                self.settings["direction"] = correct_direction
+                self.save()
+            self._apply_direction(correct_direction)
 
             # Apply theme
             self._pending_theme_apply = True
@@ -413,7 +408,6 @@ class SettingsManager(QObject):
                 font_family=self.get("font_family"),
             )
 
-            self._apply_direction(self.get("direction"))
             self._pending_theme_apply = False
 
             logger.info("Theme applied successfully")
@@ -537,17 +531,17 @@ class SettingsManager(QObject):
             if key == "language":
                 self._apply_language(value)
 
-                # Update direction automatically
+                # Update direction — فقط إذا تغيّرت اللغة فعلاً (translator يُطلق signal)
                 direction = "rtl" if value == "ar" else "ltr"
-                if self.settings.get("direction") != direction:
-                    # استخدم set() لضمان الحفظ في الملف
+                current_dir = self.settings.get("direction", "ltr")
+                if current_dir != direction:
                     self.settings["direction"] = direction
                     self.save()
-                    self.setting_changed.emit("direction", direction)
                     self._apply_direction(direction)
+                    self.setting_changed.emit("direction", direction)
 
-            # Theme-related changes
-            if key in ("theme", "font_size", "font_family", "direction"):
+            # Theme-related changes — direction مستقل لا يُعيد apply_theme
+            if key in ("theme", "font_size", "font_family"):
                 from core.theme_manager import ThemeManager
 
                 ThemeManager.get_instance().apply_theme(
@@ -556,10 +550,9 @@ class SettingsManager(QObject):
                     font_family=self.get("font_family"),
                 )
 
-                if key == "direction":
-                    self._apply_direction(value)
-
                 self._pending_theme_apply = False
+
+            # Direction — يُطبَّق فقط عند تغيير اللغة (مُعالَج أعلاه)
 
         except Exception as e:
             logger.error(f"Error applying side effects for '{key}': {e}")
@@ -576,6 +569,10 @@ class SettingsManager(QObject):
     def _apply_direction(self, direction: str) -> None:
         """Apply layout direction change"""
         try:
+            if not direction or direction not in ("rtl", "ltr"):
+                logger.warning(f"_apply_direction: invalid value '{direction}', skipping")
+                return
+
             app = QApplication.instance()
             if app is None:
                 return

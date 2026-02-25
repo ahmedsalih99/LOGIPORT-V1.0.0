@@ -11,6 +11,48 @@ DEFAULT_DB_NAME = "logiport.db"
 
 
 # -----------------------------
+# Datetime utilities
+# -----------------------------
+
+def utc_to_local(dt: datetime.datetime) -> datetime.datetime:
+    """
+    يحوّل datetime مخزّن بـ UTC (naive) إلى التوقيت المحلي للجهاز.
+    يستخدم في العرض فقط — لا في الحفظ.
+    """
+    if dt is None:
+        return dt
+    # أضف tzinfo=UTC ثم حوّل للتوقيت المحلي ثم اسحب tzinfo
+    import datetime as _dt
+    utc_aware = dt.replace(tzinfo=_dt.timezone.utc)
+    return utc_aware.astimezone().replace(tzinfo=None)
+
+
+def format_local_dt(dt: datetime.datetime, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    """
+    يعرض datetime بالتوقيت المحلي. الاستخدام:
+        format_local_dt(row.timestamp)           → "2024-01-15 14:30"
+        format_local_dt(row.created_at, "%H:%M") → "14:30"
+    """
+    if dt is None:
+        return "—"
+    return utc_to_local(dt).strftime(fmt)
+
+
+def utc_now() -> datetime.datetime:
+    """
+    المصدر الوحيد للوقت الحالي في المشروع.
+
+    - يُرجع datetime naive (بدون tzinfo) بتوقيت UTC
+    - متوافق مع SQLite الذي لا يدعم timezone-aware datetimes
+    - يجب استخدام هذه الدالة في كل مكان بدلاً من:
+        datetime.utcnow()          ← deprecated في Python 3.12
+        datetime.now()             ← يُرجع التوقيت المحلي
+        datetime.now(timezone.utc) ← aware datetime — مشكلة مع SQLite
+    """
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
+
+# -----------------------------
 # Helpers
 # -----------------------------
 

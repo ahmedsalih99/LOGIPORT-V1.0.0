@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Form A — Certificate of Origin (GSP)</title>
+<style>
+/* ══════════════════════════════════════════════════════
+   A4 STRICT — 210 × 297 mm
+   ══════════════════════════════════════════════════════ */
+@page {
+  size: 210mm 297mm;
+  margin: 0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width:  210mm;
+  height: 297mm;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 7.5pt;
+  color: #000;
+  background: #fff;
+}
+
+.page {
+  width:  210mm;
+  height: 297mm;
+  padding: 5mm;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── outer border ── */
+.outer {
+  width: 100%;
+  height: 100%;
+  border: 1pt solid #000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── generic cell ── */
+.cell {
+  border-bottom: 0.5pt solid #000;
+  padding: 3pt 5pt;
+  position: relative;
+  overflow: hidden;
+}
+.row { display: flex; }
+.row > .cell + .cell { border-left: 0.5pt solid #000; }
+
+/* widths */
+.w50  { flex: 0 0 50%; }
+.w60  { flex: 0 0 60%; }
+.w40  { flex: 0 0 40%; }
+.wflex { flex: 1; }
+
+/* ── top section: boxes 1-4 ── */
+.top-section {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 0.5pt solid #000;
+}
+.top-left {
+  flex: 1;
+  border-right: 0.5pt solid #000;
+}
+.top-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── right-top: header block ── */
+.ref-block {
+  border-bottom: 0.5pt solid #000;
+  padding: 4pt 8pt;
+  text-align: center;
+}
+.ref-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 7pt;
+  margin-bottom: 3pt;
+}
+.ref-no {
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 1pt;
+}
+.gsp-title  { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .3pt; margin-top:4pt; }
+.cert-title { font-size: 9pt; font-weight: 900; text-transform: uppercase; letter-spacing: .5pt; margin-top:2pt; }
+.cert-sub   { font-size: 7pt; font-style: italic; margin-top:1pt; }
+.form-a-big { font-size: 13pt; font-weight: 900; letter-spacing: 2pt; margin-top:3pt; }
+.issued-in  { font-size: 7pt; margin-top:6pt; }
+.issued-in span { display: inline-block; border-bottom: 0.5pt solid #000; min-width: 90pt; }
+.see-notes  { font-size: 6pt; font-style: italic; text-align: right; margin-top:4pt; }
+
+/* ── box labels ── */
+.box-no   { font-size: 6pt; font-weight: 700; margin-bottom: 1pt; display: block; }
+.box-lbl  { font-size: 7pt; font-weight: 700; display: block; margin-bottom: 2pt; }
+.box-lbl2 { font-size: 6.5pt; font-style: italic; display: block; margin-bottom: 2pt; color: #333; }
+.val      { font-size: 8pt; font-weight: 700; display: block; margin-top: 2pt; min-height: 12pt; }
+
+/* ── goods table ── */
+.goods-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.goods-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7pt;
+}
+.goods-table th {
+  border: 0.5pt solid #000;
+  padding: 3pt 3pt;
+  font-size: 6.5pt;
+  font-weight: 700;
+  vertical-align: top;
+  text-align: center;
+  line-height: 1.3;
+}
+.goods-table td {
+  border: 0.5pt solid #000;
+  padding: 2pt 3pt;
+  height: 14pt;
+  vertical-align: top;
+  font-size: 7pt;
+}
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.center { text-align: center; }
+
+/* ── bottom: boxes 11 & 12 ── */
+.bottom-section {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 0.5pt solid #000;
+  min-height: 55mm;
+}
+.bottom-cell {
+  flex: 1;
+  padding: 4pt 6pt;
+}
+.bottom-cell + .bottom-cell {
+  border-left: 0.5pt solid #000;
+}
+.bottom-title {
+  font-size: 7.5pt;
+  font-weight: 700;
+  margin-bottom: 4pt;
+  display: block;
+}
+.bottom-text {
+  font-size: 7pt;
+  line-height: 1.5;
+}
+.dot-line {
+  display: block;
+  border-bottom: 0.5pt dotted #000;
+  margin: 6pt 0 2pt;
+  min-width: 100%;
+}
+.foot-sig {
+  font-size: 6.5pt;
+  border-top: 0.5pt solid #000;
+  padding: 2pt 5pt;
+  display: block;
+  margin-top: 6pt;
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="outer">
+
+  <!-- ══ TOP SECTION (Boxes 1–4) ══ -->
+  <div class="top-section" style="min-height:70mm;">
+    <!-- Left: boxes 1 + 2 -->
+    <div class="top-left">
+      <!-- Box 1 -->
+      <div class="cell" style="min-height:32mm; border-bottom:0.5pt solid #000;">
+        <span class="box-no">1.</span>
+        <span class="box-lbl">Goods consigned from (exporter's business name, address, country)</span>
+        <span class="val">{{ (exporter or {}).get('name','') or '' }}</span>
+        <span style="font-size:7pt; display:block;">{{ (exporter or {}).get('address','') or '' }}</span>
+        <span style="font-size:7pt; display:block;">{{ (exporter or {}).get('city','') or '' }}{% if (exporter or {}).get('city') and (exporter or {}).get('country') %}, {% endif %}{{ (exporter or {}).get('country','') or '' }}</span>
+        {% if (exporter or {}).get('tax_id') %}
+        <span style="font-size:6.5pt; display:block; margin-top:2pt; color:#555;">Tax ID: {{ exporter.tax_id }}</span>
+        {% endif %}
+      </div>
+      <!-- Box 2 -->
+      <div class="cell" style="min-height:32mm;">
+        <span class="box-no">2.</span>
+        <span class="box-lbl">Goods consigned to (consignee's name, address, country)</span>
+        <span class="val">{{ (consignee or {}).get('name','') or '' }}</span>
+        <span style="font-size:7pt; display:block;">{{ (consignee or {}).get('address','') or '' }}</span>
+        <span style="font-size:7pt; display:block;">{{ (consignee or {}).get('city','') or '' }}{% if (consignee or {}).get('city') and (consignee or {}).get('country') %}, {% endif %}{{ (consignee or {}).get('country','') or '' }}</span>
+      </div>
+    </div>
+
+    <!-- Right: ref block + boxes 3 + 4 -->
+    <div class="top-right">
+      <!-- Reference + GSP header -->
+      <div class="ref-block">
+        <div class="ref-line">
+          <span>Reference No</span>
+          <span class="ref-no">{{ certificate_no or reference_no or '' }}</span>
+        </div>
+        <div class="gsp-title">Generalized System of Preferences</div>
+        <div class="cert-title">Certificate of Origin</div>
+        <div class="cert-sub">(Combined declaration and certificate)</div>
+        <div class="form-a-big">FORM A</div>
+        <div class="issued-in">
+          Issued in <span>{{ (exporter or {}).get('country','') or '' }}</span>
+          <span style="font-size:6pt; display:block;">(country)</span>
+        </div>
+        <div class="see-notes">See notes overleaf</div>
+      </div>
+      <!-- Box 3: Transport -->
+      <div class="cell" style="flex:1; border-bottom:0.5pt solid #000; min-height:30mm;">
+        <span class="box-no">3.</span>
+        <span class="box-lbl">Means of transport and route (as far as known)</span>
+        <span class="val">{{ transport_info or delivery_method or '' }}</span>
+      </div>
+      <!-- Box 4: Official use -->
+      <div class="cell" style="flex:1; min-height:30mm;">
+        <span class="box-no">4.</span>
+        <span class="box-lbl">For official use</span>
+      </div>
+    </div>
+  </div><!-- /top-section -->
+
+  <!-- ══ GOODS TABLE (Boxes 5–10) ══ -->
+  <div class="goods-section">
+    <table class="goods-table">
+      <thead>
+        <tr>
+          <th style="width:6%">5.<br/>Item num-<br/>ber</th>
+          <th style="width:11%">6.<br/>Marks and<br/>numbers of<br/>packages</th>
+          <th style="width:35%">7. Number and kind of packages;<br/>description of goods</th>
+          <th style="width:12%">8.<br/>Origin<br/>criterion<br/><span style="font-style:italic; font-size:6pt;">(see notes<br/>overleaf)</span></th>
+          <th style="width:14%">9.<br/>Gross weight<br/>or other<br/>quantity</th>
+          <th style="width:22%">10.<br/>Number<br/>and date of<br/>invoices</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set items_list = items or [] %}
+        {% for it in items_list %}
+        <tr>
+          <td class="center">{{ it.n }}</td>
+          <td>{{ it.code or '' }}</td>
+          <td>
+            <strong>{{ it.description or '' }}</strong>
+            {% if it.packaging %}<br/><span style="font-size:6.5pt; color:#555;">{{ it.qty|int }} {{ it.packaging }}</span>{% endif %}
+          </td>
+          <td class="center">P</td>
+          <td class="num">{{ "%.3f"|format(it.gross) }} kg</td>
+          <td class="center" style="font-size:7pt;">{{ invoice_no or reference_no or '' }}<br/>{{ date or '' }}</td>
+        </tr>
+        {% endfor %}
+        <!-- filler rows -->
+        {% for _ in range([12 - (items_list|length), 0]|max) %}
+        <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══ BOTTOM SECTION (Boxes 11 & 12) ══ -->
+  <div class="bottom-section">
+    <!-- Box 11: Certification -->
+    <div class="bottom-cell">
+      <span class="bottom-title">11. Certification</span>
+      <div class="bottom-text">
+        It is hereby certified, on the basis of control carried out, that the declaration by the exporter is correct.
+        <span class="dot-line">&nbsp;</span>
+        <span class="dot-line">&nbsp;</span>
+        <span class="dot-line">&nbsp;</span>
+      </div>
+      {% if issuing_authority %}
+      <div style="font-size:7pt; margin-top:4pt;"><strong>{{ issuing_authority }}</strong></div>
+      {% endif %}
+      <span class="foot-sig">Place and date, signature and stamp of certifying authority</span>
+    </div>
+
+    <!-- Box 12: Declaration by exporter -->
+    <div class="bottom-cell">
+      <span class="bottom-title">12. Declaration by the exporter</span>
+      <div class="bottom-text">
+        The undersigned hereby declares that the above details and statements are correct; that all the goods were
+        <br/><br/>
+        produced in
+        <span class="dot-line">&nbsp;</span>
+        <span style="display:block; text-align:center; font-size:6.5pt; font-style:italic; margin-bottom:4pt;">(country)</span>
+        and that they comply with the origin requirements specified for those goods in the generalized system of preferences for goods exported to
+        <span class="dot-line">&nbsp;</span>
+        <span style="display:block; text-align:center; font-size:6.5pt; font-style:italic;">(importing country)</span>
+      </div>
+      <span class="foot-sig">Place and date, signature of authorized signatory</span>
+    </div>
+  </div>
+
+</div><!-- /outer -->
+</div><!-- /page -->
+</body>
+</html>

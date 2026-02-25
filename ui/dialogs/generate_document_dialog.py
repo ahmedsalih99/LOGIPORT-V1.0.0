@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 import logging
 logger = logging.getLogger(__name__)
 
-# ترجمة
 try:
     from core.translator import TranslationManager
     _T = TranslationManager.get_instance()
@@ -37,18 +36,28 @@ _DB_CODE_TO_DOC_CODE: Dict[str, str] = {
     "PL_EXPORT_SIMPLE":       "packing_list.export.simple",
     "PL_EXPORT_WITH_DATES":   "packing_list.export.with_dates",
     "PL_EXPORT_WITH_LINE_ID": "packing_list.export.with_line_id",
+    # ─── جديد ────────────────────────────────────────────────────────────────
+    "cmr":                    "cmr",
+    "form_a":                 "form_a",
 }
 
-_INVOICE_PREFIXES = ("INV_", "invoice.")
-_PACKING_PREFIXES = ("PL_", "PACKING", "packing")
+_INVOICE_PREFIXES  = ("INV_", "invoice.")
+_PACKING_PREFIXES  = ("PL_", "PACKING", "packing")
+_TRANSPORT_CODES   = ("cmr",)
+_ORIGIN_CERT_CODES = ("form_a", "form.a")
 
 
 def _classify_doc_type(code: str) -> str:
-    cu = code.upper()
+    cu  = code.upper()
+    clo = code.lower()
     if any(cu.startswith(p.upper()) for p in _INVOICE_PREFIXES):
         return "invoice"
     if any(cu.startswith(p.upper()) for p in _PACKING_PREFIXES):
         return "packing"
+    if clo in _TRANSPORT_CODES:
+        return "transport"
+    if clo in _ORIGIN_CERT_CODES:
+        return "origin_cert"
     return "other"
 
 
@@ -173,18 +182,12 @@ class _ResultsDialog(QDialog):
 
 
 # =============================================================================
-# Main Generation Dialog — v2
+# Main Generation Dialog — v3  (+ CMR / Form A)
 # =============================================================================
 class GenerateDocumentDialog(QDialog):
     """
-    حوار توليد المستندات — الإصدار المطوّر:
-
-    التطويرات:
-    1. اللغة تُقرأ تلقائياً من إعداد documents_language (مع إمكانية التعديل)
-    2. preselected_doc_types: يمكن تمرير أنواع محددة من تاب المستندات
-    3. precheck مرن: يحذّر بدل الرفض للبيانات الناقصة (سعر=0, عملة ناقصة..)
-    4. مسار حفظ مخصص من إعداد documents_output_path
-    5. نتيجة محسّنة: زر فتح المجلد + عرض اسم الملف
+    حوار توليد المستندات — الإصدار الثالث:
+    - يدعم الفواتير + قوائم التعبئة + CMR + شهادة المنشأ (Form A)
     """
 
     def __init__(
@@ -197,11 +200,11 @@ class GenerateDocumentDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(_("generate_documents"))
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(480)
         self.trx_id   = transaction_id
         self.trx_no   = transaction_no
         self._thread: QThread | None = None
-        self._preselected      = preselected_doc_types or []
+        self._preselected       = preselected_doc_types or []
         self._preselected_codes = preselected_doc_codes or []
 
         try:
@@ -209,9 +212,7 @@ class GenerateDocumentDialog(QDialog):
         except Exception:
             self._lang = "ar"
 
-        # لغة المستندات من الإعدادات
-        self._doc_lang_default = self._get_documents_language()
-        # مسار الحفظ من الإعدادات
+        self._doc_lang_default  = self._get_documents_language()
         self._output_path_default = self._get_output_path()
 
         layout = QVBoxLayout(self)
@@ -221,11 +222,18 @@ class GenerateDocumentDialog(QDialog):
         # ── 1) أنواع المستندات ────────────────────────────────────────
         types_box = QGroupBox(_("document_types"))
         hb_types  = QHBoxLayout(types_box)
-        self.chk_invoice = QCheckBox(_("invoice"))
-        self.chk_packing = QCheckBox(_("packing_list"))
+
+        self.chk_invoice   = QCheckBox(_("invoice"))
+        self.chk_packing   = QCheckBox(_("packing_list"))
+        self.chk_cmr       = QCheckBox("CMR")
+        self.chk_forma     = QCheckBox(_("form_a_certificate"))   # "شهادة المنشأ"
+
         self.chk_invoice.setChecked(True)
+
         hb_types.addWidget(self.chk_invoice)
         hb_types.addWidget(self.chk_packing)
+        hb_types.addWidget(self.chk_cmr)
+        hb_types.addWidget(self.chk_forma)
         layout.addWidget(types_box)
 
         # ── 2) اللغات ────────────────────────────────────────────────
@@ -235,7 +243,6 @@ class GenerateDocumentDialog(QDialog):
         self.chk_lang_ar  = QCheckBox("العربية")
         self.chk_lang_en  = QCheckBox("English")
         self.chk_lang_tr  = QCheckBox("Türkçe")
-        # ✅ التحسين #1 — اللغة من الإعدادات تلقائياً
         self._apply_default_lang()
         grid.addWidget(self.chk_lang_all, 0, 0, 1, 3)
         grid.addWidget(self.chk_lang_ar,  1, 0)
@@ -256,12 +263,45 @@ class GenerateDocumentDialog(QDialog):
         self.cmb_pl_type.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(self.cmb_pl_type)
 
-        self._load_document_types_from_db()
+        # ── 5) نوع CMR ────────────────────────────────────────────────
+        self.lbl_cmr_type = QLabel("CMR — " + _("consignment_note"))
+        layout.addWidget(self.lbl_cmr_type)
+        self.cmb_cmr_type = QComboBox()
+        self.cmb_cmr_type.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        layout.addWidget(self.cmb_cmr_type)
 
-        # ✅ التحسين #2 — تطبيق الاختيار المسبق من تاب المستندات
+        # ── 6) نوع Form A ─────────────────────────────────────────────
+        self.lbl_forma_type = QLabel(_("form_a_certificate") + " (GSP)")
+        layout.addWidget(self.lbl_forma_type)
+        self.cmb_forma_type = QComboBox()
+        self.cmb_forma_type.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        layout.addWidget(self.cmb_forma_type)
+
+        # ربط الـ visibility بالـ checkboxes
+        self.chk_invoice.toggled.connect(lambda v: (
+            self.cmb_invoice_type.setVisible(v)
+        ))
+        self.chk_packing.toggled.connect(lambda v: (
+            self.cmb_pl_type.setVisible(v)
+        ))
+        self.chk_cmr.toggled.connect(lambda v: (
+            self.lbl_cmr_type.setVisible(v),
+            self.cmb_cmr_type.setVisible(v),
+        ))
+        self.chk_forma.toggled.connect(lambda v: (
+            self.lbl_forma_type.setVisible(v),
+            self.cmb_forma_type.setVisible(v),
+        ))
+        # حالة أولية
+        self.lbl_cmr_type.setVisible(False)
+        self.cmb_cmr_type.setVisible(False)
+        self.lbl_forma_type.setVisible(False)
+        self.cmb_forma_type.setVisible(False)
+
+        self._load_document_types_from_db()
         self._apply_preselected()
 
-        # ── 5) مسار الحفظ ─────────────────────────────────────────────
+        # ── 7) مسار الحفظ ─────────────────────────────────────────────
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         layout.addWidget(sep)
@@ -279,8 +319,8 @@ class GenerateDocumentDialog(QDialog):
         layout.addLayout(path_row)
         self.btn_browse.clicked.connect(self._browse_path)
 
-        # ── 6) شريط التقدم + رسالة الحالة ───────────────────────────
-        self.progress = QProgressBar()
+        # ── 8) شريط التقدم ────────────────────────────────────────────
+        self.progress   = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
@@ -290,7 +330,7 @@ class GenerateDocumentDialog(QDialog):
         self.lbl_status.setObjectName("status-label")
         layout.addWidget(self.lbl_status)
 
-        # ── 7) الأزرار ────────────────────────────────────────────────
+        # ── 9) الأزرار ────────────────────────────────────────────────
         btns = QHBoxLayout()
         self.btn_generate = QPushButton("▶  " + _("generate"))
         self.btn_cancel   = QPushButton(_("cancel"))
@@ -323,7 +363,6 @@ class GenerateDocumentDialog(QDialog):
             return ""
 
     def _apply_default_lang(self):
-        """يضع علامة على اللغة المحددة في الإعدادات."""
         lang = self._doc_lang_default
         self.chk_lang_ar.setChecked(lang == "ar")
         self.chk_lang_en.setChecked(lang == "en")
@@ -341,8 +380,10 @@ class GenerateDocumentDialog(QDialog):
             self._load_fallback_types()
             return
 
-        invoices: List[Tuple[str, str, int | None]] = []
-        packings: List[Tuple[str, str, int | None]] = []
+        invoices:   List[Tuple[str, str, int | None]] = []
+        packings:   List[Tuple[str, str, int | None]] = []
+        transports: List[Tuple[str, str, int | None]] = []
+        origin_certs: List[Tuple[str, str, int | None]] = []
 
         for dt in all_types:
             if not getattr(dt, "is_active", 1):
@@ -358,20 +399,34 @@ class GenerateDocumentDialog(QDialog):
                 invoices.append((label, doc_code, db_id))
             elif category == "packing":
                 packings.append((label, doc_code, db_id))
+            elif category == "transport":
+                transports.append((label, doc_code, db_id))
+            elif category == "origin_cert":
+                origin_certs.append((label, doc_code, db_id))
 
         self.cmb_invoice_type.clear()
-        if invoices:
-            for label, doc_code, db_id in invoices:
-                self.cmb_invoice_type.addItem(label, (doc_code, db_id))
-        else:
+        for label, dc, db_id in invoices:
+            self.cmb_invoice_type.addItem(label, (dc, db_id))
+        if not invoices:
             self._load_fallback_invoices()
 
         self.cmb_pl_type.clear()
-        if packings:
-            for label, doc_code, db_id in packings:
-                self.cmb_pl_type.addItem(label, (doc_code, db_id))
-        else:
+        for label, dc, db_id in packings:
+            self.cmb_pl_type.addItem(label, (dc, db_id))
+        if not packings:
             self._load_fallback_packings()
+
+        self.cmb_cmr_type.clear()
+        for label, dc, db_id in transports:
+            self.cmb_cmr_type.addItem(label, (dc, db_id))
+        if not transports:
+            self.cmb_cmr_type.addItem("CMR", ("cmr", None))
+
+        self.cmb_forma_type.clear()
+        for label, dc, db_id in origin_certs:
+            self.cmb_forma_type.addItem(label, (dc, db_id))
+        if not origin_certs:
+            self.cmb_forma_type.addItem("Form A (GSP)", ("form_a", None))
 
     def _doc_type_label(self, dt) -> str:
         lang = self._lang
@@ -381,67 +436,50 @@ class GenerateDocumentDialog(QDialog):
             return (getattr(dt, "name_tr", None) or getattr(dt, "name_en", None) or getattr(dt, "name_ar", None) or "")
         return (getattr(dt, "name_en", None) or getattr(dt, "name_ar", None) or getattr(dt, "name_tr", None) or "")
 
-    # ✅ التحسين #2 — تطبيق الاختيار المسبق
     def _apply_preselected(self):
-        """
-        يضبط الـ checkboxes وأنواع المستندات بناءً على:
-        1. preselected_doc_codes (codes مباشرة من documents_tab) — أولوية
-        2. preselected_doc_types (IDs) — fallback
-        """
-        has_invoice = False
-        has_packing = False
+        has_invoice = has_packing = has_cmr = has_forma = False
 
-        # ── ربط بالـ codes (أدق) ──────────────────────────────────────
+        def _match_cmb(cmb: QComboBox, codes: list, ids: list) -> bool:
+            for i in range(cmb.count()):
+                data = cmb.itemData(i)
+                code = data[0] if isinstance(data, tuple) else data
+                db_id = data[1] if isinstance(data, tuple) else None
+                if code in codes or (db_id is not None and db_id in ids):
+                    cmb.setCurrentIndex(i)
+                    return True
+            return False
+
         if self._preselected_codes:
-            for i in range(self.cmb_invoice_type.count()):
-                data = self.cmb_invoice_type.itemData(i)
-                code = data[0] if isinstance(data, tuple) else data
-                if code in self._preselected_codes:
-                    self.cmb_invoice_type.setCurrentIndex(i)
-                    has_invoice = True
-                    break
-
-            for i in range(self.cmb_pl_type.count()):
-                data = self.cmb_pl_type.itemData(i)
-                code = data[0] if isinstance(data, tuple) else data
-                if code in self._preselected_codes:
-                    self.cmb_pl_type.setCurrentIndex(i)
-                    has_packing = True
-                    break
-
-        # ── fallback بالـ IDs ─────────────────────────────────────────
+            has_invoice = _match_cmb(self.cmb_invoice_type, self._preselected_codes, [])
+            has_packing = _match_cmb(self.cmb_pl_type,      self._preselected_codes, [])
+            has_cmr     = _match_cmb(self.cmb_cmr_type,     self._preselected_codes, [])
+            has_forma   = _match_cmb(self.cmb_forma_type,   self._preselected_codes, [])
         elif self._preselected:
-            for i in range(self.cmb_invoice_type.count()):
-                data = self.cmb_invoice_type.itemData(i)
-                if isinstance(data, tuple):
-                    _, db_id = data
-                    if db_id in self._preselected:
-                        self.cmb_invoice_type.setCurrentIndex(i)
-                        has_invoice = True
-                        break
+            has_invoice = _match_cmb(self.cmb_invoice_type, [], self._preselected)
+            has_packing = _match_cmb(self.cmb_pl_type,      [], self._preselected)
+            has_cmr     = _match_cmb(self.cmb_cmr_type,     [], self._preselected)
+            has_forma   = _match_cmb(self.cmb_forma_type,   [], self._preselected)
 
-            for i in range(self.cmb_pl_type.count()):
-                data = self.cmb_pl_type.itemData(i)
-                if isinstance(data, tuple):
-                    _, db_id = data
-                    if db_id in self._preselected:
-                        self.cmb_pl_type.setCurrentIndex(i)
-                        has_packing = True
-                        break
-
-        if has_invoice or has_packing:
+        if any([has_invoice, has_packing, has_cmr, has_forma]):
             self.chk_invoice.setChecked(has_invoice)
             self.chk_packing.setChecked(has_packing)
+            self.chk_cmr.setChecked(has_cmr)
+            self.chk_forma.setChecked(has_forma)
+            # مزامنة الـ visibility
+            self.lbl_cmr_type.setVisible(has_cmr)
+            self.cmb_cmr_type.setVisible(has_cmr)
+            self.lbl_forma_type.setVisible(has_forma)
+            self.cmb_forma_type.setVisible(has_forma)
 
     # Fallbacks
     def _load_fallback_invoices(self) -> None:
         for label, doc_code in [
-            ("External Invoice",        "invoice.foreign.commercial"),
-            ("Normal Invoice",          "invoice.normal"),
-            ("Proforma Invoice",        "invoice.proforma"),
-            ("Syrian – Transit",        "invoice.syrian.transit"),
-            ("Syrian – Intermediary",   "invoice.syrian.intermediary"),
-            ("Syrian – Entry",          "invoice.syrian.entry"),
+            ("External Invoice",       "invoice.foreign.commercial"),
+            ("Normal Invoice",         "invoice.normal"),
+            ("Proforma Invoice",       "invoice.proforma"),
+            ("Syrian – Transit",       "invoice.syrian.transit"),
+            ("Syrian – Intermediary",  "invoice.syrian.intermediary"),
+            ("Syrian – Entry",         "invoice.syrian.entry"),
         ]:
             self.cmb_invoice_type.addItem(label, (doc_code, None))
 
@@ -456,8 +494,12 @@ class GenerateDocumentDialog(QDialog):
     def _load_fallback_types(self) -> None:
         self.cmb_invoice_type.clear()
         self.cmb_pl_type.clear()
+        self.cmb_cmr_type.clear()
+        self.cmb_forma_type.clear()
         self._load_fallback_invoices()
         self._load_fallback_packings()
+        self.cmb_cmr_type.addItem("CMR",         ("cmr",    None))
+        self.cmb_forma_type.addItem("Form A (GSP)", ("form_a", None))
 
     # =========================================================================
     # UI helpers
@@ -479,6 +521,8 @@ class GenerateDocumentDialog(QDialog):
         types = []
         if self.chk_invoice.isChecked(): types.append("invoice")
         if self.chk_packing.isChecked(): types.append("packing_list")
+        if self.chk_cmr.isChecked():     types.append("cmr")
+        if self.chk_forma.isChecked():   types.append("origin_cert")
         langs = []
         if self.chk_lang_ar.isChecked(): langs.append("ar")
         if self.chk_lang_en.isChecked(): langs.append("en")
@@ -495,12 +539,15 @@ class GenerateDocumentDialog(QDialog):
         data = cmb.currentData()
         if isinstance(data, tuple):
             return data[0]
-        return data  # fallback للـ strings القديمة
+        return data
 
     def _build_jobs(self, types: List[str], langs: List[str]) -> List[_JobSpec]:
         jobs: List[_JobSpec] = []
-        inv_code = self._get_doc_code(self.cmb_invoice_type)
-        pl_code  = self._get_doc_code(self.cmb_pl_type)
+        inv_code   = self._get_doc_code(self.cmb_invoice_type)
+        pl_code    = self._get_doc_code(self.cmb_pl_type)
+        cmr_code   = self._get_doc_code(self.cmb_cmr_type)
+        forma_code = self._get_doc_code(self.cmb_forma_type)
+
         for t in types:
             if t == "invoice":
                 if not inv_code:
@@ -510,6 +557,10 @@ class GenerateDocumentDialog(QDialog):
                 if not pl_code:
                     raise ValueError(_("please_select_packing_list_type"))
                 code = pl_code
+            elif t == "cmr":
+                code = cmr_code or "cmr"
+            elif t == "origin_cert":
+                code = forma_code or "form_a"
             else:
                 continue
             for lg in langs:
@@ -517,14 +568,9 @@ class GenerateDocumentDialog(QDialog):
         return jobs
 
     # =========================================================================
-    # ✅ التحسين #3 — Precheck مرن: يحذّر بدل الرفض
+    # Precheck
     # =========================================================================
     def _precheck_transaction_requirements(self, doc_codes: list) -> List[str]:
-        """
-        يتحقق من صحة بيانات المعاملة.
-        يُثير ValueError للأخطاء الحقيقية (معاملة غير موجودة، لا أقلام).
-        يُرجع قائمة تحذيرات للبيانات الناقصة غير الحرجة (سعر=0، عملة ناقصة).
-        """
         from sqlalchemy import text as _sql
         from database.models import get_session_local as _gs
 
@@ -549,18 +595,23 @@ class GenerateDocumentDialog(QDialog):
             if not rows:
                 raise ValueError(_("transaction_has_no_items"))
 
-            currencies = set()
+            # CMR / Form A لا تحتاج سعراً — أسقط تحذيرات السعر لها
+            is_transport_only = all(
+                c in ("cmr", "form_a") for c in doc_codes
+            )
+
+            currencies   = set()
             missing_price = []
             for r in rows:
-                if r["currency_id"] is None:
+                if r["currency_id"] is None and not is_transport_only:
                     warnings.append("⚠  " + _("row_missing_currency").format(id=r["id"]))
                 else:
                     currencies.add(r["currency_id"])
-                if r["pricing_type_id"] is None:
+                if r["pricing_type_id"] is None and not is_transport_only:
                     warnings.append("⚠  " + _("row_missing_pricing").format(id=r["id"]))
                 if r["packaging_type_id"] is None:
                     warnings.append("⚠  " + _("row_missing_packaging").format(id=r["id"]))
-                if r["unit_price"] in (None, 0):
+                if r["unit_price"] in (None, 0) and not is_transport_only:
                     missing_price.append(str(r["id"]))
 
             if missing_price:
@@ -568,6 +619,25 @@ class GenerateDocumentDialog(QDialog):
 
             if len(currencies) > 1:
                 warnings.append("⚠  " + _("multiple_currencies_not_supported"))
+
+            # تحذير خاص بـ CMR: هل يوجد transport_details؟
+            if any(c == "cmr" for c in doc_codes):
+                td = s.execute(_sql(
+                    "SELECT truck_plate, carrier_company_id FROM transport_details WHERE transaction_id=:i"
+                ), {"i": int(self.trx_id)}).mappings().first()
+                if not td or not td.get("truck_plate"):
+                    warnings.append("⚠  " + _("cmr_truck_plate_missing"))
+                if not td or not td.get("carrier_company_id"):
+                    warnings.append("⚠  " + _("cmr_carrier_missing"))
+
+            # تحذير خاص بـ Form A: هل يوجد certificate_no؟
+            if any(c == "form_a" for c in doc_codes):
+                td2 = s.execute(_sql(
+                    "SELECT certificate_no FROM transport_details WHERE transaction_id=:i"
+                ), {"i": int(self.trx_id)}).mappings().first()
+                if not td2 or not td2.get("certificate_no"):
+                    warnings.append("⚠  " + _("form_a_certificate_no_missing"))
+
         finally:
             s.close()
 
@@ -588,7 +658,6 @@ class GenerateDocumentDialog(QDialog):
             QMessageBox.warning(self, _("warning"), str(e))
             return
 
-        # Precheck
         try:
             unique_codes = sorted({j.doc_code for j in jobs})
             warnings = self._precheck_transaction_requirements(unique_codes)
@@ -599,7 +668,6 @@ class GenerateDocumentDialog(QDialog):
             logger.warning("precheck failed: %s", e)
             warnings = []
 
-        # ✅ التحسين #3 — اسأل المستخدم عند وجود تحذيرات بدل الرفض المباشر
         if warnings:
             reply = QMessageBox.question(
                 self,
@@ -611,15 +679,16 @@ class GenerateDocumentDialog(QDialog):
             if reply != QMessageBox.Yes:
                 return
 
-        # توزيع رقم المستند
         from services.persist_generated_doc import allocate_group_doc_no
-        prefix = "INVPL" if len(types) > 1 else ("INV" if "invoice" in types else "PL")
+        prefix = "INVPL" if len(types) > 1 else (
+            "INV" if "invoice" in types else (
+            "CMR" if "cmr" in types else (
+            "FA"  if "origin_cert" in types else "PL")))
         try:
             shared_no = allocate_group_doc_no(self.trx_id, prefix=prefix)
         except Exception:
             shared_no = None
 
-        # ✅ التحسين #4 — مسار الحفظ: احفظه في الإعدادات ليقرأه _get_output_root()
         output_path = self.txt_output_path.text().strip()
         if output_path:
             try:

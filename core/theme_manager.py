@@ -11,6 +11,8 @@ Theme Manager - LOGIPORT v3.0 (NEW SYSTEM ONLY)
 import logging
 from typing import Optional, Dict
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Signal
+from core.singleton import QObjectSingletonMixin
 
 logger = logging.getLogger(__name__)
 
@@ -34,25 +36,17 @@ DEFAULT_FONT_FAMILY = "Tajawal"
 AVAILABLE_THEMES = ["light", "dark"]
 
 
-class ThemeManager:
+class ThemeManager(QObject, QObjectSingletonMixin):
     """Centralized Theme Manager (Singleton)."""
 
-    _instance: Optional["ThemeManager"] = None
+    theme_changed = Signal(str)   # يُطلق بعد تطبيق theme جديد — يحمل اسمه
 
     def __init__(self) -> None:
+        super().__init__()
         self.current_theme = DEFAULT_THEME
         self._theme_applied = False  # True بعد أول apply_theme ناجح
         self.current_font_size = DEFAULT_FONT_SIZE
         self.current_font_family = DEFAULT_FONT_FAMILY
-
-    # --------------------------------------------------
-    # Singleton access
-    # --------------------------------------------------
-    @classmethod
-    def get_instance(cls) -> "ThemeManager":
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
 
     # --------------------------------------------------
     # Apply theme
@@ -106,6 +100,7 @@ class ThemeManager:
             self.current_font_family = font_family
 
             logger.info("✅ Theme applied successfully")
+            self.theme_changed.emit(theme_name)
             return True
 
         except (ImportError, RuntimeError, ValueError) as exc:

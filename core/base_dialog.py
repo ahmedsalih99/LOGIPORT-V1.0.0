@@ -42,7 +42,6 @@ class BaseDialog(QDialog):
         super().__init__(parent)
         self._loading_counter = 0
         self._auto_center = auto_center
-        self._loading_counter = 0
         self.settings = SettingsManager.get_instance()
         self.current_user = user or self._get_current_user()
         self.translator = TranslationManager.get_instance()
@@ -522,44 +521,3 @@ class BaseDialog(QDialog):
                 self.center_on_screen()
         except Exception as e:
             logger.error(f"Error centering on parent: {e}")
-
-
-
-
-
-# Example dialog using BaseDialog
-class ExampleDialog(BaseDialog):
-    """Example dialog demonstrating BaseDialog usage"""
-
-    def __init__(self, parent=None, user=None):
-        super().__init__(parent, user, title_key="example_dialog_title")
-
-        self.init_ui()
-
-    def init_ui(self):
-        """Initialize UI"""
-        layout = QVBoxLayout()
-
-        # Add button box
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        layout.addWidget(buttons)
-        self.setLayout(layout)
-
-        # Set responsive size
-        self.set_responsive_size(400, 300)
-        self.center_on_screen()
-
-    def accept(self):
-        """Handle accept (OK button)"""
-        self.log_event("Dialog accepted")
-        super().accept()
-
-    def reject(self):
-        """Handle reject (Cancel button)"""
-        self.log_event("Dialog rejected")
-        super().reject()

@@ -15,7 +15,7 @@ class DocumentGroup(Base):
     seq = Column(Integer, nullable=False)
 
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, server_default=func.datetime("now"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     transaction = relationship("Transaction")
     created_by = relationship("User", foreign_keys=[created_by_id])

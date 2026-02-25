@@ -31,6 +31,13 @@ _RULES = {
 
     # قوائم التعبئة
     "packing_list.": "documents.builders.packing_list",
+
+    # CMR — بوليصة الشحن البري الدولية
+    "cmr": "documents.builders.cmr_builder",
+
+    # Form A — شهادة المنشأ (GSP)
+    "form_a": "documents.builders.form_a_builder",
+    "form.a": "documents.builders.form_a_builder",
 }
 
 def _best_rule(doc_code: str) -> Optional[Tuple[str, str]]:

@@ -75,13 +75,20 @@ class Transaction(Base):
 
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, server_default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
     items = relationship("TransactionItem", back_populates="transaction", cascade="all, delete-orphan")
     entry_links = relationship("TransactionEntry", back_populates="transaction", cascade="all, delete-orphan")
+    transport_details = relationship(
+        "TransportDetails",
+        back_populates="transaction",
+        uselist=False,          # one-to-one
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, transaction_no ={self.transaction_no!r})>"

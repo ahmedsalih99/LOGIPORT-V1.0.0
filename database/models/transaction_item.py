@@ -49,9 +49,9 @@ class TransactionItem(Base):
 
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, server_default=func.current_timestamp(), onupdate=func.current_timestamp(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships (lazy='select' by default)
     transaction = relationship("Transaction", back_populates="items")

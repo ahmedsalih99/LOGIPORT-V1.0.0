@@ -34,7 +34,7 @@ except Exception:
 
 from PySide6.QtWidgets import (
     QMessageBox, QTableWidgetItem, QHBoxLayout, QWidget, QPushButton,
-    QDateEdit, QComboBox, QLabel, QFrame, QSizePolicy
+    QDateEdit, QComboBox, QLabel, QFrame, QSizePolicy, QVBoxLayout
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
@@ -65,7 +65,7 @@ class TransactionsTab(BaseTab):
         self.set_columns_for_role(
             base_columns=[
                 {"label": "transaction_no",       "key": "transaction_no"},
-                {"label": "transaction_type",     "key": "transaction_type_label"},
+                {"label": "transaction_type",     "key": "transaction_type_badge"},
                 {"label": "transaction_date",     "key": "transaction_date"},
                 {"label": "client",               "key": "client_name"},
                 {"label": "exporting_company",    "key": "exporter_name"},
@@ -92,6 +92,10 @@ class TransactionsTab(BaseTab):
 
         # ── build date/type filter bar ──────────────────────────────
         self._build_filter_bar()
+        self._build_footer()
+        # filter_box من البيس مكرر مع _type_combo الخاص بنا — نخفيه
+        if hasattr(self, "filter_box"):
+            self.filter_box.setVisible(False)
 
         for sig_name, handler in (
             ("request_add",        self.add_new_item),
@@ -250,34 +254,34 @@ class TransactionsTab(BaseTab):
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _get_filter_values(self):
-        """Return (date_from_str, date_to_str, trx_type_str)."""
-        d_from = self._date_from.date().toString("yyyy-MM-dd") if hasattr(self, "_date_from") else None
-        d_to   = self._date_to.date().toString("yyyy-MM-dd")   if hasattr(self, "_date_to")   else None
-        t_type = self._type_combo.currentData()                if hasattr(self, "_type_combo") else ""
-        # also apply search_bar text as client-side filter key
-        search = self.search_bar.text().strip().lower()        if hasattr(self, "search_bar")  else ""
-        return d_from, d_to, t_type or None, search
+        """Return (date_from_str, date_to_str, trx_type_str, search, status_str)."""
+        d_from  = self._date_from.date().toString("yyyy-MM-dd") if hasattr(self, "_date_from")    else None
+        d_to    = self._date_to.date().toString("yyyy-MM-dd")   if hasattr(self, "_date_to")      else None
+        t_type  = self._type_combo.currentData()                if hasattr(self, "_type_combo")   else ""
+        status  = self._status_combo.currentData()              if hasattr(self, "_status_combo") else ""
+        search  = self.search_bar.text().strip().lower()        if hasattr(self, "search_bar")    else ""
+        return d_from, d_to, t_type or None, search, status or None
 
     # ── Data ──────────────────────────────────────────────────────────
 
     def reload_data(self):
-        d_from, d_to, t_type, search = self._get_filter_values()
+        self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
+        self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
+        d_from, d_to, t_type, search, status = self._get_filter_values()
         admin = is_admin(self.current_user)
 
-        # Fetch with server-side date + type filters
+        # كل الفلاتر server-side الآن
         try:
             items = self.trx_crud.list_transactions(
                 limit=1000,
                 date_from=d_from,
                 date_to=d_to,
+                transaction_type=t_type or None,
+                search=search or None,
+                status=status or None,
             ) or []
         except TypeError:
-            # fallback if CRUD doesn't support date params yet
             items = self.trx_crud.list_transactions(limit=1000) or []
-
-        # Client-side type filter
-        if t_type:
-            items = [t for t in items if getattr(t, "transaction_type", "") == t_type]
 
         client_ids, company_ids, currency_ids = set(), set(), set()
         created_ids, updated_ids = set(), set()
@@ -334,10 +338,13 @@ class TransactionsTab(BaseTab):
 
             client_name = _pick(id_to_client.get(getattr(t, "client_id", None) or -1, {}))
 
+            trx_type_code = getattr(t, "transaction_type", "export") or "export"
+            trx_status = getattr(t, "status", "active") or "active"
             row = {
                 "id":                    getattr(t, "id", None),
                 "transaction_no":        getattr(t, "transaction_no", ""),
-                "transaction_type_label": self._(getattr(t, "transaction_type", "export")),
+                "transaction_type_label": self._(trx_type_code),
+                "transaction_type_badge": trx_type_code,
                 "transaction_date":      str(getattr(t, "transaction_date", "") or ""),
                 "client_name":           client_name,
                 "exporter_name":         _pick(id_to_company.get(getattr(t, "exporter_company_id", None) or -1, {})),
@@ -345,8 +352,9 @@ class TransactionsTab(BaseTab):
                 "relationship_label":    rel_map.get(str(getattr(t, "relationship_type", "") or ""), str(getattr(t, "relationship_type", "") or "")),
                 "entries_count":         entries_count.get(getattr(t, "id", 0), 0),
                 "totals_value_label":    tlbl,
+                "status":                trx_status,
                 "actions":               t,
-                "_client_name_raw":      client_name,  # for search
+                "_client_name_raw":      client_name,
             }
             if admin:
                 row.update({
@@ -357,21 +365,13 @@ class TransactionsTab(BaseTab):
                 })
             all_rows.append(row)
 
-        # ── Client-side search filter ──────────────────────────────
-        if search:
-            all_rows = [
-                r for r in all_rows
-                if search in str(r.get("transaction_no", "")).lower()
-                or search in str(r.get("_client_name_raw", "")).lower()
-                or search in str(r.get("exporter_name", "")).lower()
-            ]
-
         self.data = all_rows
 
         # ── Update result count ───────────────────────────────────
         if hasattr(self, "_count_lbl"):
             self._count_lbl.setText(f"({len(self.data)} " + self._("total_rows") + ")")
 
+        self._update_footer(self.data)
         self.render_table(self.data, show_actions=bool(self.can_edit or self.can_delete))
 
     def render_table(self, data, show_actions=True):
@@ -387,20 +387,77 @@ class TransactionsTab(BaseTab):
                 key = col.get("key")
                 if key == "actions":
                     if not show_actions: continue
-                    obj = row["actions"]
-                    al  = QHBoxLayout(); al.setContentsMargins(4,4,4,4); al.setSpacing(8)
-                    if can_edit:
-                        b = QPushButton(self._("edit")); b.setObjectName("primary-btn")
+                    obj    = row["actions"]
+                    status = str(row.get("status", "active") or "active")
+                    al = QHBoxLayout(); al.setContentsMargins(4, 2, 4, 2); al.setSpacing(4)
+
+                    # ── Edit (مسموح فقط للمسودة والنشطة) ─────────────
+                    if can_edit and status in ("draft", "active"):
+                        b = QPushButton(self._("edit"))
+                        b.setObjectName("primary-btn")
+                        b.setFixedHeight(28)
                         b.setCursor(Qt.PointingHandCursor)
                         b.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
                         al.addWidget(b)
-                    if can_delete:
-                        b = QPushButton(self._("delete")); b.setObjectName("danger-btn")
+
+                    # ── Workflow buttons ────────────────────────────────
+                    can_workflow = has_perm(self.current_user, "close_transaction") or is_admin(self.current_user)
+
+                    if can_workflow:
+                        if status == "draft":
+                            b = QPushButton("▶ " + self._("activate"))
+                            b.setObjectName("success-btn")
+                            b.setFixedHeight(28)
+                            b.setCursor(Qt.PointingHandCursor)
+                            b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
+                            al.addWidget(b)
+                        elif status == "active":
+                            b = QPushButton("🔒 " + self._("close"))
+                            b.setObjectName("warning-btn")
+                            b.setFixedHeight(28)
+                            b.setCursor(Qt.PointingHandCursor)
+                            b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "closed"))
+                            al.addWidget(b)
+                        elif status == "closed":
+                            b_reopen = QPushButton("🔓 " + self._("reopen"))
+                            b_reopen.setObjectName("secondary-btn")
+                            b_reopen.setFixedHeight(28)
+                            b_reopen.setCursor(Qt.PointingHandCursor)
+                            b_reopen.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
+                            al.addWidget(b_reopen)
+                            b_arch = QPushButton("📦 " + self._("archive"))
+                            b_arch.setObjectName("muted-btn")
+                            b_arch.setFixedHeight(28)
+                            b_arch.setCursor(Qt.PointingHandCursor)
+                            b_arch.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "archived"))
+                            al.addWidget(b_arch)
+
+                    # ── Delete ──────────────────────────────────────────
+                    if can_delete and status not in ("closed", "archived"):
+                        b = QPushButton(self._("delete"))
+                        b.setObjectName("danger-btn")
+                        b.setFixedHeight(28)
                         b.setCursor(Qt.PointingHandCursor)
                         b.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
                         al.addWidget(b)
+
                     w = QWidget(); w.setLayout(al)
                     self.table.setCellWidget(ri, ci, w)
+                elif key == "transaction_type_badge":
+                    code   = str(row.get("transaction_type_badge", ""))
+                    label  = str(row.get("transaction_type_label", code))
+                    status = str(row.get("status", "active") or "active")
+                    type_badge   = self._make_type_badge(code, label)
+                    status_badge = self._make_status_badge(status)
+                    container = QWidget()
+                    cl = QHBoxLayout(container)
+                    cl.setContentsMargins(4, 2, 4, 2)
+                    cl.setSpacing(4)
+                    cl.addStretch()
+                    cl.addWidget(type_badge)
+                    cl.addWidget(status_badge)
+                    cl.addStretch()
+                    self.table.setCellWidget(ri, ci, container)
                 else:
                     item = QTableWidgetItem(str(row.get(key, "")))
                     item.setTextAlignment(Qt.AlignCenter)
@@ -433,7 +490,53 @@ class TransactionsTab(BaseTab):
         if getattr(dlg, "exec", None): dlg.exec()
         else: dlg.show()
 
+    def _workflow_action(self, trx_obj, new_status: str):
+        """ينفذ تغيير حالة مع تأكيد + رسالة نتيجة."""
+        trx_id = getattr(trx_obj, "id", None)
+        if not trx_id:
+            return
+
+        # رسائل التأكيد حسب الانتقال
+        confirm_msgs = {
+            "active":   self._("confirm_activate_transaction"),
+            "closed":   self._("confirm_close_transaction"),
+            "archived": self._("confirm_archive_transaction"),
+        }
+        confirm_msg = confirm_msgs.get(new_status, self._("confirm_action"))
+        trx_no = getattr(trx_obj, "transaction_no", str(trx_id))
+
+        reply = QMessageBox.question(
+            self,
+            self._("confirm"),
+            f"{confirm_msg}\n\n📋 {trx_no}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        ok, err = self.trx_crud.change_status(trx_id, new_status, self.current_user)
+
+        if ok:
+            success_msgs = {
+                "active":   self._("transaction_activated"),
+                "closed":   self._("transaction_closed"),
+                "archived": self._("transaction_archived"),
+            }
+            QMessageBox.information(self, self._("success"), success_msgs.get(new_status, self._("updated")))
+            self.reload_data()
+        else:
+            if "transition_not_allowed" in err:
+                QMessageBox.warning(self, self._("error"), self._("status_transition_not_allowed"))
+            else:
+                QMessageBox.warning(self, self._("error"), f"{self._('error')}: {err}")
+
     def _open_edit_dialog(self, trx_obj):
+        # حماية: المغلقة والمؤرشفة read-only
+        status = getattr(trx_obj, "status", "active") or "active"
+        if status in ("closed", "archived"):
+            QMessageBox.information(self, self._("info"), self._("cannot_edit_closed_transaction"))
+            return
         trx_id = getattr(trx_obj, "id", None) or (trx_obj.get("id") if isinstance(trx_obj, dict) else None)
         self._open_add_window(transaction=trx_id)
 
@@ -449,6 +552,11 @@ class TransactionsTab(BaseTab):
         self.reload_data()
 
     def _delete_single(self, trx_obj, confirm=True):
+        # حماية: المغلقة والمؤرشفة لا تُحذف
+        status = getattr(trx_obj, "status", "active") or "active"
+        if status in ("closed", "archived"):
+            QMessageBox.warning(self, self._("error"), self._("cannot_delete_closed_transaction"))
+            return
         if confirm and QMessageBox.question(self, self._("delete_transaction"), self._("are_you_sure_delete"),
                                             QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes: return
         try:
@@ -605,6 +713,133 @@ class TransactionsTab(BaseTab):
                 pass  # Not on Windows or file manager unavailable
         except Exception as e:
             QMessageBox.critical(self, self._("error"), str(e))
+
+    # ── Type Badge ────────────────────────────────────────────────────
+    _BADGE_STYLES = {
+        "export":  ("📤", "#10b981", "#d1fae5"),   # أخضر
+        "import":  ("📥", "#3b82f6", "#dbeafe"),   # أزرق
+        "transit": ("🔄", "#f59e0b", "#fef3c7"),   # برتقالي
+    }
+
+    def _make_type_badge(self, code: str, label: str) -> QLabel:
+        icon, fg, bg = self._BADGE_STYLES.get(code, ("•", "#6b7280", "#f3f4f6"))
+        badge = QLabel(f"{icon} {label}")
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setObjectName("type-badge")
+        badge.setProperty("badge_type", code)
+        badge.setStyleSheet(
+            f"QLabel {{ color: {fg}; background: {bg}; border: 1px solid {fg}40;"
+            f"border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; }}"
+        )
+        return badge
+
+    # ── Footer / Totals ───────────────────────────────────────────────
+    def _make_status_badge(self, status: str) -> QLabel:
+        """Badge ملوّن للحالة يُدمج مع badge النوع."""
+        STATUS_STYLES = {
+            "draft":    ("#6366f1", "#e0e7ff", "📝"),   # بنفسجي — مسودة
+            "active":   ("#10b981", "#d1fae5", "🟢"),   # أخضر   — نشطة
+            "closed":   ("#ef4444", "#fee2e2", "🔴"),   # أحمر   — مغلقة
+            "archived": ("#64748b", "#f1f5f9", "📦"),   # رمادي  — مؤرشفة
+        }
+        color, bg, icon = STATUS_STYLES.get(status, ("#64748b", "#f1f5f9", "⚪"))
+        label_text = self._(f"status_{status}") if f"status_{status}" in (self._("status_draft"), self._("status_active"), self._("status_closed"), self._("status_archived")) else self._(status)
+        lbl = QLabel(f"{icon} {label_text}")
+        lbl.setStyleSheet(f"""
+            QLabel {{
+                background: {bg};
+                color: {color};
+                border: 1px solid {color}40;
+                border-radius: 8px;
+                padding: 1px 6px;
+                font-size: 10px;
+                font-weight: 600;
+            }}
+        """)
+        lbl.setAlignment(Qt.AlignCenter)
+        return lbl
+
+
+    def _build_footer(self):
+        """شريط الإجماليات أسفل الجدول."""
+        footer = QWidget()
+        footer.setObjectName("transactions-footer")
+        lay = QHBoxLayout(footer)
+        lay.setContentsMargins(12, 6, 12, 6)
+        lay.setSpacing(24)
+
+        def _stat(label_key):
+            wrap = QWidget()
+            wl   = QVBoxLayout(wrap)
+            wl.setContentsMargins(0, 0, 0, 0)
+            wl.setSpacing(1)
+            lbl_title = QLabel(self._(label_key))
+            lbl_title.setObjectName("footer-stat-title")
+            lbl_title.setAlignment(Qt.AlignCenter)
+            lbl_val = QLabel("—")
+            lbl_val.setObjectName("footer-stat-value")
+            lbl_val.setAlignment(Qt.AlignCenter)
+            wl.addWidget(lbl_title)
+            wl.addWidget(lbl_val)
+            lay.addWidget(wrap)
+            return lbl_val
+
+        self._ft_total    = _stat("total_rows")
+        self._ft_export   = _stat("export")
+        self._ft_import   = _stat("import")
+        self._ft_transit  = _stat("transit")
+
+        sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine); sep1.setObjectName("separator"); sep1.setFixedHeight(30)
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.VLine); sep2.setObjectName("separator"); sep2.setFixedHeight(30)
+        sep3 = QFrame(); sep3.setFrameShape(QFrame.VLine); sep3.setObjectName("separator"); sep3.setFixedHeight(30)
+        lay.insertWidget(1, sep1)
+        lay.insertWidget(3, sep2)
+        lay.insertWidget(5, sep3)
+
+        lay.addStretch()
+
+        # إجمالي القيم المالية
+        val_wrap = QWidget()
+        vwl = QVBoxLayout(val_wrap)
+        vwl.setContentsMargins(0, 0, 0, 0)
+        vwl.setSpacing(1)
+        lbl_vtitle = QLabel("Σ " + self._("total_value"))
+        lbl_vtitle.setObjectName("footer-stat-title")
+        lbl_vtitle.setAlignment(Qt.AlignCenter)
+        self._ft_value = QLabel("—")
+        self._ft_value.setObjectName("footer-stat-value-accent")
+        self._ft_value.setAlignment(Qt.AlignCenter)
+        vwl.addWidget(lbl_vtitle)
+        vwl.addWidget(self._ft_value)
+        lay.addWidget(val_wrap)
+
+        try:
+            self.layout.insertWidget(self.layout.count() - 1, footer)
+        except Exception:
+            self.layout.addWidget(footer)
+
+    def _update_footer(self, rows: list):
+        if not hasattr(self, "_ft_total"):
+            return
+        total   = len(rows)
+        exports = sum(1 for r in rows if r.get("transaction_type_badge") == "export")
+        imports = sum(1 for r in rows if r.get("transaction_type_badge") == "import")
+        transit = sum(1 for r in rows if r.get("transaction_type_badge") == "transit")
+
+        # مجموع القيم المالية (من النص — نستخرج الرقم فقط)
+        total_val = 0.0
+        for r in rows:
+            try:
+                raw = str(r.get("totals_value_label", "") or "").split()[0]
+                total_val += float(raw)
+            except Exception:
+                pass
+
+        self._ft_total.setText(str(total))
+        self._ft_export.setText(str(exports))
+        self._ft_import.setText(str(imports))
+        self._ft_transit.setText(str(transit))
+        self._ft_value.setText(f"{total_val:,.2f}" if total_val else "—")
 
     # ── i18n ──────────────────────────────────────────────────────────
     def retranslate_ui(self):

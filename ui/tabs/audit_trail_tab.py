@@ -15,6 +15,7 @@ from PySide6.QtGui import QFont, QColor
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from database.db_utils import format_local_dt
 from database.models import get_session_local, AuditLog, User
 from sqlalchemy import desc, func
 from sqlalchemy.orm import joinedload
@@ -395,7 +396,7 @@ class AuditTrailTab(QWidget):
             self._cell(ri, 3, str(row.record_id or "—"))
             details = str(getattr(row, "details", "") or "")[:80]
             self._cell(ri, 4, details)
-            ts = row.timestamp.strftime("%Y-%m-%d  %H:%M:%S") if row.timestamp else "—"
+            ts = format_local_dt(row.timestamp, "%Y-%m-%d  %H:%M:%S")
             self._cell(ri, 5, ts)
 
     def _cell(self, row, col, text, color=None):

@@ -354,6 +354,8 @@ class DocumentsTab(BaseTab):
         self.cmb_type.addItem(_tr("all_types"), None)
         self.cmb_type.addItem(_tr("document_invoice"), "invoice")
         self.cmb_type.addItem(_tr("document_packing_list"), "packing")
+        self.cmb_type.addItem("CMR", "cmr")
+        self.cmb_type.addItem(_tr("form_a_certificate"), "form_a")
 
         # Language filter
         lbl_lang = QLabel(_tr("language") + ":")
@@ -391,6 +393,8 @@ class DocumentsTab(BaseTab):
         self.tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl.verticalHeader().setVisible(False)
+        self.tbl.verticalHeader().setDefaultSectionSize(44)  # row height
+        self.tbl.verticalHeader().setMinimumSectionSize(44)
         self.tbl.setAlternatingRowColors(True)
         self.tbl.setWordWrap(False)
         self.tbl.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -405,8 +409,8 @@ class DocumentsTab(BaseTab):
         header.setSectionResizeMode(self.COL_ACTIONS, QHeaderView.Fixed)
         header.setDefaultAlignment(Qt.AlignCenter)
 
-        # Fixed width for actions column (wider to show buttons clearly)
-        self.tbl.setColumnWidth(self.COL_ACTIONS, 200)
+        # Fixed width for actions column
+        self.tbl.setColumnWidth(self.COL_ACTIONS, 220)
 
         layout.addWidget(self.tbl, 1)
 
@@ -631,72 +635,30 @@ class DocumentsTab(BaseTab):
             self.tbl.setCellWidget(r, self.COL_ACTIONS, actions_widget)
 
     def _create_action_buttons(self, rec: Dict[str, Any]) -> QWidget:
-        """Create clean action buttons for each row"""
+        """Create action buttons using global theme objectNames"""
         container = QWidget()
         layout = QHBoxLayout(container)
-        layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(8)  # ⭐ زيادة المسافة بين الأزرار
+        layout.setContentsMargins(4, 6, 4, 6)
+        layout.setSpacing(6)
         layout.setAlignment(Qt.AlignCenter)
 
-        # Style with better visibility
-        btn_style = """
-            QPushButton {
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: 600;
-                font-size: 11px;
-                min-width: 55px;
-                max-width: 55px;
-                height: 28px;
-                border: none;
-                color: white;
-            }
-        """
-
-        # Get language for button texts
-        current_lang = "ar"
-        try:
-            current_lang = TranslationManager.get_instance().get_current_language()
-        except:
-            pass
-
-        # Button texts based on language
-        if current_lang == "ar":
-            txt_open = self._("open_file")
-            txt_folder = self._("open_folder")
-            txt_delete = self._("delete_file")
-        elif current_lang == "tr":
-            txt_open = "Aç"
-            txt_folder = "Klasör"
-            txt_delete = "Sil"
-        else:  # en
-            txt_open = "Open"
-            txt_folder = "Folder"
-            txt_delete = "Delete"
-
-        # Open button - Green
-        btn_open = QPushButton(txt_open)
-        btn_open.setStyleSheet(btn_style + """
-            background-color: #28a745;
-        """)
+        btn_open = QPushButton(self._("open_file"))
+        btn_open.setObjectName("primary-btn")
+        btn_open.setFixedHeight(30)
         btn_open.setToolTip(_tr("open_file"))
         btn_open.setCursor(Qt.PointingHandCursor)
         btn_open.clicked.connect(lambda: self._open_file(rec))
 
-        # Folder button - Cyan
-        btn_folder = QPushButton(txt_folder)
-        btn_folder.setStyleSheet(btn_style + """
-            background-color: #17a2b8;
-        """)
+        btn_folder = QPushButton(self._("open_folder"))
+        btn_folder.setObjectName("secondary-btn")
+        btn_folder.setFixedHeight(30)
         btn_folder.setToolTip(_tr("open_folder"))
         btn_folder.setCursor(Qt.PointingHandCursor)
         btn_folder.clicked.connect(lambda: self._open_folder(rec))
 
-        # Delete button - Red
-        btn_delete = QPushButton(txt_delete)
-        btn_delete.setStyleSheet(btn_style + """
-            background-color: #dc3545;
-        """)
+        btn_delete = QPushButton(self._("delete"))
+        btn_delete.setObjectName("danger-btn")
+        btn_delete.setFixedHeight(30)
         btn_delete.setToolTip(_tr("delete"))
         btn_delete.setCursor(Qt.PointingHandCursor)
         btn_delete.clicked.connect(lambda: self._delete_document(rec))
@@ -946,8 +908,10 @@ class DocumentsTab(BaseTab):
                 where.append("(LOWER(COALESCE(dt.code,'')) LIKE 'pl%' OR LOWER(COALESCE(dt.code,'')) IN ('packing','packing_list'))")
             elif doc_type_lower in ("coo", "certificate_of_origin"):
                 where.append("LOWER(COALESCE(dt.code,'')) IN ('coo','certificate_of_origin')")
-            elif doc_type_lower == "form_a":
-                where.append("LOWER(COALESCE(dt.code,'')) = 'form_a'")
+            elif doc_type_lower in ("form_a", "form.a"):
+                where.append("LOWER(COALESCE(dt.code,'')) IN ('form_a','form.a')")
+            elif doc_type_lower == "cmr":
+                where.append("LOWER(COALESCE(dt.code,'')) = 'cmr'")
             else:
                 where.append("LOWER(COALESCE(dt.code,'')) = :dtype")
                 params["dtype"] = doc_type_lower

@@ -197,62 +197,8 @@ class MaterialsTab(BaseTab):
     # Display
     # -----------------------------
     def display_data(self):
-        can_edit = has_perm(self.current_user, "edit_material")
-        can_delete = has_perm(self.current_user, "delete_material")
-        show_actions = (can_edit or can_delete)
+        self._display_with_actions("edit_material", "delete_material")
 
-        self.table.setRowCount(0)
-
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    obj = row["actions"]
-                    action_layout = QHBoxLayout()
-                    action_layout.setContentsMargins(0, 0, 0, 0)
-                    action_layout.setSpacing(6)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("table-edit")
-                        btn_edit.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        action_layout.addWidget(btn_edit)
-                        btn_edit.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("table-delete")
-                        btn_delete.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        action_layout.addWidget(btn_delete)
-                        btn_delete.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-
-                    w = QWidget()
-                    w.setLayout(action_layout)
-                    self.table.setCellWidget(row_idx, col_idx, w)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        # إخفاء عمود الإجراءات إذا ما في صلاحيات
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        self._apply_admin_columns()
-        self.update_pagination_label()
-
-    # -----------------------------
-    # Actions
-    # -----------------------------
     def add_new_item(self):
         # جهّز قوائم النوع/العملة للحوار
         material_types = self.mt_crud.get_all() or []

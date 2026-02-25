@@ -10,6 +10,18 @@ from PySide6.QtWidgets import (
 )
 
 from core.base_dialog import BaseDialog
+
+
+class _NoHoverTable(QTableWidget):
+    """يمنع تحديد السطر بمجرد مرور الماوس فوق cellWidget."""
+    def mouseMoveEvent(self, event):
+        event.ignore()
+
+    def viewportEvent(self, event):
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.HoverMove:
+            return False
+        return super().viewportEvent(event)
 from core.translator import TranslationManager
 
 if TYPE_CHECKING:
@@ -123,7 +135,7 @@ class AddEntryDialog(BaseDialog):
         lbl_items.setObjectName("section-label")
         items_layout.addWidget(lbl_items)
 
-        self.table = QTableWidget(0, 10, self)
+        self.table = _NoHoverTable(0, 10, self)
         self.table.setObjectName("entryTable")
 
         headers = [
@@ -244,6 +256,7 @@ class AddEntryDialog(BaseDialog):
 
         # material
         cmb_mat = QComboBox()
+        cmb_mat.setFocusPolicy(Qt.ClickFocus)
         cmb_mat.addItem(self._("choose"), None)
         for m in self.materials:
             cmb_mat.addItem(self._label(m), getattr(m, "id", None))
@@ -251,6 +264,7 @@ class AddEntryDialog(BaseDialog):
 
         # packaging_type
         cmb_pack = QComboBox()
+        cmb_pack.setFocusPolicy(Qt.ClickFocus)
         cmb_pack.addItem(self._("not_set"), None)
         for p in self.packaging_types:
             cmb_pack.addItem(self._label(p), getattr(p, "id", None))
@@ -258,16 +272,19 @@ class AddEntryDialog(BaseDialog):
 
         # count
         sp_count = QSpinBox()
+        sp_count.setFocusPolicy(Qt.ClickFocus)
         sp_count.setMinimum(0)
         sp_count.setMaximum(10**9)
         self.table.setCellWidget(r, 2, sp_count)
 
         # net, gross
         ds_net = QDoubleSpinBox()
+        ds_net.setFocusPolicy(Qt.ClickFocus)
         ds_net.setDecimals(3)
         ds_net.setMinimum(0)
         ds_net.setMaximum(10**9)
         ds_gross = QDoubleSpinBox()
+        ds_gross.setFocusPolicy(Qt.ClickFocus)
         ds_gross.setDecimals(3)
         ds_gross.setMinimum(0)
         ds_gross.setMaximum(10**9)
@@ -276,9 +293,11 @@ class AddEntryDialog(BaseDialog):
 
         # mfg, exp
         de_mfg = QDateEdit()
+        de_mfg.setFocusPolicy(Qt.ClickFocus)
         de_mfg.setCalendarPopup(True)
         de_mfg.setDisplayFormat("yyyy-MM-dd")
         de_exp = QDateEdit()
+        de_exp.setFocusPolicy(Qt.ClickFocus)
         de_exp.setCalendarPopup(True)
         de_exp.setDisplayFormat("yyyy-MM-dd")
         self.table.setCellWidget(r, 5, de_mfg)
@@ -286,6 +305,7 @@ class AddEntryDialog(BaseDialog):
 
         # origin
         cmb_country = QComboBox()
+        cmb_country.setFocusPolicy(Qt.ClickFocus)
         cmb_country.addItem(self._("not_set"), None)
         for co in self.countries:
             cmb_country.addItem(self._label(co), getattr(co, "id", None))
@@ -293,8 +313,10 @@ class AddEntryDialog(BaseDialog):
 
         # batch, notes
         le_batch = QLineEdit()
+        le_batch.setFocusPolicy(Qt.ClickFocus)
         self.table.setCellWidget(r, 8, le_batch)
         le_notes = QLineEdit()
+        le_notes.setFocusPolicy(Qt.ClickFocus)
         self.table.setCellWidget(r, 9, le_notes)
 
         # preset (for edit)

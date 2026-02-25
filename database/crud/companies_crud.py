@@ -243,6 +243,7 @@ class CompanyBanksCRUD(BaseCRUD):
                     CompanyBank.is_primary == True,
                 ).update({CompanyBank.is_primary: False})
                 s.flush()
+                s.commit()
 
             obj = CompanyBank(
                 company_id=company_id,
@@ -259,6 +260,7 @@ class CompanyBanksCRUD(BaseCRUD):
             )
             s.add(obj)
             s.flush()
+            s.commit()
             s.refresh(obj)
             return obj
 
@@ -283,6 +285,7 @@ class CompanyBanksCRUD(BaseCRUD):
                             CompanyBank.id != bank_id,
                         ).update({CompanyBank.is_primary: False})
                         s.flush()
+                        s.commit()
 
         return self.update(bank_id, payload)
 
@@ -322,6 +325,7 @@ class CompanyPartnersCRUD(BaseCRUD):
             )
             s.add(obj)
             s.flush()
+            s.commit()
             s.refresh(obj)
             return obj
 

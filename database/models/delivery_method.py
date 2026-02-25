@@ -16,9 +16,9 @@ class DeliveryMethod(Base):
 
     # حسب نمط مشروعك؛ أبقيتها كما هي لتفادي هجرة إضافية الآن
     created_by = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_by = Column(Integer, nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # علاقة عكسية مع التسعير
     prices = relationship("Pricing", back_populates="delivery_method")

@@ -190,6 +190,7 @@ class ClientContactsCRUD(BaseCRUD):
             )
             s.add(obj)
             s.flush()
+            s.commit()
             s.refresh(obj)
             return obj
 
@@ -233,6 +234,7 @@ class ClientContactsCRUD(BaseCRUD):
                         ClientContact.id != contact_id,
                     ).update({ClientContact.is_primary: False})
                     s.flush()
+                    s.commit()
 
         return self.update(contact_id, payload)
 

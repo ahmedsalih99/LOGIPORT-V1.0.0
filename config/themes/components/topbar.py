@@ -72,4 +72,27 @@ def get_styles(theme):
         font-size: {s["lg"]}px;
         text-align: center;
     }}
+
+    /* ── Icon-only topbar buttons ── */
+    QPushButton#topbar-btn-icon {{
+        min-width: 36px;
+        min-height: 36px;
+        max-width: 36px;
+        max-height: 36px;
+        background: qlineargradient(
+            x1: 0, y1: 0, x2: 0, y2: 1,
+            stop: 0 rgba(255, 255, 255, 0.15),
+            stop: 1 rgba(255, 255, 255, 0.05)
+        );
+        border: 1px solid {c["glass_border"]};
+        border-radius: {BorderRadius.MD};
+        padding: 0;
+    }}
+    QPushButton#topbar-btn-icon:hover {{
+        background: {c["bg_hover"]};
+        border-color: {c["primary"]};
+    }}
+    QPushButton#topbar-btn-icon:pressed {{
+        background: {c["primary_lighter"]};
+    }}
     """

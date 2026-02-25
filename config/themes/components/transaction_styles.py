@@ -192,6 +192,125 @@ def get_styles(theme):
     }}
 
     /* ============================================================================
+       Transactions Footer / Totals Bar
+       ============================================================================ */
+
+    QWidget#transactions-footer {{
+        background: {c["bg_secondary"]};
+        border-top: 1px solid {c["border"]};
+    }}
+
+    QLabel#footer-stat-title {{
+        color: {c["text_secondary"]};
+        font-size: 10px;
+        font-weight: 500;
+    }}
+
+    QLabel#footer-stat-value {{
+        color: {c["text_primary"]};
+        font-size: 14px;
+        font-weight: 700;
+    }}
+
+    QLabel#footer-stat-value-accent {{
+        color: {c["accent"]};
+        font-size: 14px;
+        font-weight: 700;
+    }}
+
+    /* ============================================================================
+       Documents Side Panel
+       ============================================================================ */
+
+    QWidget#documents-side-panel {{
+        background: {c["bg_secondary"]};
+        border-left: 1px solid {c["border"]};
+        border-radius: 0;
+    }}
+
+    QLabel#docs-panel-title {{
+        color: {c["text_primary"]};
+        font-size: 12px;
+        font-weight: 700;
+    }}
+
+    QLabel#docs-count-badge {{
+        background: {c["accent"]};
+        color: {c["text_white"]};
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 0 4px;
+    }}
+
+    QLabel#docs-count-badge[count_state="none"] {{
+        background: {c["border"]};
+        color: {c["text_secondary"]};
+    }}
+
+    QLabel#docs-count-badge[count_state="some"] {{
+        background: {c["warning"] if "warning" in c else "#f59e0b"};
+        color: white;
+    }}
+
+    QLabel#docs-count-badge[count_state="all"] {{
+        background: {c["success"] if "success" in c else "#10b981"};
+        color: white;
+    }}
+
+    QFrame#docs-separator {{
+        background: {c["border"]};
+        max-height: 1px;
+    }}
+
+    QCheckBox#doc-checkbox-card {{
+        color: {c["text_primary"]};
+        font-size: 11px;
+        padding: 4px 6px;
+        border-radius: 4px;
+        spacing: 8px;
+    }}
+
+    QCheckBox#doc-checkbox-card:hover {{
+        background: {c["bg_hover"]};
+    }}
+
+    QCheckBox#doc-checkbox-card:checked {{
+        color: {c["accent"]};
+        font-weight: 600;
+    }}
+
+    QCheckBox#doc-checkbox-card:disabled {{
+        color: {c["text_secondary"]};
+        opacity: 0.5;
+    }}
+
+    QLabel#doc-group-header {{
+        color: {c["text_secondary"]};
+        font-size: 10px;
+        padding: 6px 4px 2px 4px;
+        text-transform: uppercase;
+    }}
+
+    QLabel#docs-hint-label {{
+        color: {c["text_secondary"]};
+        font-size: 10px;
+        padding: 6px;
+        border: 1px dashed {c["border"]};
+        border-radius: 4px;
+        background: transparent;
+    }}
+
+    QScrollArea#docs-scroll-area {{
+        background: transparent;
+        border: none;
+    }}
+
+    QWidget#docs-scroll-content {{
+        background: transparent;
+    }}
+
+    /* ============================================================================
        End of Unified Transaction Styles
        ============================================================================ */
     """

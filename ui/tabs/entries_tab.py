@@ -238,6 +238,8 @@ class EntriesTab(BaseTab):
 
     # ---------- data ----------
     def reload_data(self):
+        self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
+        self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
         _ = TranslationManager.get_instance().translate
         lang = TranslationManager.get_instance().get_current_language()
 

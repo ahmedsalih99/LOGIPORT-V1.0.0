@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QStackedWidget, QWidget, QHBoxLayout, QVBoxLayout, QApplication, QMessageBox
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 
 # ── الاستيرادات الضرورية فقط عند بدء التشغيل ─────────────────────────────
 from ui.widgets.sidebar import Sidebar
@@ -62,6 +63,16 @@ class MainWindow(BaseWindow):
         TranslationManager.get_instance().language_changed.connect(
             self._on_language_change
         )
+
+        # بعد كل تغيير ثيم، Qt قد يُعيد توريث direction من QApplication
+        # نُصحّح الاتجاه فوراً بناءً على اللغة الفعلية
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(
+                lambda _: self.update_layout_direction()
+            )
+        except Exception:
+            pass
 
         self._init_ui()
         self._restore_window_geometry()
@@ -162,7 +173,15 @@ class MainWindow(BaseWindow):
             self.top_bar.about_requested.connect(self._open_about)
         except Exception:
             pass
+        try:
+            self.top_bar.search_requested.connect(self._open_global_search)
+        except Exception:
+            pass
         main_layout.addWidget(self.top_bar)
+
+        # Ctrl+F — Global Search shortcut
+        self._search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self._search_shortcut.activated.connect(self._open_global_search)
 
         # Center
         center_widget = QWidget()
@@ -265,6 +284,31 @@ class MainWindow(BaseWindow):
                 self.stack.setCurrentWidget(tab)
 
     # ─── dialogs ─────────────────────────────────────────────────────────────
+
+    def _open_global_search(self):
+        """يفتح نافذة البحث العام."""
+        try:
+            from ui.dialogs.global_search_dialog import GlobalSearchDialog
+            dlg = GlobalSearchDialog(self)
+            dlg.navigate_to.connect(self._navigate_to_result)
+            dlg.exec()
+        except Exception as e:
+            logger.error(f"Global search error: {e}", exc_info=True)
+
+    def _navigate_to_result(self, entity_key: str, record_id: int):
+        """
+        ينتقل للتاب المناسب ويحدد السجل.
+        يُستدعى عند الضغط على نتيجة في البحث العام.
+        """
+        # 1) انتقل للتاب
+        self.switch_section(entity_key)
+        self.sidebar.change_section(entity_key)
+
+        # 2) اطلب من التاب تحديد السجل
+        tab = self.tabs.get(entity_key)
+        if tab and hasattr(tab, "select_record_by_id"):
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: tab.select_record_by_id(record_id))
 
     def _open_about(self):
         try:
@@ -385,6 +429,11 @@ class MainWindow(BaseWindow):
     def update_layout_direction(self):
         lang = SettingsManager.get_instance().get("language", "ar")
         direction = Qt.RightToLeft if lang == "ar" else Qt.LeftToRight
+        # صحّح اتجاه QApplication أولاً — هذا ما يُورَث
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            app.setLayoutDirection(direction)
         if hasattr(self, "center_widget"):
             self.center_widget.setLayoutDirection(direction)
         if hasattr(self, "top_bar"):

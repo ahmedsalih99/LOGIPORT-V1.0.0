@@ -8,8 +8,6 @@ This makes the system fully extensible without code changes.
 import logging
 from typing import Any, Dict, List, Optional, Callable
 from functools import wraps, lru_cache
-import sqlite3
-from database.db_utils import get_db_path
 
 
 logger = logging.getLogger(__name__)
@@ -51,27 +49,27 @@ class PermissionManager:
             'view_dashboard'
         """
         try:
-            conn = sqlite3.connect(str(get_db_path()))
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, code, description, label_ar, label_en, label_tr
-                FROM permissions
-                ORDER BY id
-            """)
-
-            permissions = []
-            for row in cursor.fetchall():
-                permissions.append({
-                    'id': row[0],
-                    'code': row[1],
-                    'description': row[2] or '',
-                    'label_ar': row[3] or '',
-                    'label_en': row[4] or '',
-                    'label_tr': row[5] or ''
-                })
-
-            conn.close()
+            from database.db_utils import get_session_local
+            from sqlalchemy import text
+            session_factory = get_session_local()
+            session = session_factory()
+            try:
+                rows = session.execute(text(
+                    "SELECT id, code, description, label_ar, label_en, label_tr "
+                    "FROM permissions ORDER BY id"
+                )).fetchall()
+                permissions = [
+                    {
+                        'id': r[0], 'code': r[1],
+                        'description': r[2] or '',
+                        'label_ar': r[3] or '',
+                        'label_en': r[4] or '',
+                        'label_tr': r[5] or '',
+                    }
+                    for r in rows
+                ]
+            finally:
+                session.close()
             logger.info(f"Loaded {len(permissions)} permissions from database")
             return permissions
 
@@ -102,19 +100,19 @@ class PermissionManager:
             return []
 
         try:
-            conn = sqlite3.connect(str(get_db_path()))
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT p.code
-                FROM role_permissions rp
-                JOIN permissions p ON rp.permission_id = p.id
-                WHERE rp.role_id = ?
-            """, (role_id,))
-
-            permissions = [row[0] for row in cursor.fetchall()]
-            conn.close()
-
+            from database.db_utils import get_session_local
+            from sqlalchemy import text
+            session_factory = get_session_local()
+            session = session_factory()
+            try:
+                rows = session.execute(text(
+                    "SELECT p.code FROM role_permissions rp "
+                    "JOIN permissions p ON rp.permission_id = p.id "
+                    "WHERE rp.role_id = :rid"
+                ), {"rid": role_id}).fetchall()
+                permissions = [r[0] for r in rows]
+            finally:
+                session.close()
             logger.debug(f"Role {role_id} has {len(permissions)} permissions")
             return permissions
 
@@ -137,27 +135,27 @@ class PermissionManager:
             'Admin'
         """
         try:
-            conn = sqlite3.connect(str(get_db_path()))
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, name, description, label_ar, label_en, label_tr
-                FROM roles
-                ORDER BY id
-            """)
-
-            roles = []
-            for row in cursor.fetchall():
-                roles.append({
-                    'id': row[0],
-                    'name': row[1],
-                    'description': row[2] or '',
-                    'label_ar': row[3] or '',
-                    'label_en': row[4] or '',
-                    'label_tr': row[5] or ''
-                })
-
-            conn.close()
+            from database.db_utils import get_session_local
+            from sqlalchemy import text
+            session_factory = get_session_local()
+            session = session_factory()
+            try:
+                rows = session.execute(text(
+                    "SELECT id, name, description, label_ar, label_en, label_tr "
+                    "FROM roles ORDER BY id"
+                )).fetchall()
+                roles = [
+                    {
+                        'id': r[0], 'name': r[1],
+                        'description': r[2] or '',
+                        'label_ar': r[3] or '',
+                        'label_en': r[4] or '',
+                        'label_tr': r[5] or '',
+                    }
+                    for r in rows
+                ]
+            finally:
+                session.close()
             return roles
 
         except Exception as e:

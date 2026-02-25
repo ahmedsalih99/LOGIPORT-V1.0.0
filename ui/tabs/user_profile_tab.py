@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
+from database.db_utils import format_local_dt
 from database.models import get_session_local, AuditLog, Transaction
 from sqlalchemy import func, desc
 
@@ -266,7 +267,7 @@ class UserProfileTab(QWidget):
             role       = getattr(user, "role", None)
             role_name  = getattr(role, "name", "—") if role else "—"
             created    = getattr(user, "created_at", None)
-            created_str = created.strftime("%Y-%m-%d") if created else "—"
+            created_str = format_local_dt(created, "%Y-%m-%d")
             status     = self._("user_status_active") if getattr(user, "is_active", True) else self._("user_status_suspended")
             rows = [
                 (self._("username"),   getattr(user, "username",  "—")),
@@ -359,7 +360,7 @@ class UserProfileTab(QWidget):
                 tbl      = self._(tbl_key) if tbl_key else (row.table_name or "—")
                 act_key  = ACTION_KEYS.get(action)
                 act      = self._(act_key) if act_key else action
-                ts       = row.timestamp.strftime("%Y-%m-%d %H:%M") if row.timestamp else "—"
+                ts       = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
 
                 item = QFrame()
                 item.setStyleSheet(f"""

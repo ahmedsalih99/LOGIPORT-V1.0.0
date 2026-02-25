@@ -41,7 +41,7 @@ from .base_details_view import BaseDetailsView
 
 # Utilities
 from .admin_columns import apply_admin_columns_to_table
-from .singleton import SingletonMeta, singleton
+from .singleton import SingletonMeta, QObjectSingletonMixin
 
 # Logging
 from .logging_config import LoggingConfig
@@ -74,7 +74,7 @@ __all__ = [
     # Utilities
     "apply_admin_columns_to_table",
     "SingletonMeta",
-    "singleton",
+    "QObjectSingletonMixin",
     "LoggingConfig",
 ]
 

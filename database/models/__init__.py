@@ -1,4 +1,3 @@
-
 from .base import Base, get_engine, get_session_local
 
 # ---- Core models ---------------------------------------------------------
@@ -20,6 +19,7 @@ from .pricing import Pricing
 from .entry import Entry
 from .entry_item import EntryItem
 from .transaction import Transaction
+from .transport_details import TransportDetails
 
 # ---- Optional/where-available models ------------------------------------
 # TransactionItem قد يكون في ملف مستقل أو ضمن transaction.py

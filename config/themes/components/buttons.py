@@ -239,4 +239,43 @@ def get_styles(theme):
         font-size: {s["sm"]}px;
         border-radius: {BorderRadius.SM};
     }}
+
+    /* ── Workflow Buttons ──────────────────────────────────────────────── */
+
+    QPushButton#success-btn {{
+        background: {c["success"]};
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-weight: 600;
+    }}
+    QPushButton#success-btn:hover {{
+        background: {c["success_hover"]};
+    }}
+
+    QPushButton#warning-btn {{
+        background: {c["warning"]};
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-weight: 600;
+    }}
+    QPushButton#warning-btn:hover {{
+        background: {c["warning_hover"]};
+    }}
+
+    QPushButton#muted-btn {{
+        background: {c["bg_secondary"]};
+        color: {c["text_secondary"]};
+        border: 1px solid {c["border"]};
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-weight: 500;
+    }}
+    QPushButton#muted-btn:hover {{
+        background: {c["bg_hover"]};
+        color: {c["text_primary"]};
+    }}
     """

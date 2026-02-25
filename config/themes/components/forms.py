@@ -1,8 +1,8 @@
 """
-Form Components - Clean & Auto Size
-==================================
-No fixed width / height.
-Layouts control sizing 100%.
+Form Components - No Borders, Bold Text
+========================================
+Clean inputs: no internal borders, bold font everywhere.
+Focus/hover shown via background change only.
 """
 
 from ..spacing import Spacing
@@ -10,21 +10,21 @@ from ..border_radius import BorderRadius
 
 
 def get_styles(theme):
-    """Generate form input styles - auto size safe"""
+    """Generate borderless bold form input styles"""
     c = theme.colors
     s = theme.sizes
 
     return f"""
-    /* ========== FORMS - AUTO SIZE ========== */
+    /* ========== QLineEdit — NO BORDER ========== */
 
-    /* QLineEdit */
     QLineEdit {{
         background: {c["bg_card"]};
-    color: {c["text_primary"]};
-    border: none;
-    border-radius: {BorderRadius.MD};
-    padding: {Spacing.SM} {Spacing.MD};
-    font-size: {s["base"]}px;
+        color: {c["text_primary"]};
+        border: none;
+        border-radius: {BorderRadius.MD};
+        padding: {Spacing.SM} {Spacing.MD};
+        font-size: {s["base"]}px;
+        font-weight: 600;
     }}
 
     QLineEdit:hover {{
@@ -32,7 +32,7 @@ def get_styles(theme):
     }}
 
     QLineEdit:focus {{
-        background: {c["bg_card"]};
+        background: {c["bg_hover"]};
     }}
 
     QLineEdit:disabled {{
@@ -45,43 +45,41 @@ def get_styles(theme):
         color: {c["text_secondary"]};
     }}
 
-    /* Search Field */
     QLineEdit#search-field {{
         padding-left: {Spacing.XL};
         border-radius: {BorderRadius.LG};
     }}
 
-    /* ========== QComboBox ========== */
+    /* ========== QComboBox — NO BORDER ========== */
 
     QComboBox {{
         background: {c["bg_card"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
+        border: none;
         border-radius: {BorderRadius.MD};
         padding: {Spacing.SM} {Spacing.MD};
         font-size: {s["base"]}px;
+        font-weight: 600;
     }}
 
     QComboBox:hover {{
-        border-color: {c["border_hover"]};
         background: {c["bg_hover"]};
     }}
 
     QComboBox:focus {{
-        border-color: {c["border_focus"]};
-        background: {c["bg_card"]};
+        background: {c["bg_hover"]};
     }}
 
     QComboBox:disabled {{
         background: {c["bg_disabled"]};
         color: {c["text_disabled"]};
-        border-color: {c["border"]};
     }}
 
     QComboBox::drop-down {{
         background: transparent;
         subcontrol-origin: padding;
         subcontrol-position: left center;
+        border: none;
     }}
 
     QComboBox::down-arrow {{
@@ -95,15 +93,15 @@ def get_styles(theme):
         border-top-color: {c["primary"]};
     }}
 
-    /* Dropdown List */
     QComboBox QAbstractItemView {{
         background: {c["bg_card"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
+        border: none;
         border-radius: {BorderRadius.SM};
         selection-background-color: {c["primary_light"]};
         selection-color: {c["primary"]};
         padding: {Spacing.XS};
+        font-weight: 600;
     }}
 
     QComboBox QAbstractItemView::item {{
@@ -120,12 +118,12 @@ def get_styles(theme):
         color: {c["primary"]};
     }}
 
-    /* ComboBox in Tables */
     QTableWidget QComboBox,
     QTableView QComboBox {{
         padding: 2px 4px;
         font-size: {s["sm"]}px;
         border-radius: {BorderRadius.SM};
+        border: none;
     }}
 
     QTableWidget QComboBox::down-arrow,
@@ -136,19 +134,24 @@ def get_styles(theme):
         margin-left: 2px;
     }}
 
-    /* ========== QTextEdit ========== */
+    /* ========== QTextEdit — NO BORDER ========== */
 
     QTextEdit {{
         background: {c["bg_card"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
+        border: none;
         border-radius: {BorderRadius.MD};
         padding: {Spacing.SM};
         font-size: {s["base"]}px;
+        font-weight: 600;
+    }}
+
+    QTextEdit:hover {{
+        background: {c["bg_hover"]};
     }}
 
     QTextEdit:focus {{
-        border-color: {c["border_focus"]};
+        background: {c["bg_hover"]};
     }}
 
     QTextEdit:disabled {{
@@ -156,24 +159,24 @@ def get_styles(theme):
         color: {c["text_disabled"]};
     }}
 
-    /* ========== QDateEdit ========== */
+    /* ========== QDateEdit — NO BORDER ========== */
 
     QDateEdit {{
         background: {c["bg_card"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
+        border: none;
         border-radius: {BorderRadius.MD};
         padding: {Spacing.SM} {Spacing.MD};
         font-size: {s["base"]}px;
+        font-weight: 600;
     }}
 
     QDateEdit:hover {{
-        border-color: {c["border_hover"]};
         background: {c["bg_hover"]};
     }}
 
     QDateEdit:focus {{
-        border-color: {c["border_focus"]};
+        background: {c["bg_hover"]};
     }}
 
     QDateEdit:disabled {{
@@ -185,6 +188,7 @@ def get_styles(theme):
         background: transparent;
         subcontrol-origin: padding;
         subcontrol-position: left center;
+        border: none;
     }}
 
     QDateEdit::down-arrow {{
@@ -193,23 +197,24 @@ def get_styles(theme):
         border-top: 5px solid {c["text_secondary"]};
     }}
 
-    /* ========== QSpinBox & QDoubleSpinBox ========== */
+    /* ========== QSpinBox & QDoubleSpinBox — NO BORDER ========== */
 
     QSpinBox, QDoubleSpinBox {{
         background: {c["bg_card"]};
         color: {c["text_primary"]};
-        border: 1px solid {c["border"]};
+        border: none;
         border-radius: {BorderRadius.MD};
         padding: {Spacing.SM};
         font-size: {s["base"]}px;
+        font-weight: 600;
     }}
 
     QSpinBox:hover, QDoubleSpinBox:hover {{
-        border-color: {c["border_hover"]};
+        background: {c["bg_hover"]};
     }}
 
     QSpinBox:focus, QDoubleSpinBox:focus {{
-        border-color: {c["border_focus"]};
+        background: {c["bg_hover"]};
     }}
 
     QSpinBox:disabled, QDoubleSpinBox:disabled {{
@@ -220,71 +225,15 @@ def get_styles(theme):
     QSpinBox::up-button, QDoubleSpinBox::up-button,
     QSpinBox::down-button, QDoubleSpinBox::down-button {{
         background: transparent;
+        border: none;
     }}
 
     /* ========== QCheckBox ========== */
 
     QCheckBox {{
-        color: {c["text_primary"]};
-        font-size: {s["base"]}px;
-        spacing: {Spacing.SM};
-    }}
-
-    QCheckBox::indicator {{
-        border: 2px solid {c["border"]};
-        border-radius: {BorderRadius.SM};
-        background: {c["bg_card"]};
-    }}
-
-    QCheckBox::indicator:hover {{
-        border-color: {c["primary"]};
-        background: {c["bg_hover"]};
-    }}
-
-    QCheckBox::indicator:checked {{
-        background: {c["primary"]};
-        border-color: {c["primary"]};
-    }}
-
-    /* ========== QRadioButton ========== */
-
-    QRadioButton {{
-        color: {c["text_primary"]};
-        font-size: {s["base"]}px;
-        spacing: {Spacing.SM};
-    }}
-
-    QRadioButton::indicator {{
-        border: 2px solid {c["border"]};
-        border-radius: 10px;
-        background: {c["bg_card"]};
-    }}
-
-    QRadioButton::indicator:checked {{
-        background: {c["primary"]};
-        border-color: {c["primary"]};
-    }}
-
-    /* ========== QProgressBar ========== */
-
-    QProgressBar {{
-        background: {c["bg_hover"]};
-        border: 1px solid {c["border"]};
-        border-radius: {BorderRadius.SM};
-        text-align: center;
-        color: {c["text_primary"]};
-    }}
-
-    QProgressBar::chunk {{
-        background: {c["primary"]};
-        border-radius: {BorderRadius.SM};
-    }}
-    
-    
-        /* ========== CHECKBOX ========== */
-    QCheckBox {{
         spacing: 6px;
-        font-size: 14px;
+        font-size: {s["base"]}px;
+        font-weight: 600;
         color: {c["text_primary"]};
     }}
 
@@ -292,17 +241,16 @@ def get_styles(theme):
         width: 16px;
         height: 16px;
         border-radius: 4px;
-        border: 1px solid {c["border"]};
-        background: {c["bg_card"]};
+        border: none;
+        background: {c["bg_hover"]};
     }}
 
     QCheckBox::indicator:hover {{
-        border: 1px solid {c["primary"]};
+        background: {c["bg_active"]};
     }}
 
     QCheckBox::indicator:checked {{
         background: {c["primary"]};
-        border: 1px solid {c["primary"]};
     }}
 
     QCheckBox::indicator:checked:hover {{
@@ -311,8 +259,41 @@ def get_styles(theme):
 
     QCheckBox::indicator:disabled {{
         background: {c["bg_hover"]};
-        border: 1px solid {c["border"]};
     }}
-    
-    
+
+    /* ========== QRadioButton ========== */
+
+    QRadioButton {{
+        color: {c["text_primary"]};
+        font-size: {s["base"]}px;
+        font-weight: 600;
+        spacing: {Spacing.SM};
+    }}
+
+    QRadioButton::indicator {{
+        border: none;
+        border-radius: 10px;
+        background: {c["bg_hover"]};
+    }}
+
+    QRadioButton::indicator:checked {{
+        background: {c["primary"]};
+    }}
+
+    /* ========== QProgressBar ========== */
+
+    QProgressBar {{
+        background: {c["bg_hover"]};
+        border: none;
+        border-radius: {BorderRadius.SM};
+        text-align: center;
+        color: {c["text_primary"]};
+        font-weight: 600;
+    }}
+
+    QProgressBar::chunk {{
+        background: {c["primary"]};
+        border-radius: {BorderRadius.SM};
+    }}
+
     """

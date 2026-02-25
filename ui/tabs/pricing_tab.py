@@ -200,56 +200,8 @@ class PricingTab(BaseTab):
         self.display_data()
 
     def display_data(self):
-        can_edit = has_perm(self.current_user, "edit_pricing")
-        can_delete = has_perm(self.current_user, "delete_pricing")
-        show_actions = (can_edit or can_delete)
+        self._display_with_actions("edit_pricing", "delete_pricing")
 
-        self.table.setRowCount(0)
-
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    obj = row["actions"]
-                    layout = QHBoxLayout()
-                    layout.setContentsMargins(0, 0, 0, 0)
-                    layout.setSpacing(12)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("primary-btn")
-                        btn_edit.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        layout.addWidget(btn_edit)
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("danger-btn")
-                        btn_delete.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        layout.addWidget(btn_delete)
-
-                    w = QWidget(); w.setLayout(layout)
-                    self.table.setCellWidget(row_idx, col_idx, w)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        self._apply_admin_columns()
-        self.update_pagination_label()
-
-    # ---------- actions ----------
     def add_new_item(self):
         # جهّز قوائم الاختيار من الـ DB مباشرة (نفس أسلوب clients_tab)
         sellers, buyers, materials, currencies, ptypes = [], [], [], [], []

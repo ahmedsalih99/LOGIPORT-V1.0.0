@@ -19,6 +19,7 @@ from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from ui.settings_window import SettingsWindow
 from ui.widgets.notification_bell import NotificationBell
+from ui.utils.svg_icons import set_icon, refresh_icons
 import datetime
 
 
@@ -29,6 +30,7 @@ class TopBar(QWidget):
     profile_requested = Signal()   # فتح صفحة البروفايل
     logout_requested  = Signal()   # تسجيل الخروج
     about_requested   = Signal()   # نافذة عن التطبيق
+    search_requested  = Signal()   # فتح البحث العام
 
     def __init__(self):
         super().__init__()
@@ -61,32 +63,40 @@ class TopBar(QWidget):
         layout.setSpacing(max(8, int(self.topbar_height * 0.2)))
 
         # ─── LEFT: Settings / Language / Theme ───────────────────────────────
-        self.settings_btn = QPushButton(f"⚙ {self._('settings')}")
+        self.settings_btn = QPushButton(f"{self._('settings')}")
         self.settings_btn.setObjectName("topbar-btn")
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.clicked.connect(self.open_settings)
         layout.addWidget(self.settings_btn)
 
-        self.lang_btn = QPushButton(f"🌐 {self._('language')}")
+        self.lang_btn = QPushButton(f"{self._('language')}")
         self.lang_btn.setObjectName("topbar-btn")
         self.lang_btn.setCursor(Qt.PointingHandCursor)
         self.lang_btn.clicked.connect(self.toggle_language)
         layout.addWidget(self.lang_btn)
 
-        self.theme_btn = QPushButton(f"🌗 {self._('theme')}")
+        self.theme_btn = QPushButton(f"{self._('theme')}")
         self.theme_btn.setObjectName("topbar-btn")
         self.theme_btn.setCursor(Qt.PointingHandCursor)
         self.theme_btn.clicked.connect(self.toggle_theme)
         layout.addWidget(self.theme_btn)
 
-        self.about_btn = QPushButton("ℹ️")
-        self.about_btn.setObjectName("topbar-btn")
-        self.about_btn.setFixedWidth(36)
+        self.about_btn = QPushButton()
+        self.about_btn.setObjectName("topbar-btn-icon")
+        self.about_btn.setFixedSize(36, 36)
         self.about_btn.setCursor(Qt.PointingHandCursor)
         self.about_btn.setToolTip(self._("about_app"))
-        self.about_btn.setFont(QFont("Segoe UI Emoji", 13))
         self.about_btn.clicked.connect(self.about_requested.emit)
         layout.addWidget(self.about_btn)
+
+        # Search button
+        self.search_btn = QPushButton()
+        self.search_btn.setObjectName("topbar-btn-icon")
+        self.search_btn.setFixedSize(36, 36)
+        self.search_btn.setCursor(Qt.PointingHandCursor)
+        self.search_btn.setToolTip(self._("search") + "  (Ctrl+F)")
+        self.search_btn.clicked.connect(self.search_requested.emit)
+        layout.addWidget(self.search_btn)
 
         # ─── CENTER: Clock ────────────────────────────────────────────────────
         layout.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
@@ -112,28 +122,39 @@ class TopBar(QWidget):
         layout.addWidget(self.user_btn)
 
         # ─── RIGHT: Logout ────────────────────────────────────────────────────
-        self.logout_btn = QPushButton("🚪")
-        self.logout_btn.setObjectName("topbar-btn")
-        self.logout_btn.setFixedWidth(36)
+        self.logout_btn = QPushButton()
+        self.logout_btn.setObjectName("topbar-btn-icon")
+        self.logout_btn.setFixedSize(36, 36)
         self.logout_btn.setCursor(Qt.PointingHandCursor)
         self.logout_btn.setToolTip(self._("logout"))
-        self.logout_btn.setFont(QFont("Segoe UI Emoji", 14))
         self.logout_btn.clicked.connect(self.logout_requested.emit)
         layout.addWidget(self.logout_btn)
+
+        # ─── Icons ───────────────────────────────────────────────────────────
+        refresh_icons(self)
 
         # ─── Clock timer ──────────────────────────────────────────────────────
         timer = QTimer(self)
         timer.timeout.connect(self.update_time)
         timer.start(60000)
 
+        # ─── Theme change → أعد رسم الأيقونات ────────────────────────────────
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(
+                lambda _: refresh_icons(self)
+            )
+        except Exception:
+            pass
+
     def _refresh_user_btn(self):
         user = self.settings.get("user")
-        name = "👤"
+        name = "◉"
         if user:
             display = (getattr(user, "full_name", None) or
                        getattr(user, "username", None) or "")
             if display:
-                name = f"👤  {display}"
+                name = display
         self.user_btn.setText(name)
         self.user_btn.setFont(QFont("Tajawal", 10))
 
@@ -144,15 +165,16 @@ class TopBar(QWidget):
         lang = self.settings.get("language")
         new_lang = "en" if lang == "ar" else ("tr" if lang == "en" else "ar")
         self.settings.set_language(new_lang)
-        self.lang_btn.setText(f"🌐 {self._('language')}")
-        self.settings_btn.setText(f"⚙ {self._('settings')}")
-        self.theme_btn.setText(f"🌗 {self._('theme')}")
+        self.lang_btn.setText(self._('language'))
+        self.settings_btn.setText(self._('settings'))
+        self.theme_btn.setText(self._('theme'))
 
     def toggle_theme(self):
         theme = self.settings.get("theme")
         new_theme = "dark" if theme == "light" else "light"
         self.settings.set("theme", new_theme)
-        self.theme_btn.setText(f"🌗 {self._('theme')}")
+        self.theme_btn.setText(self._('theme'))
+
 
     def open_settings(self):
         dlg = SettingsWindow(self)
@@ -160,13 +182,15 @@ class TopBar(QWidget):
 
     def retranslate_ui(self):
         self._ = TranslationManager.get_instance().translate
-        self.lang_btn.setText(f"🌐 {self._('language')}")
-        self.theme_btn.setText(f"🌗 {self._('theme')}")
-        self.settings_btn.setText(f"⚙ {self._('settings')}")
+        self.lang_btn.setText(self._('language'))
+        self.theme_btn.setText(self._('theme'))
+        self.settings_btn.setText(self._('settings'))
         self.lang_btn.setToolTip(self._("language"))
         self.theme_btn.setToolTip(self._("theme"))
         self.settings_btn.setToolTip(self._("settings"))
         self.about_btn.setToolTip(self._("about_app"))
+        if hasattr(self, "search_btn"):
+            self.search_btn.setToolTip(self._("search") + "  (Ctrl+F)")
         self.user_btn.setToolTip(self._("profile"))
         self.logout_btn.setToolTip(self._("logout"))
         self._refresh_user_btn()

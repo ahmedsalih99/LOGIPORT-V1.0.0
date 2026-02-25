@@ -10,6 +10,7 @@ Usage:
 import os
 import json
 import logging
+from core.singleton import SingletonMeta
 from typing import Any, Optional, Dict
 from pathlib import Path
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ class ConfigurationError(Exception):
     pass
 
 
-class Config:
+class Config(metaclass=SingletonMeta):
     """
     Unified configuration manager that supports:
     - Environment variables (.env)
@@ -32,12 +33,7 @@ class Config:
     - Validation
     """
 
-    _instance = None
-
     def __init__(self):
-        if Config._instance is not None:
-            raise RuntimeError("Config is a singleton. Use Config.get_instance()")
-
         self._env_loaded = False
         self._config_cache: Dict[str, Any] = {}
         self._config_file_path = Path("config/settings.json")
@@ -47,13 +43,6 @@ class Config:
 
         # Load JSON config
         self._load_json_config()
-
-    @classmethod
-    def get_instance(cls) -> 'Config':
-        """Get singleton instance"""
-        if cls._instance is None:
-            cls._instance = Config()
-        return cls._instance
 
     def _load_env(self):
         """Load environment variables from .env file"""

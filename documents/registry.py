@@ -19,6 +19,13 @@ DOC_CODES: Dict[str, str] = {
     "packing_list.export.with_dates":   "packing_list/export/with_dates",
     "packing_list.export.with_line_id": "packing_list/export/with_line_id",
 
+    # CMR — بوليصة الشحن البري الدولية
+    "cmr":                          "cmr",
+
+    # Form A — شهادة المنشأ (GSP)
+    "form_a":                       "form_a",
+    "form.a":                       "form_a",
+
     # Legacy alias (للتوافق مع الموجود سابقًا)
     "invoice.foreign.commercial":   "invoices/commercial",
 }
