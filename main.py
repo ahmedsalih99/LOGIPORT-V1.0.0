@@ -28,6 +28,11 @@ def main():
     # 2) إنشاء التطبيق أولاً (مطلوب قبل أي نافذة)
     app = QApplication(sys.argv)
 
+    # منع QComboBox/QSpinBox من تغيير قيمتها بعجلة الفأرة بدون focus
+    # يُنصَّب هنا مرة واحدة فيغطي كل التطبيق بما فيه dialogs
+    from core.base_tab import _wheel_filter
+    app.installEventFilter(_wheel_filter)
+
     # 3) حمّل الإعدادات وطبّقها (لغة + اتجاه + ثيم)
     settings = SettingsManager.get_instance()
     settings.apply_all_settings()

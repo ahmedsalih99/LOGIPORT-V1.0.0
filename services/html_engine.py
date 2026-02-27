@@ -4,7 +4,10 @@ from typing import Dict
 from jinja2 import Environment, FileSystemLoader
 from documents import TEMPLATES_DIR
 from documents.registry import resolve_template
-from .exceptions import TemplateNotFound, HtmlRenderError
+# استخدام الأسماء الكانونية من exceptions.py مباشرةً
+from .exceptions import TemplateNotFoundError, HtmlRenderError
+# alias للتوافق مع الكود القديم الذي قد يستخدم الاسم القصير
+TemplateNotFound = TemplateNotFoundError
 
 _env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -15,9 +18,9 @@ _env = Environment(
 
 def render_html(doc_code: str, lang: str, ctx: Dict) -> str:
     try:
-        spec = resolve_template(doc_code, lang)  # ممكن ما يحتوي extra في نسختك
+        spec = resolve_template(doc_code, lang)
     except FileNotFoundError as e:
-        raise TemplateNotFound(str(e)) from e
+        raise TemplateNotFoundError(doc_code=doc_code, lang=lang) from e
 
     try:
         template_rel = spec.path.relative_to(TEMPLATES_DIR).as_posix()
@@ -28,7 +31,7 @@ def render_html(doc_code: str, lang: str, ctx: Dict) -> str:
         tpl = _env.get_template(template_rel)
         merge_ctx = dict(ctx)
 
-        # ✅ اجعلها آمنة حتى لو ما فيه خاصية extra
+        # آمنة حتى لو ما فيه خاصية extra
         extra = getattr(spec, "extra", None)
         if isinstance(extra, dict):
             merge_ctx.update(extra)

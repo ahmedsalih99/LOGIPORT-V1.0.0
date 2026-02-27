@@ -17,6 +17,7 @@ from PySide6.QtCore import Signal
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
+from utils.user_utils import get_current_user, get_user_display_name, get_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -85,30 +86,10 @@ class BaseWindow(QMainWindow):
 
     def _get_current_user(self) -> Any:
         """
-        Get current user from settings or app property.
-
-        Returns:
-            User object or empty dict
+        Get current user from QApplication or settings.
+        يستخدم user_utils.get_current_user() الموحّدة.
         """
-        try:
-            # Try from QApplication first
-            app = QApplication.instance()
-            if app:
-                user = app.property("user")
-                if user:
-                    return user
-
-            # Try from settings (if available)
-            if hasattr(self, 'settings') and self.settings:
-                user = self.settings.get("user")
-                if user:
-                    return user
-
-            return {}
-
-        except Exception as e:
-            logger.error(f"Error getting current user: {e}")
-            return {}
+        return get_current_user(settings=self.settings)
 
     def get_current_user(self) -> Any:
         """Get current user (public method)"""
@@ -345,35 +326,11 @@ class BaseWindow(QMainWindow):
             level: Log level ('info', 'warning', 'error', 'debug')
             exc: Optional exception object
         """
-        # Build user info
-        user_info = "[User: None]"
-        if self.current_user:
-            try:
-                if isinstance(self.current_user, dict):
-                    name = (
-                        self.current_user.get("username") or
-                        self.current_user.get("full_name") or
-                        "Unknown"
-                    )
-                    uid = self.current_user.get("id", "?")
-                else:
-                    name = (
-                        getattr(self.current_user, "username", None) or
-                        getattr(self.current_user, "full_name", None) or
-                        "Unknown"
-                    )
-                    uid = getattr(self.current_user, "id", "?")
-
-                user_info = f"[User: {name}#{uid}]"
-            except Exception:
-                user_info = "[User: Error]"
-
-        # Build full message
-        msg = f"{self.__class__.__name__}: {user_info} {message}"
+        user_display = get_user_display_name(self.current_user)
+        msg = f"{self.__class__.__name__}: [User: {user_display}] {message}"
         if exc:
             msg += f" | Exception: {exc}"
 
-        # Log with appropriate level
         if level == "error":
             logger.error(msg)
         elif level == "warning":
@@ -394,30 +351,3 @@ class BaseWindow(QMainWindow):
         """Handle window close event"""
         self.log_event("Window closed", level="debug")
         super().closeEvent(event)
-
-
-# Example window using BaseWindow
-class ExampleWindow(BaseWindow):
-    """Example window demonstrating BaseWindow usage"""
-
-    def __init__(self, parent=None, user=None):
-        super().__init__(parent, user)
-
-        self.set_translated_title("example_window_title")
-        self.init_ui()
-        self.center_on_screen()
-
-    def init_ui(self):
-        """Initialize UI"""
-        # Create central widget
-        central = QWidget()
-        self.setCentralWidget(central)
-
-        # Set window size
-        self.set_default_size(800, 600)
-
-    def update_user_permissions(self):
-        """Update UI based on user permissions"""
-        super().update_user_permissions()
-        # Custom permission logic here
-        self.log_event("Permissions updated", level="debug")

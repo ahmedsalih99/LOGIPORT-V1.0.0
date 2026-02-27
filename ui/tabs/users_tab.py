@@ -159,57 +159,7 @@ class UsersTab(BaseTab):
         self.display_data()
 
     def display_data(self):
-        can_edit = has_perm(self.current_user, "edit_user")
-        can_delete = has_perm(self.current_user, "delete_user")
-        show_actions = (can_edit or can_delete)
-
-        self.table.setRowCount(0)
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    user_obj = row["actions"]
-                    action_layout = QHBoxLayout()
-                    action_layout.setContentsMargins(0, 0, 0, 0)
-                    action_layout.setSpacing(12)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("primary-btn")
-                        btn_edit.clicked.connect(self.make_edit_callback(user_obj))
-                        action_layout.addWidget(btn_edit)
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("danger-btn")
-                        btn_delete.clicked.connect(self.make_delete_callback(user_obj))
-                        action_layout.addWidget(btn_delete)
-
-                    action_widget = QWidget()
-                    action_widget.setLayout(action_layout)
-                    self.table.setCellWidget(row_idx, col_idx, action_widget)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        # أخفِ عمود الإجراءات عند عدم وجود صلاحيات
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        # أعمدة الأدمن
-        self._apply_admin_columns()
-
-        self.update_pagination_label()
+        self._display_with_actions("edit_user", "delete_user")
 
     # -----------------------------
     # Actions
@@ -284,21 +234,31 @@ class UsersTab(BaseTab):
             QMessageBox.information(self, self._("updated"), self._("user_updated_success"))
             self.reload_data()
 
+    def _open_edit_dialog(self, user):
+        """Hook مطلوب من _display_with_actions."""
+        self.open_edit_user(user)
+
+    def _delete_single(self, user, confirm=True):
+        """Hook مطلوب من _display_with_actions."""
+        if confirm:
+            reply = QMessageBox.question(
+                self, self._("delete_user"), self._("are_you_sure_delete"),
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        self.users_crud.delete(user.get("id") if isinstance(user, dict) else user.id)
+        QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
+        self.reload_data()
+
     def delete_user(self, user):
-        reply = QMessageBox.question(
-            self, self._("delete_user"), self._("are_you_sure_delete"),
-            QMessageBox.Yes | QMessageBox.No,
-        )
-        if reply == QMessageBox.Yes:
-            self.users_crud.delete(user.get("id") if isinstance(user, dict) else user.id)
-            QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
-            self.reload_data()
+        self._delete_single(user, confirm=True)
 
     def make_edit_callback(self, user):
         return lambda checked=False: self.open_edit_user(user)
 
     def make_delete_callback(self, user):
-        return lambda checked=False: self.delete_user(user)
+        return lambda checked=False: self._delete_single(user)
 
     # -----------------------------
     # Row double-click → View dialog

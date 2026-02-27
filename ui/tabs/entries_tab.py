@@ -13,7 +13,6 @@ from database.models.client import Client
 from database.models.material import Material
 from database.models.packaging_type import PackagingType
 from database.models.country import Country
-from functools import partial
 
 from ui.dialogs.add_entry_dialog import AddEntryDialog
 from ui.dialogs.view_details.view_entry_dialog import ViewEntryDialog
@@ -309,63 +308,7 @@ class EntriesTab(BaseTab):
         self.display_data()
 
     def display_data(self):
-        """
-        عرض البيانات في الجدول مع دعم أزرار Edit/Delete وحماية الأعمدة الإدارية
-        """
-        can_edit = has_perm(self.current_user, "edit_entry")
-        can_delete = has_perm(self.current_user, "delete_entry")
-        show_actions = (can_edit or can_delete)
-
-        self.table.setRowCount(0)
-
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    obj = row["actions"]
-                    layout = QHBoxLayout()
-                    layout.setContentsMargins(0, 0, 0, 0)
-                    layout.setSpacing(12)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("primary-btn")
-                        btn_edit.clicked.connect(partial(self._open_edit_dialog, obj))
-                        layout.addWidget(btn_edit)
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("danger-btn")
-                        btn_delete.clicked.connect(partial(self._delete_single, obj))
-                        layout.addWidget(btn_delete)
-
-                    w = QWidget()
-                    w.setLayout(layout)
-                    self.table.setCellWidget(row_idx, col_idx, w)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        # إخفاء عمود actions إذا المستخدم لا يملك صلاحية
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        # تطبيق أعمدة admin حسب الصلاحيات
-        self._apply_admin_columns()
-
-        # تحديث label للصفوف / pagination
-        self.update_pagination_label()
+        self._display_with_actions("edit_entry", "delete_entry")
 
     # ---------- actions ----------
     def add_new_item(self):

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+    <html lang="{{ lang }}">
+    <head>
+      <meta charset="utf-8"/>
+      <title>Packing List</title>
+      <link rel="stylesheet" href="../../common/base.css"/>
+      <link rel="stylesheet" href="../../common/print.css"/>
+    </head>
+    <body>
+      {{ header_partial }}
+
+      <h3>{{ labels.shipment }}</h3>
+      <table>
+        <tr><th>{{ labels.entry_no }}</th><td>{{ entry.number }}</td></tr>
+        <tr><th>{{ labels.container }}</th><td>{{ entry.container_no }}</td></tr>
+        <tr><th>{{ labels.truck }}</th><td>{{ entry.truck_plate }}</td></tr>
+      </table>
+
+      <h3>{{ labels.pack_list }}</h3>
+      {{ items_table_partial }}
+
+      {{ footer_partial }}
+    </body>
+    </html>

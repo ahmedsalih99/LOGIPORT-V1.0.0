@@ -12,33 +12,33 @@ from database.models import get_session_local
 # ----------------------------------------------------------------------------
 # Mapping template-code -> document_types.code in DB (no assumptions)
 DOC_TYPE_MAP: dict[str, str] = {
-    # Invoices — commercial/foreign
-    "invoice.foreign.commercial":  "INV_EXT",
+    # ─── Invoices — commercial / foreign ──────────────────────────────────────
+    "invoice.foreign.commercial":  "INV_EXT",        # DB id=1
     "invoice.commercial":          "INV_EXT",
 
-    # Invoices — normal
-    "invoice.normal":              "INV_NORMAL",
+    # ─── Invoices — normal ────────────────────────────────────────────────────
+    "invoice.normal":              "INV_NORMAL",      # DB id=16
 
-    # Invoices — proforma
-    "invoice.proforma":            "INV_PROFORMA",
+    # ─── Invoices — proforma ──────────────────────────────────────────────────
+    "invoice.proforma":            "INV_PROFORMA",    # DB id=15
 
-    # Invoices — Syrian
-    "invoice.syrian.intermediary": "INV_SYR_INTERM",
-    "invoice.syrian.transit":      "INV_SYR_TRANS",
-    "invoice.syrian.entry":        "invoice.syrian.entry",
-    "invoice.syrian":              "INV_SY",
+    # ─── Invoices — Syrian (كلها أكواد متسقة من جدول document_types) ─────────
+    "invoice.syrian":              "INV_SY",          # DB id=2  (عام)
+    "invoice.syrian.entry":        "invoice.syrian.entry",  # DB id=10 (الكود الفعلي في DB)
+    "invoice.syrian.transit":      "INV_SYR_TRANS",   # DB id=11
+    "invoice.syrian.intermediary": "INV_SYR_INTERM",  # DB id=12
 
-    # Packing Lists
-    "packing_list.export.simple":       "PL_EXPORT_SIMPLE",
-    "packing_list.export.with_dates":   "PL_EXPORT_WITH_DATES",
-    "packing_list.export.with_line_id": "PL_EXPORT_WITH_LINE_ID",
+    # ─── Packing Lists ────────────────────────────────────────────────────────
+    "packing_list.export.simple":       "PL_EXPORT_SIMPLE",      # DB id=13
+    "packing_list.export.with_dates":   "PL_EXPORT_WITH_DATES",  # DB id=14
+    "packing_list.export.with_line_id": "PL_EXPORT_WITH_LINE_ID",# DB id=17
 
-    # CMR
-    "cmr": "cmr",
+    # ─── CMR ──────────────────────────────────────────────────────────────────
+    "cmr": "cmr",                                     # DB id=18
 
-    #form a
-    "form_a": "form_a",
-    "form.a": "form_a",
+    # ─── Form A (شهادة المنشأ) ────────────────────────────────────────────────
+    "form_a": "form_a",                               # DB id=19
+    "form.a": "form_a",                               # alias
 }
 
 

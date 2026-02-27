@@ -14,9 +14,7 @@ from database.models import get_session_local, User, Country
 from core.permissions import has_perm, is_admin
 from core.admin_columns import apply_admin_columns_to_table
 
-from PySide6.QtWidgets import (
-    QMessageBox, QTableWidgetItem, QHBoxLayout, QWidget, QPushButton, QSizePolicy
-)
+from PySide6.QtWidgets import QMessageBox, QTableWidgetItem
 from PySide6.QtCore import Qt
 
 
@@ -197,58 +195,7 @@ class ClientsTab(BaseTab):
         self.display_data()
 
     def display_data(self):
-        can_edit = has_perm(self.current_user, "edit_client")
-        can_delete = has_perm(self.current_user, "delete_client")
-        show_actions = (can_edit or can_delete)
-
-        self.table.setRowCount(0)
-
-        for row_idx, row in enumerate(self.data):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions:
-                        self.table.setCellWidget(row_idx, col_idx, QWidget())
-                        continue
-
-                    obj = row["actions"]
-                    action_layout = QHBoxLayout()
-                    action_layout.setContentsMargins(0, 0, 0, 0)
-                    action_layout.setSpacing(6)
-
-                    if can_edit:
-                        btn_edit = QPushButton(self._("edit"))
-                        btn_edit.setObjectName("primary-btn")
-                        btn_edit.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        action_layout.addWidget(btn_edit)
-                        btn_edit.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-
-
-                    if can_delete:
-                        btn_delete = QPushButton(self._("delete"))
-                        btn_delete.setObjectName("danger-btn")
-                        btn_delete.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        action_layout.addWidget(btn_delete)
-                        btn_delete.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-
-
-                    w = QWidget(); w.setLayout(action_layout)
-                    self.table.setCellWidget(row_idx, col_idx, w)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(row_idx, col_idx, item)
-
-        try:
-            actions_index = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if actions_index is not None:
-                self.table.setColumnHidden(actions_index, not show_actions)
-        except Exception:
-            pass
-
-        self._apply_admin_columns()
-        self.update_pagination_label()
+        self._display_with_actions("edit_client", "delete_client")
 
     def add_new_item(self):
         countries = self.countries_crud.get_all() or []

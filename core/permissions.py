@@ -549,8 +549,12 @@ def get_permission_label(code: str, language: str = 'en') -> str:
 
 
 def clear_permission_cache():
-    """Clear all permission caches. Call after updating permissions."""
+    """
+    امسح كل الـ caches المتعلقة بالصلاحيات.
+    استدعِها بعد أي تعديل على صلاحيات الأدوار في DB.
+    """
     PermissionManager.clear_cache()
+    logger.info("Permission cache cleared — changes will take effect immediately")
 
 
 # --------- Dynamic Permission Constants (Auto-Generated) ---------

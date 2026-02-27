@@ -242,6 +242,13 @@ class PermissionsTab(QWidget):
         for perm_id in to_remove:
             remove_permission_from_role(role_id, perm_id, user_id=uid)
 
+        # امسح الـ cache حتى تنعكس التغييرات فوراً على كل المستخدمين
+        try:
+            from core.permissions import clear_permission_cache
+            clear_permission_cache()
+        except Exception:
+            pass
+
         QMessageBox.information(self, self._("save"), self._("permissions_updated_successfully"))
         self.load_permissions(role_id)
 
@@ -253,6 +260,14 @@ class PermissionsTab(QWidget):
         current_perm_ids = [p["id"] for p in get_role_permissions(role_id)]
         for perm_id in current_perm_ids:
             remove_permission_from_role(role_id, perm_id, user_id=uid)
+
+        # امسح الـ cache
+        try:
+            from core.permissions import clear_permission_cache
+            clear_permission_cache()
+        except Exception:
+            pass
+
         self.load_permissions(role_id)
         QMessageBox.information(self, self._("reset_to_role_defaults"), self._("permissions_reset_successfully"))
 

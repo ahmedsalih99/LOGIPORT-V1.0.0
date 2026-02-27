@@ -49,9 +49,9 @@ def _get_output_root() -> Path:
 
 
 def _sanitize_tx_no(tx_no: str) -> str:
-    """يحوّل رقم المعاملة لاسم ملف آمن (يستبدل / و \\ بـ -)."""
+    """يحوّل رقم المعاملة لاسم ملف آمن (يستبدل / و \\ والمسافات بـ -)."""
     import re as _re
-    return _re.sub(r"[\/]", "-", (tx_no or "").strip())
+    return _re.sub(r"[/\\\s]+", "-", (tx_no or "").strip()) or "UNKNOWN"
 
 
 def _output_paths(

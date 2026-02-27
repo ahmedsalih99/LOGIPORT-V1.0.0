@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>CMR — International Consignment Note</title>
+<style>
+@page { size: 210mm 297mm; margin: 8mm 7mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 210mm; height: 297mm;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6.8pt; color: #000; background: #fff; line-height: 1.2;
+}
+.page { width: 100%; overflow: hidden; }
+
+/* ── main table ── */
+table.cmr {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+  overflow: hidden;
+}
+table.cmr td {
+  border: 0.5pt solid #000;
+  padding: 1.5pt 2pt;
+  vertical-align: top;
+  overflow: hidden;
+  font-size: 7pt;
+}
+
+/* ── column widths (exact XLSX proportions) ── */
+/* B=14.03%  C=13.73%  D=11.34%  E=13.73%  F=11.94%  G=12.74%  H=12.04%  I=10.45% */
+col.cB { width: 11.5%; }
+col.cC { width: 13.73%; }
+col.cD { width: 11.34%; }
+col.cE { width: 11.5%; }
+col.cF { width: 11.94%; }
+col.cG { width: 14%; }
+col.cH { width: 14%; }
+col.cI { width: 11.99%; }
+
+/* ── row heights from XLSX (pt × 0.3528 = mm) ── */
+tr.r1  { height: 6.6mm;  }
+tr.r2  { height: 8.6mm;  }
+tr.r3  { height: 5.2mm;  }
+tr.r4  { height: 12.0mm; }
+tr.r5  { height: 7.6mm;  }
+tr.r6  { height: 17.0mm; }
+tr.r7  { height: 7.8mm;  }
+tr.r8  { height: 12.2mm; }
+tr.r9  { height: 7.6mm;  }
+tr.r10 { height: 10.1mm; }
+tr.r11 { height: 7.4mm;  }
+tr.r12 { height: 12.0mm; }
+tr.r13 { height: 9.3mm;  }
+tr.r14 { height: 50mm; }
+tr.r15 { height: 6.2mm;  }
+tr.r16 { height: 7.4mm;  }
+tr.r17 { height: 12.0mm; }
+tr.r18 { height: 5.0mm;  }
+tr.r19 { height: 5.0mm;  }
+tr.r20 { height: 5.0mm;  }
+tr.r21 { height: 5.0mm;  }
+tr.r22 { height: 5.0mm;  }
+tr.r23 { height: 5.0mm;  }
+tr.r24 { height: 5.0mm;  }
+tr.r25 { height: 10.0mm; }
+tr.r26 { height: 4.8mm;  }
+tr.r27 { height: 12.2mm; }
+tr.r28 { height: 15.5mm; }
+
+
+/* ── text styles ── */
+.lbl-en { font-size: 6pt; font-weight: 700; display: block; line-height: 1.3; }
+.lbl-ar { font-size: 5.5pt; color: #222; display: block; direction: rtl; line-height: 1.3; }
+.val    { font-size: 7.5pt; font-weight: 700; display: block; margin-top: 1pt; }
+.sm     { font-size: 7.5pt; display: block; line-height: 1.4; }
+.vm     { vertical-align: middle !important; }
+.tc     { text-align: center; }
+.tr     { text-align: right; }
+
+/* ── header area styles ── */
+.cmr-big   { font-size: 24pt; font-weight: 900; letter-spacing: 4pt; }
+.icn-en    { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .3pt; }
+.icn-ar    { font-size: 7pt; direction: rtl; display: block; }
+.conv-en   { font-size: 5.8pt; line-height: 1.4; }
+.conv-ar   { font-size: 5.5pt; direction: rtl; line-height: 1.4; display: block; margin-top: 2pt; }
+.badge     { font-size: 9pt; font-weight: 900; border: 0.8pt solid #000; padding: 1pt 5pt; display: inline-block; margin-right: 3pt; }
+
+/* ── goods header ── */
+.gh        { font-size: 6pt; font-weight: 700; text-align: center; line-height: 1.3; vertical-align: middle; }
+.gha       { font-size: 5.5pt; font-weight: 400; direction: rtl; color: #333; display: block; }
+
+/* ── goods data table ── */
+table.goods { width: 100%; height: 100%; border-collapse: collapse; font-size: 7pt; }
+table.goods td { border: 0.4pt solid #000; padding: 1pt 2pt; vertical-align: top; }
+
+/* ── payment row ── */
+.pl  { font-size: 6.5pt; font-weight: 700; display: block; }
+.pla { font-size: 5.5pt; direction: rtl; color: #333; display: block; }
+
+/* ── signature ── */
+.sig  { font-size: 6pt; font-weight: 700; display: block; }
+.siga { font-size: 5.5pt; direction: rtl; color: #333; display: block; margin-top: 1pt; }
+</style>
+</head>
+<body>
+
+{%- set snd   = sender    or {} -%}
+{%- set csg   = consignee or {} -%}
+{%- set car   = carrier   or {} -%}
+{%- set tots  = totals    or {} -%}
+{%- set ilist = items     or [] -%}
+{%- set ddate = shipment_date or date or '' -%}
+
+<div class="page">
+<table class="cmr">
+<colgroup>
+  <col class="cB"/><col class="cC"/><col class="cD"/><col class="cE"/>
+  <col class="cF"/><col class="cG"/><col class="cH"/><col class="cI"/>
+</colgroup>
+<tbody>
+
+{# ══════════════════════════════════════════════════
+   ROW 1 — Copy badge
+   B1 (content) + C1..I1 (merged, empty)
+══════════════════════════════════════════════════ #}
+<tr class="r1">
+  <td colspan="4" class="vm">
+    <span class="badge">1</span>
+    <span class="lbl-en" style="display:inline; font-size:7.5pt;">Copy for sender</span>
+    <span class="lbl-ar" style="display:inline; font-size:6.5pt;"> / نسخة للمرسل</span>
+  </td>
+  <td colspan="4" style="border-left:none;"></td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROWS 2–4
+   B2:E2 = Sender label
+   F2:H2 = ICN title
+   I2 = (part of right)
+   B3:E4 = Sender data (rowspan 2)
+   F3:I3 = CMR big (colspan 4)
+   F4:G4 = Convention EN
+   H4:I4 = Convention AR
+══════════════════════════════════════════════════ #}
+<tr class="r2">
+  <td colspan="4">{# B2:E2 #}
+    <span class="lbl-en">1. sender (name, address, country)</span>
+    <span class="lbl-ar">المرسل (الاسم، العنوان، البلد)</span>
+  </td>
+  <td colspan="3" class="tc vm">{# F2:H2 #}
+    <span class="icn-en">INTERNATIONAL CONSIGNMENT NOTE</span>
+    <span class="icn-ar">رسالة شـحن دولي</span>
+  </td>
+  <td class="vm"></td>{# I2 #}
+</tr>
+<tr class="r3">
+  <td colspan="4" rowspan="2" class="vm">{# B3:E4 #}
+    <span class="val">{{ snd.name or '' }}</span>
+    <span class="sm">{{ snd.address or '' }}</span>
+    <span class="sm">{{ snd.city or '' }}{% if snd.city and snd.country %}, {% endif %}{{ snd.country or '' }}</span>
+  </td>
+  <td colspan="4" class="tc vm">{# F3:I3 #}
+    <span class="cmr-big">CMR</span>
+  </td>
+</tr>
+<tr class="r4">
+  {# B3:E4 continues via rowspan — F4:G4 convention EN, H4:I4 convention AR #}
+  <td colspan="2">{# F4:G4 #}
+    <span class="conv-en">This carriage is subject, notwithstanding any clause to the contrary, to the Convention on the contract for the International Carriage of goods by road (CMR).</span>
+  </td>
+  <td colspan="2">{# H4:I4 #}
+    <span class="conv-ar">هذه الشحنة، بغض النظر عن أي نص مخالف، خاضعة لأحكام الاتفاق المتعلق بعقد النقل الدولي للبضائع بـرًا (CMR).</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 5 — B5:E5 = Consignee label | F5:I5 = Carrier label
+══════════════════════════════════════════════════ #}
+<tr class="r5">
+  <td colspan="4">{# B5:E5 #}
+    <span class="lbl-en">2. consignee (name, address, country)</span>
+    <span class="lbl-ar">المرسل إليه (الاسم، العنوان، البلد)</span>
+  </td>
+  <td colspan="4">{# F5:I5 #}
+    <span class="lbl-en">16. Carrier (name, address, country)</span>
+    <span class="lbl-ar">الناقل (الاسم، العنوان، البلد)</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 6 — B6:E6 = Consignee data | F6:I6 = Carrier data
+══════════════════════════════════════════════════ #}
+<tr class="r6">
+  <td colspan="4">{# B6:E6 #}
+    <span class="val">{{ csg.name or '' }}</span>
+    <span class="sm">{{ csg.address or '' }}</span>
+    <span class="sm">{{ csg.city or '' }}{% if csg.city and csg.country %}, {% endif %}{{ csg.country or '' }}</span>
+  </td>
+  <td colspan="4">{# F6:I6 #}
+    <span class="val">{{ car.name or '' }}</span>
+    <span class="sm">{{ car.address or '' }}</span>
+    <span class="sm">{{ car.city or '' }}{% if car.city and car.country %}, {% endif %}{{ car.country or '' }}</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 7 — B7:E7 = Box 3 label | F7:I7 = Box 17 label
+══════════════════════════════════════════════════ #}
+<tr class="r7">
+  <td colspan="4">
+    <span class="lbl-en">3. Place of delivery of the goods (place, country)</span>
+    <span class="lbl-ar">مكان تسليم البضائع (المدينة، الدولة)</span>
+  </td>
+  <td colspan="4">
+    <span class="lbl-en">17. Successive carriers (name, address, country)</span>
+    <span class="lbl-ar">الناقلون المتوالون (الاسم، العنوان، البلد)</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 8 — B8:E8 = Box 3 data | F8:I8 = Box 17 data
+══════════════════════════════════════════════════ #}
+<tr class="r8">
+  <td colspan="4">
+    <span class="val">{{ delivery_place or '' }}</span>
+  </td>
+  <td colspan="4"></td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 9 — B9:E9 = Box 4 label | F9:I9 = Box 18 label
+══════════════════════════════════════════════════ #}
+<tr class="r9">
+  <td colspan="4">
+    <span class="lbl-en">4. Place and date of taking over the goods (Place, country, date)</span>
+    <span class="lbl-ar">مكان وتاريخ استلام البضاعة (المكان، البلد، التاريخ)</span>
+  </td>
+  <td colspan="4">
+    <span class="lbl-en">18. Carrier's reservations and observations</span>
+    <span class="lbl-ar">تحفظات وملاحظات الناقل</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 10 — B10:E10 = Box 4 data | F10:I12 = TRUCK NO (rowspan 3)
+══════════════════════════════════════════════════ #}
+<tr class="r10">
+  <td colspan="4">
+    <span class="val">{{ loading_place or '' }}</span>
+    <span class="sm">{{ ddate }}</span>
+  </td>
+  <td colspan="4" rowspan="3" class="vm" style="text-align:center;">{# F10:I12 #}
+    <span style="font-size:9.5pt; font-weight:900; letter-spacing:1.5pt;">
+      TRUCK NO:
+    </span>
+    <br/>
+    <span style="font-size:11pt; font-weight:900; letter-spacing:3pt; font-family:'Courier New',monospace;">
+      {{ truck_plate or '________________' }}
+    </span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 11 — B11:E11 = Box 5 label  (F10:I12 continues)
+══════════════════════════════════════════════════ #}
+<tr class="r11">
+  <td colspan="4">
+    <span class="lbl-en">5. Documents attached</span>
+    <span class="lbl-ar">الوثائق المرفقة</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 12 — B12:E12 = Box 5 data  (F10:I12 continues)
+══════════════════════════════════════════════════ #}
+<tr class="r12">
+  <td colspan="4">
+    <span class="sm">{{ transport_ref or attached_documents or '' }}</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 13 — Goods column headers
+   B=6  C=7  D=8  E13:F13=(9+ADR label)  G=10  H=11  I=12
+══════════════════════════════════════════════════ #}
+<tr class="r13">
+  <td class="gh">
+    6. Marks and Nos
+    <span class="gha">العلامات والأرقام</span>
+  </td>
+  <td class="gh">
+    7. Number<br/>of packages
+    <span class="gha">عدد الطرود</span>
+  </td>
+  <td class="gh">
+    8. Method<br/>of packing
+    <span class="gha">طريقة التغليف</span>
+  </td>
+  <td colspan="2" class="gh">{# E13:F13 #}
+    9. Nature of the goods
+    <span class="gha">نوع البضاعة</span>
+  </td>
+  <td class="gh">
+    10. Statistical<br/>number
+    <span class="gha">رقم إحصائي</span>
+  </td>
+  <td class="gh">
+    11. Gross wt<br/>in kg
+    <span class="gha">الوزن القائم بالكغ</span>
+  </td>
+  <td class="gh">
+    12. Volume<br/>in m³
+    <span class="gha">الحجم ب م³</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 14 — Goods data (tall)
+   B14:F14 = goods description area (colspan 5)
+   G14:G15 = Statistical (rowspan 2)
+   H14:H15 = Gross weight (rowspan 2)
+   I14:I15 = Volume (rowspan 2)
+══════════════════════════════════════════════════ #}
+<tr class="r14">
+  <td colspan="5" style="padding:0;">{# B14:F14 #}
+    <table class="goods" style="height:50mm; max-height:50mm;">
+      <colgroup>
+        {# B C D E F proportional within 5 cols #}
+        <col style="width:20.55%;"/>
+        <col style="width:20.13%;"/>
+        <col style="width:16.63%;"/>
+        <col style="width:20.13%;"/>
+        <col style="width:22.56%;"/>
+      </colgroup>
+      <tbody>
+        {%- for it in ilist %}
+        <tr>
+          <td>{{ it.code or '' }}</td>
+          <td class="tc">{{ it.qty|int }}</td>
+          <td>{{ it.packaging or '' }}</td>
+          <td style="font-weight:700;" colspan="2">{{ it.description or '' }}</td>
+        </tr>
+        {%- endfor %}
+        {%- for _ in range([8 - (ilist|length), 1]|max) %}
+        <tr><td>&nbsp;</td><td></td><td></td><td colspan="2"></td></tr>
+        {%- endfor %}
+        <tr style="background:#f0f0f0;">
+          <td colspan="5" style="text-align:right; font-weight:700; font-size:6.5pt; padding-right:6pt; vertical-align:middle;">Total / الإجمالي</td>
+        </tr>
+      </tbody>
+    </table>
+  </td>
+  <td rowspan="2" style="text-align:right; vertical-align:top;">{# G14:G15 #}
+    {%- for it in ilist %}<span style="display:block; font-size:7pt; padding:1pt;">{{ it.code or '' }}</span>{%- endfor %}
+  </td>
+  <td rowspan="2" style="text-align:right; vertical-align:top;">{# H14:H15 #}
+    {%- for it in ilist %}<span style="display:block; font-size:7pt; padding:1pt;">{{ "%.3f"|format(it.gross|float) }}</span>{%- endfor %}
+    <span style="display:block; font-size:7pt; font-weight:700; padding:1pt; border-top:0.4pt solid #000; background:#f0f0f0;">{{ "%.3f"|format((tots.gross or 0)|float) }}</span>
+  </td>
+  <td rowspan="2" style="vertical-align:top;">{# I14:I15 #}
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 15 — ADR sub-columns
+   B15=Class  C15=Number  D15=Letter  E15:F15=(ADR)
+   G14:G15, H14:H15, I14:I15 continue via rowspan
+══════════════════════════════════════════════════ #}
+<tr class="r15">
+  <td class="gh tc">Class<span class="gha">فئة</span></td>
+  <td class="gh tc">Number<span class="gha">الرقم</span></td>
+  <td class="gh tc">Letter<span class="gha">الحرف</span></td>
+  <td colspan="2" class="gh tc">(ADR)</td>
+  {# G H I continue from rowspan #}
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 16 — B16:E16 = Box 13 label | F16:I16 = Box 19 label
+══════════════════════════════════════════════════ #}
+<tr class="r16">
+  <td colspan="4">
+    <span class="lbl-en">13. Sender's instructions</span>
+    <span class="lbl-ar">تعليمات المرسل</span>
+  </td>
+  <td colspan="4">
+    <span class="lbl-en">19. Special agreements</span>
+    <span class="lbl-ar">إتفاقيات خاصة</span>
+  </td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 17 — B17:E21 = Box 13+14 data (rowspan 5) | F17:I17 = Box 19 data
+══════════════════════════════════════════════════ #}
+<tr class="r17">
+  <td colspan="4" rowspan="5" style="overflow:hidden;">{# B17:E21 — Box13 data area #}
+  </td>
+  <td colspan="4"></td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 18 — Payment header (B17:E21 continues)
+══════════════════════════════════════════════════ #}
+<tr class="r18">
+  <td class="vm">
+    <span class="pl">20. To be paid by:</span>
+    <span class="pla">تدفع من قبل</span>
+  </td>
+  <td class="gh tc vm">المرسل<br/>Sender</td>
+  <td class="gh tc vm">العملة<br/>Currency</td>
+  <td class="gh tc vm">المرسل إليه<br/>Consignee</td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROWS 19–24 — Payment rows (B17:E21 continues for 19-21)
+══════════════════════════════════════════════════ #}
+<tr class="r19">
+  <td><span class="pl">Carriage charges:</span><span class="pla">أجور النقل</span></td>
+  <td></td><td></td><td></td>
+</tr>
+<tr class="r20">
+  <td><span class="pl">Deductions</span><span class="pla">الخصومات</span></td>
+  <td></td><td></td><td></td>
+</tr>
+<tr class="r21">
+  <td><span class="pl">Balance:</span><span class="pla">الرصيد</span></td>
+  <td></td><td></td><td></td>
+</tr>
+
+<tr class="r22">
+  <td colspan="3" class="vm">{# B22:D22 #}
+    <span class="lbl-en" style="font-size:6pt;">14. Instructions As To Payment For Carriage /</span>
+    <span class="lbl-ar" style="font-size:5.5pt;">تعليمات بشأن دفع أجور النقل</span>
+  </td>
+  <td></td>
+  <td class="vm"><span class="pl">Supplem. charges:</span><span class="pla">أجور إضافية</span></td>
+  <td></td><td></td><td></td>
+</tr>
+<tr class="r23">
+  <td class="vm"><span class="pla" style="font-size:6pt;">أجرة مدفوعة</span></td>
+  <td colspan="2"></td>
+  <td></td>
+  <td class="vm"><span class="pl">Other charges:</span><span class="pla">أجور أخرى</span></td>
+  <td></td><td></td><td></td>
+</tr>
+<tr class="r24">
+  <td class="vm"><span class="pla" style="font-size:6pt;">الأجرة على المرسل إليه</span></td>
+  <td colspan="2"></td>
+  <td></td>
+  <td class="vm"><span class="pl" style="font-weight:900;">TOTAL / المجموع :</span></td>
+  <td></td><td></td><td></td>
+</tr>
+
+{# ══════════════════════════════════════════════════
+   ROW 25 — B25=Box21 | C-D=on/date | E=22 | F25:I25=Box15
+══════════════════════════════════════════════════ #}
+{# ROW 25: B=Box21 | D=on/date | F-I=Box15 #}
+{# ══ ROW 25: B25=Box21 | C,D=on/date | F25:I25=Box15 ══
+   XLSX: B25 standalone, D25 standalone, F25:I25 colspan4
+#}
+<tr class="r25">
+  <td class="vm">{# B25 #}
+    <span class="lbl-en" style="font-size:6pt;">21. Established in /</span>
+    <span class="lbl-ar" style="font-size:5.5pt;">نظم في</span>
+    <span class="val" style="font-size:7.5pt;">{{ loading_place or '' }}</span>
+  </td>
+  <td class="vm">{# C25 #}</td>
+  <td class="vm">{# D25 — on/date #}
+    <span class="lbl-en" style="font-size:6pt;">on</span>
+    <span class="lbl-ar" style="font-size:5.5pt;">بتاريخ:</span>
+    <span style="font-size:8pt; font-weight:700; display:block;">{{ ddate }}</span>
+  </td>
+  <td class="vm">{# E25 #}</td>
+  <td colspan="4" class="vm">{# F25:I25 #}
+    <span class="lbl-en">15. Cash on delivery</span>
+    <span class="lbl-ar">نقد عند التسليم</span>
+  </td>
+</tr>
+
+{# ══ ROWS 26-28: مربعات 22 / 23 / 24
+   كل مربع = colspan عريض + rowspan 3 (rows 26,27,28)
+   22: B+C+D (39.1%)  23: E+F (25.67%)  24: G+H+I (35.23%)
+   الرقم أعلى المربع، "Place/المكان" أسفل مربع 24
+#}
+<tr class="r26">
+  <td colspan="3" rowspan="3" style="padding:2pt 3pt;">{# 22: B26:D28 #}
+    <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+      <span style="font-size:6.5pt; font-weight:700;">22.</span>
+      <div>
+        <span style="font-size:6pt; font-weight:700; display:block;">Signature and stamp of the sender</span>
+        <span style="font-size:5.5pt; color:#333; direction:rtl; display:block;">توقيع وختم المرسل</span>
+      </div>
+    </div>
+  </td>
+  <td colspan="2" rowspan="3" style="padding:2pt 3pt;">{# 23: E26:F28 #}
+    <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+      <span style="font-size:6.5pt; font-weight:700;">23.</span>
+      <div>
+        <span style="font-size:6pt; font-weight:700; display:block;">Signature and stamp of the carrier</span>
+        <span style="font-size:5.5pt; color:#333; direction:rtl; display:block;">توقيع وختم الناقل</span>
+      </div>
+    </div>
+  </td>
+  <td colspan="3" rowspan="3" style="padding:2pt 3pt;">{# 24: G26:I28 #}
+    <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+      <div>
+        <span style="font-size:6.5pt; font-weight:700; display:block;">24. Goods received / بضاعة مستلمة</span>
+        <span style="font-size:6.5pt; font-weight:700; display:block; margin-top:1pt;">Place / المكان</span>
+      </div>
+      <div>
+        <span style="font-size:6pt; font-weight:700; display:block;">Signature and stamp of the consignee</span>
+        <span style="font-size:5.5pt; color:#333; direction:rtl; display:block;">توقيع وختم المرسل إليه</span>
+      </div>
+    </div>
+  </td>
+</tr>
+<tr class="r27"></tr>
+<tr class="r28"></tr>
+
+{# Row 29 removed — signatures now inside boxes 22/23/24 #}
+
+</tbody>
+</table>
+</div>
+</body>
+</html>

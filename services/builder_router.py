@@ -5,37 +5,41 @@ from importlib import import_module
 from functools import lru_cache
 from typing import Callable, Optional, Tuple
 
-# قواعــد التوجيه: احرص أن تكون القواعد "الأكثر تحديدًا" قبل الأعم
+# قواعد التوجيه — القاعدة الأطول تُطبَّق أولاً (longest-prefix wins)
+# ترتيب الأقسام: من الأكثر تحديداً إلى الأعم
 _RULES = {
-    # فاتورة سورية إدخال (الجديدة) — يجب أن تأتي قبل "invoice.syrian."
+    # ── فاتورة سورية إدخال (قبل "invoice.syrian.") ───────────────────────────
     "invoice.syrian.entry.": "documents.builders.invoice_syrian_entry",
     "invoice.syrian.entry":  "documents.builders.invoice_syrian_entry",
 
-    # فواتير سورية - ترانزيت
+    # ── فواتير سورية أخرى ────────────────────────────────────────────────────
     "invoice.syrian.intermediary.": "documents.builders.invoice_syrian_transit_intermediary",
-    "invoice.syrian.intermediary": "documents.builders.invoice_syrian_transit_intermediary",
-    "invoice.syrian.transit.": "documents.builders.invoice_syrian_transit",
-    "invoice.syrian.transit": "documents.builders.invoice_syrian_transit",
+    "invoice.syrian.intermediary":  "documents.builders.invoice_syrian_transit_intermediary",
+    "invoice.syrian.transit.":      "documents.builders.invoice_syrian_transit",
+    "invoice.syrian.transit":       "documents.builders.invoice_syrian_transit",
 
-    # فواتير التصدير الأجنبية فقط
+    # ── الفاتورة السورية العامة (fallback لأي invoice.syrian.XXX غير معروف) ──
+    "invoice.syrian.": "documents.builders.invoice",
+    "invoice.syrian":  "documents.builders.invoice",   # مطابقة كاملة بلا suffix
+
+    # ── فواتير التصدير الأجنبية ────────────────────────────────────────────────
     "invoice.foreign.": "documents.builders.invoice_foreign",
 
-    # فواتير محلية/عامة (سورية/عادية/تجارية/بروفورما)
-    "invoice.syrian.": "documents.builders.invoice",
-    "invoice.normal.": "documents.builders.invoice",
-    "invoice.normal":  "documents.builders.invoice",
-    "invoice.commercial.": "documents.builders.invoice",
+    # ── فواتير عامة ───────────────────────────────────────────────────────────
+    "invoice.normal.":    "documents.builders.invoice",
+    "invoice.normal":     "documents.builders.invoice",
+    "invoice.commercial.":"documents.builders.invoice",
     "invoice.commercial": "documents.builders.invoice",
-    "invoice.proforma.": "documents.builders.invoice_proforma",
-    "invoice.proforma":  "documents.builders.invoice_proforma",
+    "invoice.proforma.":  "documents.builders.invoice_proforma",
+    "invoice.proforma":   "documents.builders.invoice_proforma",
 
-    # قوائم التعبئة
+    # ── قوائم التعبئة ─────────────────────────────────────────────────────────
     "packing_list.": "documents.builders.packing_list",
 
-    # CMR — بوليصة الشحن البري الدولية
+    # ── CMR — بوليصة الشحن البري الدولية ─────────────────────────────────────
     "cmr": "documents.builders.cmr_builder",
 
-    # Form A — شهادة المنشأ (GSP)
+    # ── Form A — شهادة المنشأ (GSP) ───────────────────────────────────────────
     "form_a": "documents.builders.form_a_builder",
     "form.a": "documents.builders.form_a_builder",
 }

@@ -9,6 +9,7 @@ from PySide6.QtGui import QFont, QColor
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from core.permissions import is_admin as _is_admin
 from database.db_utils import format_local_dt
 from database.models import get_session_local, User, AuditLog, Transaction, Client, Material, Document
 from sqlalchemy import func, desc
@@ -19,19 +20,6 @@ from datetime import datetime
 
 def _current_user():
     return SettingsManager.get_instance().get("user")
-
-def _is_admin(user) -> bool:
-    if not user: return False
-    try:
-        rid = getattr(user, "role_id", None)
-        if rid and int(rid) == 1: return True
-        role = getattr(user, "role", None)
-        if role:
-            rname = str(getattr(role, "name", "") or "").lower()
-            if rname == "admin": return True
-    except Exception:
-        pass
-    return False
 
 
 # ── StatCard ──────────────────────────────────────────────────────────────────

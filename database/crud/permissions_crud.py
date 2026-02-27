@@ -33,17 +33,14 @@ def _get_role_id(user):
         return None
 
 def _is_super_admin(user):
-    if not user:
+    """
+    مفوَّض إلى core.permissions.is_admin — مصدر موحّد للحقيقة.
+    """
+    try:
+        from core.permissions import is_admin
+        return is_admin(user)
+    except Exception:
         return False
-    role = user.get("role") if isinstance(user, dict) else getattr(user, "role", None)
-    name = ""
-    if isinstance(role, dict):
-        name = role.get("name") or ""
-    elif isinstance(role, str):
-        name = role
-    else:
-        name = getattr(role, "name", "") or ""
-    return str(name).strip().lower() == "admin"
 
 # -----------------------------
 # Permissions CRUD
@@ -242,32 +239,40 @@ def get_user_permissions(user: Optional[User], language: str = "ar") -> List[Dic
     return get_role_permissions(rid, language=language)
 
 def has_permission(user: Optional[User], permission_code: str) -> bool:
-    if _is_super_admin(user):
-        return True
-    rid = _get_role_id(user)
-    if not rid:
+    """
+    مفوَّض إلى core.permissions.has_perm — مصدر موحّد مع lru_cache.
+    يتجنب استعلامات DB متكررة في كل فحص صلاحية.
+    """
+    try:
+        from core.permissions import has_perm
+        return has_perm(user, permission_code)
+    except Exception:
         return False
-    perms = get_role_permissions(rid)
-    codes = [p["code"] for p in perms]
-    return permission_code in codes
+
+
+# خريطة التبويبات — صلاحية العرض المطلوبة (مصدر واحد للحقيقة)
+TAB_PERMISSIONS: Dict[str, str] = {
+    "dashboard":         "view_dashboard",
+    "materials":         "view_materials",
+    "clients":           "view_clients",
+    "companies":         "view_companies",
+    "countries":         "view_countries",
+    "pricing":           "view_pricing",
+    "entries":           "view_entries",
+    "transactions":      "view_transactions",
+    "documents":         "view_documents",
+    "values":            "view_values",
+    "users_permissions": "view_users_roles",
+    "audit_trail":       "view_audit_trail",
+    "control_panel":     "view_control_panel",
+}
 
 
 def allowed_tabs(user: Optional[User]) -> List[str]:
-    TAB_PERMISSIONS = {
-        "dashboard": "view_dashboard",
-        "materials": "view_materials",
-        "clients": "view_clients",
-        "companies": "view_companies",
-        "countries": "view_countries",
-        "pricing": "view_pricing",
-        "entries": "view_entries",
-        "transactions": "view_transactions",
-        "documents": "view_documents",
-        "values": "view_values",
-        "users_permissions": "view_users_roles",
-        "audit_trail": "view_audit_trail",
-        "control_panel": "view_control_panel",
-    }
+    """
+    يعيد قائمة التبويبات المسموح للمستخدم بالوصول إليها.
+    يستخدم has_permission المحوَّلة (cached عبر core.permissions).
+    """
     return [tab for tab, perm in TAB_PERMISSIONS.items() if has_permission(user, perm)]
 
 

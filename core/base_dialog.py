@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt, Signal
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
+from utils.user_utils import get_current_user, get_user_display_name
 from base64 import b64encode, b64decode
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,9 @@ class BaseDialog(QDialog):
     def _retranslate_ui(self) -> None:
         """Re-translate UI elements when language changes"""
         try:
+            # Update layout direction first
+            self._apply_layout_direction()
+
             # Update window title
             if self._title_key:
                 self.setWindowTitle(self._(self._title_key))
@@ -104,7 +108,7 @@ class BaseDialog(QDialog):
 
     def _apply_layout_direction(self):
         try:
-            lang = getattr(self.translator, "current_language", "en")
+            lang = self.translator.get_current_language()
             if lang.startswith("ar"):
                 self.setLayoutDirection(Qt.RightToLeft)
             else:
@@ -170,30 +174,9 @@ class BaseDialog(QDialog):
 
     def _get_current_user(self) -> Any:
         """
-        Get current user from settings or app.
-
-        Returns:
-            User object or empty dict
+        Get current user — يستخدم user_utils.get_current_user() الموحّدة.
         """
-        try:
-            # Try from settings first (if available)
-            if hasattr(self, 'settings') and self.settings:
-                user = self.settings.get("user")
-                if user:
-                    return user
-
-            # Try from QApplication
-            app = QApplication.instance()
-            if app:
-                user = app.property("user")
-                if user:
-                    return user
-
-            return {}
-
-        except Exception as e:
-            logger.error(f"Error getting current user: {e}")
-            return {}
+        return get_current_user(settings=self.settings)
 
     def get_user_info(self) -> str:
         """
@@ -202,30 +185,7 @@ class BaseDialog(QDialog):
         Returns:
             User info string like "[User: admin#1]"
         """
-        if not self.current_user:
-            return "[User: None]"
-
-        try:
-            # Extract user info
-            if isinstance(self.current_user, dict):
-                name = (
-                    self.current_user.get("username") or
-                    self.current_user.get("full_name") or
-                    "Unknown"
-                )
-                uid = self.current_user.get("id", "?")
-            else:
-                name = (
-                    getattr(self.current_user, "username", None) or
-                    getattr(self.current_user, "full_name", None) or
-                    "Unknown"
-                )
-                uid = getattr(self.current_user, "id", "?")
-
-            return f"[User: {name}#{uid}]"
-
-        except Exception:
-            return "[User: Error]"
+        return f"[User: {get_user_display_name(self.current_user)}]"
 
     # --------- Styling & Layout ---------
 
@@ -284,12 +244,38 @@ class BaseDialog(QDialog):
     # --------- Keyboard Shortcuts ---------
 
     def _setup_shortcuts(self) -> None:
-        """Setup default keyboard shortcuts"""
-        # Escape to close
-        QShortcut(QKeySequence("Escape"), self, self.close)
+        """اختصارات الكيبورد الافتراضية لكل الـ dialogs."""
+        # Escape → إغلاق (فقط إذا لم يكن الـ focus على حقل نص)
+        esc = QShortcut(QKeySequence("Escape"), self)
+        esc.activated.connect(self._on_escape)
 
-        # Ctrl+W to close (common shortcut)
+        # Ctrl+W → إغلاق دائماً
         QShortcut(QKeySequence("Ctrl+W"), self, self.close)
+
+        # Ctrl+S → حفظ (إذا كان الـ dialog فيه زر حفظ)
+        QShortcut(QKeySequence("Ctrl+S"), self, self._on_save_shortcut)
+
+    def _on_escape(self) -> None:
+        """Escape يُغلق الـ dialog فقط إذا لم يكن الـ focus على QLineEdit أو QComboBox."""
+        from PySide6.QtWidgets import QLineEdit, QComboBox, QAbstractSpinBox, QTextEdit, QPlainTextEdit
+        focused = QApplication.focusWidget()
+        if isinstance(focused, (QLineEdit, QComboBox, QAbstractSpinBox, QTextEdit, QPlainTextEdit)):
+            # اترك الـ widget يتعامل مع Escape بنفسه (مسح النص مثلاً)
+            return
+        self.close()
+
+    def _on_save_shortcut(self) -> None:
+        """
+        Ctrl+S — يبحث عن زر الحفظ في الـ dialog وينقر عليه.
+        الـ child يستطيع override هذه الدالة للسلوك المخصص.
+        """
+        # ابحث عن زر بـ object name يحتوي "save" أو "btn_save"
+        from PySide6.QtWidgets import QPushButton
+        for btn in self.findChildren(QPushButton):
+            name = btn.objectName().lower()
+            if "save" in name and btn.isEnabled() and btn.isVisible():
+                btn.click()
+                return
 
     def add_shortcut(self, key: str, callback) -> QShortcut:
         """

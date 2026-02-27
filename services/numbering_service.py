@@ -41,6 +41,8 @@ class NumberingService:
         "packing_list.export.with_line_id": "PKL",
         "certificate_of_origin":            "COO",
         "form_a":                           "FORMA",
+        "form.a":                           "FORMA",   # alias
+        "cmr":                              "CMR",     # بوليصة الشحن البري
     }
 
     @staticmethod

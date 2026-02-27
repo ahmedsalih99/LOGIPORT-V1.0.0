@@ -1,72 +1,40 @@
 from PySide6.QtWidgets import (
     QWidget, QTableWidget, QAbstractItemView, QMenu, QVBoxLayout, QHBoxLayout, QPushButton,
     QSpacerItem, QSizePolicy, QLabel, QComboBox, QLineEdit, QFileDialog, QMessageBox, QTableWidgetItem, QHeaderView,
-    QCheckBox
+    QCheckBox, QAbstractSpinBox
 )
-from PySide6.QtCore import Qt, QModelIndex, Signal, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QModelIndex, Signal, QTimer, QEvent, QObject
+from PySide6.QtGui import QKeySequence, QShortcut, QGuiApplication
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
-from database.crud.permissions_crud import has_permission
+from core.permissions import is_admin as _is_admin, has_perm as _has_perm, has_any_perm
 from PySide6.QtWidgets import QApplication
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtGui import QTextDocument
 import logging
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from database.crud.permissions_crud import has_permission as _has_perm
 
 logger = logging.getLogger(__name__)
 
 
-def _is_admin(user) -> bool:
-    """يتحقق إن كان المستخدم Admin.
-    يدعم: ORM أو dict، ويدعم role_id كعدد/نص، ويدعم role كقاموس/كائن/سلسلة.
+class _NoWheelOnInputs(QObject):
     """
-    if not user:
-        return False
-    try:
-        # استخرِج role_id و role بأي صيغة
-        if isinstance(user, dict):
-            rid = user.get("role_id")
-            role = user.get("role") or user.get("role_name")
-        else:
-            rid = getattr(user, "role_id", None)
-            role = getattr(user, "role", None)
+    EventFilter يمنع QComboBox و QSpinBox من تغيير قيمتها بعجلة الفارة
+    ما لم يكن الـ widget مضغوطاً عليه بشكل صريح (hasFocus).
 
-        # 1) فحص role_id مباشرة (عدد أو نص)
-        try:
-            if rid is not None and int(rid) == 1:
-                return True
-        except Exception:
-            pass
+    يُنصَّب مرة واحدة على مستوى QApplication فيغطّي كل الـ widgets.
+    """
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Wheel:
+            if isinstance(obj, (QComboBox, QAbstractSpinBox)):
+                event.ignore()
+                return True   # ابتلع الحدث كلياً — لا تغيير بالعجلة مطلقاً
+        return super().eventFilter(obj, event)
 
-        # 2) لو role قاموس: افحص id ثم name
-        if isinstance(role, dict):
-            try:
-                if role.get("id") is not None and int(role.get("id")) == 1:
-                    return True
-            except Exception:
-                pass
-            rname = str(role.get("name") or "").strip().lower()
-            if rname == "admin":
-                return True
 
-        else:
-            # 3) لو role كائن ORM: افحص id ثم name
-            try:
-                r_id_obj = getattr(role, "id", None)
-                if r_id_obj is not None and int(r_id_obj) == 1:
-                    return True
-            except Exception:
-                pass
-            rname = role if isinstance(role, str) else (getattr(role, "name", "") or "")
-            if str(rname).strip().lower() == "admin":
-                return True
-
-        return False
-    except Exception:
-        return False
+# نصنع instance واحد فقط لكل عمر التطبيق
+_wheel_filter = _NoWheelOnInputs()
 
 
 class BaseTab(QWidget):
@@ -259,6 +227,9 @@ class BaseTab(QWidget):
         # ضبط ارتفاع الهيدر
         self.table.horizontalHeader().setMinimumHeight(44)
 
+        # منع QComboBox/QSpinBox من تغيير قيمتها بالعجلة بدون focus
+        # (الـ filter يُنصَّب مرة واحدة في main.py على QApplication — يغطي كل الـ widgets)
+
         def stretch_all_columns():
             col_count = self.table.columnCount()
             if not col_count:
@@ -278,28 +249,42 @@ class BaseTab(QWidget):
         self.btn_next.clicked.connect(self.go_to_next_page)
         self.update_pagination_label()
 
+    def _table_has_focus(self) -> bool:
+        """True إذا كان الـ focus على الجدول وليس على search_bar أو أي input آخر."""
+        focused = QApplication.focusWidget()
+        if focused is None:
+            return False
+        # إذا كان الـ focus على أي QLineEdit أو QComboBox → لا تنفّذ اختصارات الجدول
+        if isinstance(focused, (QLineEdit, QComboBox)):
+            return False
+        return True
+
     def setup_shortcuts(self):
+        # ── اختصارات آمنة دائماً ──────────────────────────────────────────
         QShortcut(QKeySequence("Ctrl+N"), self, self.add_new_item)
         QShortcut(QKeySequence("Ctrl+E"), self, self.edit_selected_item)
-        QShortcut(QKeySequence("Delete"), self, self.delete_selected_items)
-        QShortcut(QKeySequence("Enter"), self, self.view_selected_item)
-        QShortcut(QKeySequence("Return"), self, self.view_selected_item)
         QShortcut(QKeySequence("Ctrl+A"), self, self.select_all_items)
         QShortcut(QKeySequence("Ctrl+D"), self, self.clear_selection)
-        QShortcut(QKeySequence("Escape"), self, self.clear_selection)
-        QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
-        QShortcut(QKeySequence("PageUp"), self, self.go_to_prev_page)
+        QShortcut(QKeySequence("PageUp"),  self, self.go_to_prev_page)
         QShortcut(QKeySequence("PageDown"), self, self.go_to_next_page)
         QShortcut(QKeySequence("Ctrl+P"), self, self.print_table)
-        QShortcut(QKeySequence("Ctrl+C"), self, self.copy_selected)
-        QShortcut(QKeySequence("Ctrl+X"), self, self.cut_selected)
-        QShortcut(QKeySequence("Ctrl+V"), self, self.paste_data)
-        QShortcut(QKeySequence("Ctrl+S"), self, self.save_changes)
-        QShortcut(QKeySequence("Ctrl+Z"), self, self.undo)
-        QShortcut(QKeySequence("Ctrl+Y"), self, self.redo)
         QShortcut(QKeySequence("Ctrl+I"), self, self.import_from_excel)
         QShortcut(QKeySequence("Ctrl+Shift+E"), self, self.export_table_to_excel)
         QShortcut(QKeySequence("Ctrl+R"), self, self.refresh_data)
+        # Ctrl+F → focus على search_bar المحلي فقط (لا يتعارض مع Global Search)
+        QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
+        # Ctrl+C → نسخ خلايا الجدول المحددة
+        QShortcut(QKeySequence("Ctrl+C"), self, self.copy_selected)
+
+        # ── اختصارات context-aware (تعمل فقط عندما الجدول هو المركّز) ─────
+        QShortcut(QKeySequence("Delete"), self,
+                  lambda: self.delete_selected_items() if self._table_has_focus() else None)
+        QShortcut(QKeySequence("Enter"), self,
+                  lambda: self.view_selected_item() if self._table_has_focus() else None)
+        QShortcut(QKeySequence("Return"), self,
+                  lambda: self.view_selected_item() if self._table_has_focus() else None)
+        QShortcut(QKeySequence("Escape"), self,
+                  lambda: self.clear_selection() if self._table_has_focus() else None)
 
     def setup_signals(self):
         self.btn_add.clicked.connect(self.add_new_item)
@@ -512,10 +497,8 @@ class BaseTab(QWidget):
           self._open_edit_dialog(obj)
           self._delete_single(obj)
         """
-        from database.crud.permissions_crud import has_permission as _hp
-
-        can_edit   = _hp(self.current_user, edit_perm)   if edit_perm   else False
-        can_delete = _hp(self.current_user, delete_perm) if delete_perm else False
+        can_edit   = _has_perm(self.current_user, edit_perm)   if edit_perm   else False
+        can_delete = _has_perm(self.current_user, delete_perm) if delete_perm else False
         show_actions = can_edit or can_delete
 
         # ── تطبيق البحث / الترتيب / pagination من البيس ─────────────────
@@ -664,21 +647,39 @@ class BaseTab(QWidget):
         self.search_bar.setFocus()
 
     def copy_selected(self):
-        pass
+        """Ctrl+C — ينسخ محتوى الخلايا المحددة إلى الـ clipboard بصيغة TSV (متوافقة مع Excel)."""
+        selected = self.table.selectedItems()
+        if not selected:
+            return
+        # نرتب الخلايا حسب row ثم column
+        rows_data: dict = {}
+        for item in selected:
+            r, c = item.row(), item.column()
+            rows_data.setdefault(r, {})[c] = item.text()
+        lines = []
+        for r in sorted(rows_data):
+            cols = rows_data[r]
+            lines.append("\t".join(cols[c] for c in sorted(cols)))
+        QGuiApplication.clipboard().setText("\n".join(lines))
 
     def cut_selected(self):
-        pass
+        """Ctrl+X — نسخ فقط (الجدول read-only، لا حذف)."""
+        self.copy_selected()
 
     def paste_data(self):
+        """Ctrl+V — غير مدعوم (الجدول read-only)."""
         pass
 
     def save_changes(self):
+        """Ctrl+S — يُطبَّق فقط في تابات تدعمه (override في الـ child)."""
         pass
 
     def undo(self):
+        """Ctrl+Z — غير مدعوم على مستوى التاب."""
         pass
 
     def redo(self):
+        """Ctrl+Y — غير مدعوم على مستوى التاب."""
         pass
 
     # -----------------------------
@@ -940,7 +941,14 @@ class BaseTab(QWidget):
     # -----------------------------
     def refresh_data(self):
         self.reload_data()
-        QMessageBox.information(self, self._("refresh"), self._("Data refreshed!"))
+        # عرض رسالة خفيفة في status bar عوضاً عن popup مزعج
+        try:
+            from PySide6.QtWidgets import QApplication
+            main_win = QApplication.activeWindow()
+            if main_win and hasattr(main_win, "statusBar"):
+                main_win.statusBar().showMessage(self._("Data refreshed!"), 2000)
+        except Exception:
+            pass
 
     def apply_settings(self):
         """
@@ -1001,8 +1009,13 @@ class BaseTab(QWidget):
         ]
         for btn, perm_key in btns:
             required_perm = self.required_permissions.get(perm_key)
-            if required_perm and not _has_any_perm(self.user, required_perm):
-                btn.setVisible(False)
+            if required_perm:
+                # قد يكون required_perm قائمة أو نص واحد
+                if isinstance(required_perm, (list, tuple, set)):
+                    visible = has_any_perm(self.user, list(required_perm))
+                else:
+                    visible = _has_perm(self.user, required_perm)
+                btn.setVisible(visible)
             else:
                 btn.setVisible(True)
 
@@ -1026,13 +1039,3 @@ class BaseTab(QWidget):
             self.reload_data()
         except Exception:
             pass
-
-
-def _has_any_perm(user, required):
-    if not required:
-        return True
-    if isinstance(required, (list, tuple, set)):
-        from database.crud.permissions_crud import has_permission
-        return any(has_permission(user, r) for r in required)
-    from database.crud.permissions_crud import has_permission
-    return has_permission(user, required)

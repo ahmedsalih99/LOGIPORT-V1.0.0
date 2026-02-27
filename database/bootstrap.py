@@ -79,17 +79,43 @@ _PERMISSIONS = [
     (52, "delete_entry",          "Delete entry",                 "حذف إدخال",         "Delete Entry",       "Girişi Sil",                 "ENTRIES"),
     (53, "add_client",            "Add new client",               "إضافة عميل",        "Add Client",         "Müşteri Ekle",               "CLIENTS"),
     (54, "edit_client",           "Edit client",                  "تعديل عميل",        "Edit Client",        "Müşteriyi Düzenle",          "CLIENTS"),
+    (55, "delete_client",         "Delete client",                "حذف عميل",          "Delete Client",      "Müşteriyi Sil",              "CLIENTS"),
+    (56, "add_company",           "Add new company",              "إضافة شركة",        "Add Company",        "Şirket Ekle",                "COMPANIES"),
+    (57, "edit_company",          "Edit company",                 "تعديل شركة",        "Edit Company",       "Şirketi Düzenle",            "COMPANIES"),
+    (58, "delete_company",        "Delete company",               "حذف شركة",          "Delete Company",     "Şirketi Sil",                "COMPANIES"),
+    (59, "add_pricing",           "Add pricing record",           "إضافة تسعيرة",      "Add Pricing",        "Fiyatlandırma Ekle",         "PRICING"),
+    (60, "edit_pricing",          "Edit pricing record",          "تعديل تسعيرة",      "Edit Pricing",       "Fiyatlandırmayı Düzenle",    "PRICING"),
+    (61, "delete_pricing",        "Delete pricing record",        "حذف تسعيرة",        "Delete Pricing",     "Fiyatlandırmayı Sil",        "PRICING"),
+    (62, "add_transaction",       "Create new transaction",       "إضافة معاملة",      "Add Transaction",    "İşlem Ekle",                 "TRANSACTIONS"),
+    (63, "edit_transaction",      "Edit transaction",             "تعديل معاملة",      "Edit Transaction",   "İşlemi Düzenle",             "TRANSACTIONS"),
+    (64, "delete_transaction",    "Delete transaction",           "حذف معاملة",        "Delete Transaction", "İşlemi Sil",                 "TRANSACTIONS"),
+    (65, "close_transaction",     "Close/archive transaction",    "إغلاق معاملة",      "Close Transaction",  "İşlemi Kapat",               "TRANSACTIONS"),
 ]
 
 _ROLE_PERMISSIONS = {
-    1: list(range(1, 55)),  # Admin → كل الصلاحيات
-    3: [1,2,3,4,6,7,8,10,11,12,14,16,17,18,19,22,27,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49],
-    4: [16, 25, 49],
-    5: [1, 3, 6, 10, 14, 16],
-    6: [1, 16, 17, 18],
-    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49],
-    8: [1, 16],
-    9: [],
+    1: list(range(1, 66)),  # Admin → كل الصلاحيات (1-65)
+    3: [  # Manager
+        1,2,3,4,6,7,8,10,11,12,14,
+        16,17,18,19,          # materials
+        20,53,54,55,          # clients (view+add+edit+delete)
+        21,56,57,             # companies (view+add+edit) بدون delete
+        22,27,                # countries + values
+        23,59,60,             # pricing (view+add+edit) بدون delete
+        24,50,51,52,          # entries full
+        25,62,63,             # transactions (view+add+edit) بدون delete/close
+        31,32,33,             # countries crud
+        34,35,36,             # packaging types crud
+        37,38,39,             # delivery methods crud
+        40,41,42,             # currencies crud
+        43,44,45,             # material types crud
+        46,47,48,49,          # view lookups
+    ],
+    4: [16, 25, 49],         # User: view materials/transactions/currencies
+    5: [1, 3, 6, 10, 14, 16],# Accountant
+    6: [1, 16, 17, 18],      # Operator: view+add+edit materials
+    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49],  # Viewer
+    8: [1, 16],              # Client
+    9: [],                   # Customs
 }
 
 _COMPANY_ROLES = [
