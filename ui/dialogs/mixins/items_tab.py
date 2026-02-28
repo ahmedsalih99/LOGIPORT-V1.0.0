@@ -778,42 +778,49 @@ class ItemsTabMixin:
             price: float,
     ) -> float:
         """
-        حساب إجمالي السطر حسب نوع التسعير — نفس منطق CRUD.
-        الأولوية: صيغة DB (compute_by/divisor) ← fallback بالكود النصي ← qty×price
+        حساب إجمالي السطر حسب نوع التسعير.
+        الأولوية: compute_by من DB → fallback بالكود → qty×price
         """
         if price == 0:
             return 0.0
 
-        if pid := pricing_type_id:
-            # ابحث أولاً في الـ cache عن الصيغة
+        pt_id = pricing_type_id
+        if pt_id:
             for _label, rid, row_obj in (self._pricing_types or []):
-                if rid == pid:
-                    # row_obj is now a dict (no DetachedInstanceError)
-                    _get = (lambda d, k, df="": d.get(k, df)) if isinstance(row_obj, dict) else (
-                        lambda o, k, df="": getattr(o, k, df))
-                    cb = str(_get(row_obj, "compute_by", "") or "").upper()
-                    dv = float(_get(row_obj, "divisor", 1.0) or 1.0) or 1.0
-                    if cb == "QTY":
-                        return (qty / dv) * price
-                    if cb == "NET":
-                        return (net / dv) * price
-                    if cb == "GROSS":
-                        return (gross / dv) * price
-                    # compute_by فارغ → fallback بالكود
-                    code = str(_get(row_obj, "code", "") or "").upper()
-                    if code in ("UNIT", "PCS", "PIECE"):
-                        return qty * price
-                    if code in ("KG", "KILO", "KG_NET"):
-                        return net * price
-                    if code in ("KG_GROSS", "GROSS", "BRUT"):
-                        return gross * price
-                    if code in ("TON", "T", "MT", "TON_NET"):
-                        return (net / 1000.0) * price
-                    if code in ("TON_GROSS",):
-                        return (gross / 1000.0) * price
-                    break  # نوع التسعير موجود لكن ما عنده كود معروف
+                if rid != pt_id:
+                    continue
+                # row_obj هو dict (من _load_table)
+                if isinstance(row_obj, dict):
+                    _g = row_obj.get
+                else:
+                    _g = lambda k, df="": getattr(row_obj, k, df)
 
-        # لا يوجد نوع تسعير محدد → افتراضي كمية × سعر
+                cb = str(_g("compute_by", "") or "").upper()
+                dv = float(_g("divisor", 1.0) or 1.0) or 1.0
+
+                # حساب حسب compute_by
+                if cb == "QTY":
+                    return (qty / dv) * price
+                if cb == "NET":
+                    return (net / dv) * price
+                if cb == "GROSS":
+                    return (gross / dv) * price
+
+                # compute_by فارغ → fallback بالكود
+                code = str(_g("code", "") or "").upper()
+                if code in ("UNIT", "PCS", "PIECE"):
+                    return qty * price
+                if code in ("KG", "KILO", "KG_NET"):
+                    return net * price
+                if code in ("KG_GROSS", "GROSS_KG", "BRUT"):
+                    return gross * price
+                if code in ("TON", "T", "MT", "TON_NET"):
+                    return (net / 1000.0) * price
+                if code in ("TON_GROSS",):
+                    return (gross / 1000.0) * price
+                break  # نوع موجود لكن غير معروف
+
+        # لا نوع تسعير → كمية × سعر
         return qty * price
 
     # Helper methods
@@ -1034,9 +1041,88 @@ class ItemsTabMixin:
         self._recalc_totals()
 
     def _auto_price_all(self) -> None:
-        """إعادة حساب إجمالي كل الصفوف حسب نوع التسعير المحدد"""
-        for r in range(self.tbl.rowCount()):
-            self._recalc_row(r)
+        """جلب الأسعار من جدول pricing ثم إعادة حساب الإجماليات"""
+        # 1. اجلب seller/buyer من نافذة المعاملة
+        seller_id = None
+        buyer_id  = None
+        try:
+            # cmb_exporter / cmb_importer موجودة في PartiesGeoTabMixin
+            if hasattr(self, "cmb_exporter"):
+                seller_id = self.cmb_exporter.currentData()
+            if hasattr(self, "cmb_importer"):
+                buyer_id = self.cmb_importer.currentData()
+        except Exception:
+            pass
+
+        # 2. جلب طريقة التسليم من نافذة المعاملة
+        delivery_method_id = None
+        try:
+            if hasattr(self, "cmb_delivery"):
+                delivery_method_id = self.cmb_delivery.currentData()
+        except Exception:
+            pass
+
+        # 3. لو ما في seller/buyer → فقط أعد حساب الإجمالي بالسعر المدخل
+        if not seller_id and not buyer_id:
+            for r in range(self.tbl.rowCount()):
+                self._recalc_row(r)
+            return
+
+        # 4. جلب الأسعار من DB
+        fetched = 0
+        try:
+            from services.pricing_service import PricingService
+            svc = PricingService()
+
+            for row in range(self.tbl.rowCount()):
+                mat_combo   = self.tbl.cellWidget(row, self.COL_MATERIAL)
+                ptype_combo = self.tbl.cellWidget(row, self.COL_PTYPE)
+                curr_combo  = self.tbl.cellWidget(row, self.COL_CURR)
+
+                material_id     = mat_combo.currentData()   if mat_combo   else None
+                pricing_type_id = ptype_combo.currentData() if ptype_combo else None
+                currency_id     = curr_combo.currentData()  if curr_combo  else None
+
+                if not material_id or not pricing_type_id or not currency_id:
+                    self._recalc_row(row)
+                    continue
+
+                p = svc.find_best_price(
+                    seller_company_id = seller_id or 0,
+                    buyer_company_id  = buyer_id  or 0,
+                    material_id       = material_id,
+                    pricing_type_id   = pricing_type_id,
+                    currency_id       = currency_id,
+                    delivery_method_id= delivery_method_id,
+                )
+                if p is not None:
+                    price_val = float(getattr(p, "price", 0) or 0)
+                    self._set_text(row, self.COL_UNIT_PRICE, f"{price_val:.4f}".rstrip("0").rstrip("."))
+                    fetched += 1
+
+                self._recalc_row(row)
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("auto_price error: %s", e)
+            # fallback: recalc فقط
+            for r in range(self.tbl.rowCount()):
+                self._recalc_row(r)
+
+        # 5. إشعار المستخدم
+        try:
+            from PySide6.QtWidgets import QMessageBox
+            parent = self.tab_items if hasattr(self, "tab_items") else None
+            _ = getattr(self, "_", lambda k: k)
+            if fetched > 0:
+                QMessageBox.information(parent, _("success"),
+                    _("auto_price_applied").format(count=fetched) if "{count}" in _("auto_price_applied")
+                    else f"{_('auto_price_applied')} ({fetched})")
+            else:
+                QMessageBox.warning(parent, _("no_price_found"),
+                    _("no_price_found_for_items"))
+        except Exception:
+            pass
 
     def refresh_language_items(self) -> None:
         """تحديث اللغة"""

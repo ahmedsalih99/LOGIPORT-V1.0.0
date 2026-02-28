@@ -594,11 +594,13 @@ class DocumentsTab(BaseTab):
         self._update_page_label()
 
     def _render_table(self, rows: List[Dict[str, Any]]):
-        """Render documents table with clean action buttons"""
+        """Render documents table with action buttons"""
+        from pathlib import Path
         self.tbl.setRowCount(0)
 
         for r, rec in enumerate(rows):
             self.tbl.insertRow(r)
+            file_missing = rec.get("_file_missing", False)
 
             # Doc number
             item_doc = QTableWidgetItem(_fmt(rec.get("doc_no")))
@@ -621,47 +623,54 @@ class DocumentsTab(BaseTab):
             item_lang.setTextAlignment(Qt.AlignCenter)
             self.tbl.setItem(r, self.COL_LANG, item_lang)
 
-            # File name (not full path)
+            # File name — يظهر "مفقود" إذا الملف غير موجود
             full_path = _fmt(rec.get("path"))
-            from pathlib import Path
-            file_name = Path(full_path).name if full_path != "-" else "-"
-            item_path = QTableWidgetItem(file_name)
+            if file_missing:
+                file_name = "⚠ " + _tr("file_missing")
+                item_path = QTableWidgetItem(file_name)
+                item_path.setForeground(__import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#EF4444"))
+            else:
+                file_name = Path(full_path).name if full_path != "-" else "-"
+                item_path = QTableWidgetItem(file_name)
             item_path.setToolTip(full_path)
             item_path.setTextAlignment(Qt.AlignCenter)
             self.tbl.setItem(r, self.COL_PATH, item_path)
 
-            # Actions: Clear buttons
-            actions_widget = self._create_action_buttons(rec)
+            # Actions
+            actions_widget = self._create_action_buttons(rec, file_missing=file_missing)
             self.tbl.setCellWidget(r, self.COL_ACTIONS, actions_widget)
 
-    def _create_action_buttons(self, rec: Dict[str, Any]) -> QWidget:
-        """Create action buttons using global theme objectNames"""
+    def _create_action_buttons(self, rec: Dict[str, Any], file_missing: bool = False) -> QWidget:
+        """Create action buttons — open/folder disabled if file missing"""
         container = QWidget()
         layout = QHBoxLayout(container)
         layout.setContentsMargins(4, 6, 4, 6)
         layout.setSpacing(6)
         layout.setAlignment(Qt.AlignCenter)
 
+        r = rec  # avoid lambda capture issues
+
         btn_open = QPushButton(self._("open_file"))
         btn_open.setObjectName("primary-btn")
         btn_open.setFixedHeight(30)
-        btn_open.setToolTip(_tr("open_file"))
-        btn_open.setCursor(Qt.PointingHandCursor)
-        btn_open.clicked.connect(lambda: self._open_file(rec))
+        btn_open.setCursor(Qt.PointingHandCursor if not file_missing else Qt.ForbiddenCursor)
+        btn_open.setEnabled(not file_missing)
+        btn_open.setToolTip(_tr("open_file") if not file_missing else _tr("file_missing"))
+        btn_open.clicked.connect(lambda checked=False, _r=r: self._open_file(_r))
 
         btn_folder = QPushButton(self._("open_folder"))
         btn_folder.setObjectName("secondary-btn")
         btn_folder.setFixedHeight(30)
-        btn_folder.setToolTip(_tr("open_folder"))
         btn_folder.setCursor(Qt.PointingHandCursor)
-        btn_folder.clicked.connect(lambda: self._open_folder(rec))
+        btn_folder.setToolTip(_tr("open_folder"))
+        btn_folder.clicked.connect(lambda checked=False, _r=r: self._open_folder(_r))
 
         btn_delete = QPushButton(self._("delete"))
         btn_delete.setObjectName("danger-btn")
         btn_delete.setFixedHeight(30)
-        btn_delete.setToolTip(_tr("delete"))
         btn_delete.setCursor(Qt.PointingHandCursor)
-        btn_delete.clicked.connect(lambda: self._delete_document(rec))
+        btn_delete.setToolTip(_tr("delete"))
+        btn_delete.clicked.connect(lambda checked=False, _r=r: self._delete_document(_r))
 
         layout.addWidget(btn_open)
         layout.addWidget(btn_folder)
@@ -742,7 +751,7 @@ class DocumentsTab(BaseTab):
             subprocess.Popen(["xdg-open", folder])
 
     def _delete_document(self, rec: Dict[str, Any]):
-        """Delete document with confirmation"""
+        """Delete document — file + DB record"""
         doc_no = rec.get("doc_no", "")
 
         reply = QMessageBox.question(
@@ -756,15 +765,42 @@ class DocumentsTab(BaseTab):
         if reply != QMessageBox.Yes:
             return
 
-        # Delete file
+        errors = []
+
+        # 1. حذف الملف من القرص
         path = rec.get("path", "")
         if path and os.path.exists(path):
             try:
                 os.remove(path)
-            except:
-                pass
+            except Exception as e:
+                errors.append(f"File: {e}")
 
-        # Refresh
+        # 2. حذف السجل من قاعدة البيانات
+        doc_id = rec.get("id")
+        if doc_id:
+            try:
+                from database.crud.documents_crud import DocumentsCRUD
+                DocumentsCRUD().delete_document(int(doc_id))
+            except Exception as e:
+                errors.append(f"DB: {e}")
+        else:
+            # fallback: حذف عبر file_path مباشرة
+            if path:
+                try:
+                    from sqlalchemy import text as _sql
+                    from database.models import get_session_local as _gs
+                    s = _gs()()
+                    s.execute(_sql("DELETE FROM documents WHERE file_path = :p"), {"p": path})
+                    s.commit()
+                    s.close()
+                except Exception as e:
+                    errors.append(f"DB path: {e}")
+
+        if errors:
+            import logging
+            logging.getLogger(__name__).warning("Delete errors: %s", errors)
+
+        # 3. تحديث الجدول فوراً
         self._reload_docs(reset_page=False)
 
     def _on_generate(self):
@@ -1013,29 +1049,18 @@ class DocumentsTab(BaseTab):
             batch_size = page_size
             current_offset = offset
 
-            while len(collected) < page_size:
-                batch_params = dict(params_data)
-                batch_params.update({
-                    "lim": batch_size,
-                    "off": current_offset,
-                })
-
-                rows_raw = [
-                    dict(r._mapping)
-                    for r in s.execute(sql_data, batch_params).fetchall()
-                ]
-
-                if not rows_raw:
-                    break
-
-                for rec in rows_raw:
-                    p = str(rec.get("path") or "")
-                    if self._file_exists_any(p):
-                        collected.append(rec)
-                        if len(collected) >= page_size:
-                            break
-
-                current_offset += batch_size
+            # جلب مباشر بدون فلترة filesystem — يمنع التجميد
+            batch_params = dict(params_data)
+            batch_params.update({"lim": page_size, "off": offset})
+            rows_raw = [
+                dict(r._mapping)
+                for r in s.execute(sql_data, batch_params).fetchall()
+            ]
+            # أضف حالة الملف كمعلومة عرض فقط (لا تفلتر)
+            for rec in rows_raw:
+                p = str(rec.get("path") or "")
+                rec["_file_missing"] = p and not self._file_exists_any(p)
+                collected.append(rec)
 
             return collected, total_sql
 

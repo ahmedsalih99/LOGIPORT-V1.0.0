@@ -81,6 +81,7 @@ class ThemeManager(QObject, QObjectSingletonMixin):
                 theme_name=theme_name,
                 font_size=font_size,
                 font_family=font_family,
+                rtl=(settings.get("language", "ar") == "ar"),
             )
 
             stylesheet = theme.build()

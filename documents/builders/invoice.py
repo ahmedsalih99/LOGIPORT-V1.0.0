@@ -51,9 +51,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         if not t:
             raise ValueError("المعاملة غير موجودة.")
 
-        # تحقق رأس المعاملة
-        _ensure(t["currency_id"], f"المعاملة {t['no']} بلا عملة.")
-        _ensure(t["delivery_method_id"], f"المعاملة {t['no']} بلا طريقة تسليم.")
+        # delivery_method اختياري — لا نوقف التوليد بسببه
+        # currency_id: إن كان فارغاً سنأخذه من بنود المعاملة لاحقاً
         # transport_type/transport_ref اختياريان لكن يفضّل وجودهما
         # الدول: أصل/وجهة
         origin = s.execute(text("SELECT name_ar, name_en, name_tr FROM countries WHERE id=:id"),
@@ -63,20 +62,62 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         _ensure(origin, f"بلد المنشأ غير محدد في المعاملة {t['no']}.")
         _ensure(dest, f"بلد الوجهة غير محدد في المعاملة {t['no']}.")
 
-        # العملة وطريقة التسليم
-        cur = s.execute(text("SELECT code, name_ar, name_en, name_tr FROM currencies WHERE id=:id"),
-                        {"id": t["currency_id"]}).mappings().first()
-        _ensure(cur, "العملة غير موجودة.")
-        dm  = s.execute(text("SELECT code, name_ar, name_en, name_tr FROM delivery_methods WHERE id=:id"),
-                        {"id": t["delivery_method_id"]}).mappings().first()
-        _ensure(dm, "طريقة التسليم غير موجودة.")
+        # العملة: من header أولاً، وإلا من بنود المعاملة (per-item currency)
+        cur = None
+        if t["currency_id"]:
+            cur = s.execute(text("SELECT code, name_ar, name_en, name_tr FROM currencies WHERE id=:id"),
+                            {"id": t["currency_id"]}).mappings().first()
+        if not cur:
+            cur_row = s.execute(text("""
+                SELECT DISTINCT c.code, c.name_ar, c.name_en, c.name_tr
+                FROM transaction_items ti
+                JOIN currencies c ON c.id = ti.currency_id
+                WHERE ti.transaction_id = :tid AND ti.currency_id IS NOT NULL
+                LIMIT 1
+            """), {"tid": int(transaction_id)}).mappings().first()
+            if cur_row:
+                cur = cur_row
 
-        currency_code = cur["code"]
-        delivery_method = _name(dm, lang)
+        # طريقة التسليم: اختيارية
+        dm = None
+        if t["delivery_method_id"]:
+            dm = s.execute(text("SELECT code, name_ar, name_en, name_tr FROM delivery_methods WHERE id=:id"),
+                           {"id": t["delivery_method_id"]}).mappings().first()
+
+        currency_code = cur["code"] if cur else ""
+        delivery_method = _name(dm, lang) if dm else ""
 
         # الأطراف
         exp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
                         {"id": t["exporter_company_id"]}).mappings().first()
+
+        # جلب بيانات البنك من company_banks (البنك الأساسي)
+        def _get_bank_info(company_id):
+            if not company_id:
+                return ""
+            try:
+                banks = s.execute(text("""
+                    SELECT bank_name, branch, beneficiary_name, iban, swift_bic, account_number
+                    FROM company_banks
+                    WHERE company_id = :cid
+                    ORDER BY is_primary DESC, id ASC
+                    LIMIT 1
+                """), {"cid": int(company_id)}).mappings().all()
+                if banks:
+                    b = banks[0]
+                    lines = []
+                    if b.get("beneficiary_name"): lines.append(b["beneficiary_name"])
+                    if b.get("bank_name"):
+                        line = b["bank_name"]
+                        if b.get("branch"): line += f" — {b['branch']}"
+                        lines.append(line)
+                    if b.get("iban"):         lines.append(f"IBAN: {b['iban']}")
+                    if b.get("swift_bic"):    lines.append(f"SWIFT/BIC: {b['swift_bic']}")
+                    if b.get("account_number"): lines.append(f"A/C: {b['account_number']}")
+                    return "\n".join(lines)
+            except Exception:
+                pass
+            return ""
         _ensure(exp, "شركة المصدّر غير موجودة.")
         imp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
                         {"id": t["importer_company_id"]}).mappings().first()
@@ -160,7 +201,9 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         ctx: Dict[str, Any] = {
             "title": None,  # العنوان من القالب
             "date": t["transaction_date"],
-            "exporter": {"name": exp["name"], "addr": exp["address"]},
+            "exporter": {"name": exp["name"], "addr": exp["address"],
+                         "bank_info": _get_bank_info(t["exporter_company_id"])},
+            "bank_info": _get_bank_info(t["exporter_company_id"]),
             "consignee": {"name": consignee["name"], "addr": consignee["address"]},
             "importer": {"name": imp["name"], "addr": imp["address"]} if imp else None,
             "shipment": {

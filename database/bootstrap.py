@@ -136,13 +136,13 @@ _DOCUMENT_TYPES = [
     (2,  "INV_SY",               "فاتورة سورية",               "Syrian Invoice",            "Suriye Faturası",            1, None,              None,                                  0),
     (3,  "INV_INDIRECT",         "فاتورة بالواسطة",             "Intermediary Invoice",      "Aracı Fatura",               1, None,              None,                                  0),
     (4,  "PACKING",              "قائمة تعبئة",                "Packing List",              "Çeki Listesi",               1, None,              None,                                  0),
-    (9,  "INV_PRO",              "بروفورما إنفويس",             "Proforma Invoice",          "Proforma Fatura",            1, "invoice.proforma","invoices/proforma",                   10),
     (10, "invoice.syrian.entry", "فاتورة سورية إدخال",          "Syrian Entry Invoice",      "Suriye Giriş Faturası",      1, "invoice.syrian",  "invoices/syrian/entry",               0),
-    (11, "INV_SYR_TRANS",        None,                          None,                        None,                         1, None,              "invoices/syrian/transit/{lang}.html", 0),
-    (12, "INV_SYR_INTERM",       None,                          None,                        None,                         1, None,              "invoices/syrian/intermediary/{lang}.html", 0),
+    (11, "INV_SYR_TRANS",        "فاتورة سورية – عبور",         "Syrian Invoice – Transit",  "Suriye Faturası – Transit",  1, "invoice.syrian.transit",       "invoices/syrian/transit",     5),
+    (12, "INV_SYR_INTERM",       "فاتورة سورية – وسيط",        "Syrian Invoice – Intermediary","Suriye Faturası – Aracı",  1, "invoice.syrian.intermediary",  "invoices/syrian/intermediary",6),
+    (20, "INV_SYR_ENTRY",        "فاتورة سورية – إدخال",       "Syrian Invoice – Entry",    "Suriye Faturası – Giriş",    1, "invoice.syrian.entry",         "invoices/syrian/entry",       4),
     (13, "PL_EXPORT_SIMPLE",     "قائمة تعبئة – بدون تواريخ", "Packing List – Simple",     "Ambalaj Listesi – Basit",    1, None,              None,                                  0),
     (14, "PL_EXPORT_WITH_DATES", "قائمة تعبئة – مع تواريخ",   "Packing List – With Dates", "Ambalaj Listesi – Tarihli",  1, None,              None,                                  0),
-    (15, "INV_PROFORMA",         "بروفورما إنفويس",             "Proforma Invoice",          "Proforma Fatura",            1, "INVPL",            None,                                 0),
+    (15, "INV_PROFORMA",         "بروفورما إنفويس",             "Proforma Invoice",          "Proforma Fatura",            1, "invoice.proforma", "invoices/proforma",                   10),
     (16, "INV_NORMAL",           "فاتورة عادية",               "Normal Invoice",            "Normal Fatura",              1, None,              None,                                  0),
     (17, "PL_EXPORT_WITH_LINE_ID","قائمة تعبئة مع رقم السطر",  "Packing List with Line ID", "Hat No'lu Paketleme Listesi",1, None,             None,                                  0),
     (18, "cmr",                   "بوليصة شحن CMR",             "CMR Consignment Note",      "CMR Taşıma Senedi",          1, "cmr",            "cmr",                                 20),
@@ -193,6 +193,26 @@ def _run_migrations(conn) -> None:
             "INSERT OR IGNORE INTO app_settings (key, value, category, description) VALUES (?,?,?,?)",
             (key, value, category, description)
         )
+    # Migration: bank_info column for companies
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
+        if "bank_info" not in cols:
+            conn.execute("ALTER TABLE companies ADD COLUMN bank_info TEXT")
+            conn.commit()
+            logger.info("Bootstrap: added bank_info to companies")
+    except Exception as _e:
+        logger.warning("Bootstrap: bank_info migration skipped: %s", _e)
+
+    # Migration: avatar_path column for users
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "avatar_path" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(500)")
+            conn.commit()
+            logger.info("Bootstrap: added avatar_path to users")
+    except Exception as _e:
+        logger.warning("Bootstrap: avatar_path migration skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

@@ -262,10 +262,10 @@
     </div>
   {% endif %}
 
-  {% if flags and flags.show_bank_block and bank_info %}
+  {% if bank_info or exporter.bank_info %}
     <div class="box mt-4">
       <div class="muted mb-2">Banka Bilgileri</div>
-      <div class="small">{{ bank_info | safe }}</div>
+      <div class="small">{{ (bank_info or exporter.bank_info) | replace("\n","<br>") | safe }}</div>
     </div>
   {% endif %}
 

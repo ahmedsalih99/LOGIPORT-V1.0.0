@@ -1,8 +1,11 @@
 """
-Sidebar Component Styles - Blue Modern with Smooth Hover
-=======================================================
-
-Professional blue Sidebar with semantic colors and smooth animations.
+Sidebar Component Styles - RTL-Aware Blue Modern
+=================================================
+إصلاحات:
+  - active border على الجانب الأيمن (RTL) بدل الأيسر
+  - hover gradient صحيح الاتجاه
+  - active state أوضح مع خلفية solid خفيفة
+  - logo box gradient محسّن
 """
 
 from ..spacing import Spacing
@@ -10,87 +13,85 @@ from ..border_radius import BorderRadius
 
 
 def get_styles(theme):
-    """Generate Sidebar styles (Blue Variant)"""
+    """Generate RTL-correct Sidebar styles"""
     c = theme.colors
     s = theme.sizes
 
     return f"""
-    /* ========== SIDEBAR ========== */
+    /* ========== SIDEBAR CONTAINER ========== */
 
-    /* Sidebar Container */
     QFrame#Sidebar {{
-        background: {c["bg_sidebar"]};
-        border-left: 1px solid {c["border_subtle"]};
+        background  : {c["bg_sidebar"]};
+        border-left : 1px solid rgba(255, 255, 255, 0.08);
     }}
 
-    /* Sidebar Buttons */
+    /* ========== SIDEBAR BUTTONS ========== */
+
     QToolButton#sidebar-btn {{
-        background: transparent;
-        border: none;
+        background   : transparent;
+        border       : none;
         border-radius: {BorderRadius.LG};
-        padding: {Spacing.SM};
-        color: {c["sidebar_text"]};
-        text-align: right;
-        font-size: {s["base"]}px;
+        padding      : {Spacing.SM} {Spacing.MD};
+        color        : {c["sidebar_text"]};
+        text-align   : right;
+        font-size    : {s["base"]}px;
+        font-weight  : 500;
     }}
 
-    /* Hover */
+    /* Hover — gradient من اليمين للأيسر (RTL-friendly) */
     QToolButton#sidebar-btn:hover {{
-        background: qlineargradient(
-            x1: 0, y1: 0, x2: 1, y2: 0,
-            stop: 0 {c["primary_light"]},
-            stop: 1 {c["primary_lighter"]}
-        );
-        color: {c["sidebar_text_hover"]};
+        background: rgba(255, 255, 255, 0.12);
+        color     : {c["sidebar_text_hover"]};
+        border-radius: {BorderRadius.MD};
     }}
 
-    /* Active / Checked */
+    /* Active/Checked — خلفية صلبة واضحة + خط على اليمين (RTL) */
     QToolButton#sidebar-btn:checked {{
-        background: qlineargradient(
-            x1: 0, y1: 0, x2: 1, y2: 0,
-            stop: 0 {c["accent_soft"]},
-            stop: 1 {c["primary_lighter"]}
-        );
-        color: {c["sidebar_text"]};
-        border-right: 3px solid {c["primary"]};
-        font-weight: 600;
+        background  : rgba(255, 255, 255, 0.22);
+        color       : {c["sidebar_text"]};
+        font-weight : 700;
+        border-right: 3px solid {c["text_white"]};
+        border-top-right-radius   : 0px;
+        border-bottom-right-radius: 0px;
     }}
 
-    /* Toggle Button */
+    /* ========== TOGGLE BUTTON ========== */
+
     QPushButton#sidebar-toggle-btn {{
-        background: {c["primary_light"]};
-        border: 2px solid {c["border_focus"]};
+        background   : rgba(255, 255, 255, 0.15);
+        border       : 1.5px solid rgba(255, 255, 255, 0.4);
         border-radius: 50%;
     }}
 
     QPushButton#sidebar-toggle-btn:hover {{
-        background: {c["accent_soft"]};
-        border: 2px solid {c["primary"]};
+        background: rgba(255, 255, 255, 0.25);
+        border    : 1.5px solid rgba(255, 255, 255, 0.7);
     }}
 
     QPushButton#sidebar-toggle-btn:pressed {{
-        background: {c["primary_hover"]};
+        background: rgba(255, 255, 255, 0.35);
     }}
 
-    /* Logo Box */
+    /* ========== LOGO BOX ========== */
+
     QFrame#SidebarLogoBox {{
-        background: qlineargradient(
-            x1: 0, y1: 0, x2: 0, y2: 1,
-            stop: 0 {c["bg_elevated"]},
-            stop: 1 {c["bg_sidebar"]}
-        );
-        border-bottom: 1px solid {c["border_subtle"]};
+        background   : transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 0px;
     }}
 
     QLabel#sidebar-app-name {{
-        color: {c["sidebar_text"]};
-        font-size: {s["lg"]}px;
-        font-weight: 700;
+        color      : {c["sidebar_text"]};
+        font-size  : {s["lg"]}px;
+        font-weight: 800;
         letter-spacing: 1px;
     }}
 
-    /* Separator */
+    /* ========== SEPARATOR ========== */
+
     QFrame#sidebar-separator {{
-        background: {c["border_subtle"]};
+        background: rgba(255, 255, 255, 0.12);
+        border    : none;
+        max-height: 1px;
     }}
     """

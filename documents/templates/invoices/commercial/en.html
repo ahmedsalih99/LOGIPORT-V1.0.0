@@ -114,6 +114,15 @@ table th{
 <body>
 
 {% set exp = exporter or {} %}
+{% set up_label = unit_price_label %}
+{% if not up_label %}
+  {% set _nsu = namespace(units=[]) %}
+  {% for it in items_list %}
+    {% set u = (it.pricing_unit or it.unit or '').strip() %}
+    {% if u and u not in _nsu.units %}{% set _nsu.units = _nsu.units + [u] %}{% endif %}
+  {% endfor %}
+  {% set up_label = (' & '.join(_nsu.units)) if _nsu.units else (unit_price_per or '') %}
+{% endif %}
 {% set imp = consignee or importer or {} %}
 {% set items_list = items or [] %}
 {% set tots = totals or {} %}
@@ -159,9 +168,12 @@ table th{
         <div class="flex-col">
             <div class="section-title">Invoice Details</div>
             <p><strong>Invoice Number:</strong> {{ invoice_no }}</p>
-            <p><strong>Invoice Date:</strong> {{ issue_date }}</p>
+            <p><strong>Invoice Date:</strong> {{ issue_date or date or '' }}</p>
             {% if incoterms %}<p><strong>Terms:</strong> {{ incoterms }}</p>{% endif %}
             {% if country_of_origin %}<p><strong>Country of Origin:</strong> {{ country_of_origin }}</p>{% endif %}
+            {% if delivery_method %}<p><strong>Delivery Method:</strong> {{ delivery_method }}</p>{% endif %}
+            {% if port_of_loading %}<p><strong>Port of Loading:</strong> {{ port_of_loading }}</p>{% endif %}
+            {% if port_of_discharge %}<p><strong>Port of Discharge:</strong> {{ port_of_discharge }}</p>{% endif %}
         </div>
 
     </div>
@@ -176,7 +188,7 @@ table th{
                 <th class="num">Quantity</th>
                 <th class="num">Gross Weight</th>
                 <th class="num">Net Weight</th>
-                <th class="num">Unit Price ({{ cur }})</th>
+                <th class="num">Unit Price ({{ cur }}{% if up_label %}/{{ up_label }}{% endif %})</th>
                 <th class="num">Total Amount ({{ cur }})</th>
             </tr>
         </thead>
@@ -203,8 +215,8 @@ table th{
             <tr class="totals-row">
                 <td>Totals:</td>
                 <td class="num">{{ tots.qty or 0 }}</td>
-                <td class="num">{{ tots.gross or 0 }}</td>
-                <td class="num">{{ tots.net or 0 }}</td>
+                <td class="num">{{ tots.gross_display if tots.gross_display is not none else (tots.gross or 0) }}</td>
+                <td class="num">{{ tots.net_display if tots.net_display is not none else (tots.net or 0) }}</td>
                 <td></td>
                 <td class="num">{{ tots.total or tots.value or 0 }}</td>
             </tr>

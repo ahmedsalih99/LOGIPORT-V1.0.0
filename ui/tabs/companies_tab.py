@@ -16,7 +16,15 @@ from core.admin_columns import apply_admin_columns_to_table
 from database.crud.companies_crud import CompaniesCRUD
 from database.models import get_session_local, User
 from database.models.currency import Currency
-from database.models.company import Company  # ✅ نحتاجه لتمريره إلى BaseCRUD
+from database.models.company import Company
+try:
+    from database.models.country import Country
+except Exception:
+    Country = None
+try:
+    from database.models.client import Client
+except Exception:
+    Client = None
 
 # Dialogs
 from ui.dialogs.add_company_dialog import AddCompanyDialog
@@ -80,10 +88,12 @@ class CompaniesTab(BaseTab):
 
         actions_col = {"label": "actions", "key": "actions"}
         base_cols = [
-            {"label": "name",    "key": "name_local"},
-            {"label": "address", "key": "address_local"},
-            {"label": "currency","key": "currency_code"},
-            {"label": "notes",   "key": "notes"},
+            {"label": "name",          "key": "name_local"},
+            {"label": "country",       "key": "country_name"},
+            {"label": "owner_client",  "key": "owner_name"},
+            {"label": "phone",         "key": "phone"},
+            {"label": "currency",      "key": "currency_code"},
+            {"label": "is_active",     "key": "is_active_label"},
             actions_col,
         ]
         self.set_columns_for_role(
@@ -110,16 +120,32 @@ class CompaniesTab(BaseTab):
     # =========================
     def reload_data(self):
         admin = is_admin(self.current_user)
+        lang  = self._lang   # نعرّف lang مبكراً لأن country_map يحتاجه
 
         items = self.companies_crud.get_all() or []
 
-        # خريطة رموز العملات
+        # خريطة رموز العملات والدول وأصحاب الشركات
         currency_map = {}
-        SessionLocal = get_session_local()  # sessionmaker
+        country_map  = {}   # country_id → name
+        owner_map    = {}   # owner_client_id → name
+        SessionLocal = get_session_local()
         try:
             with SessionLocal() as s:
                 for cid, code in s.query(Currency.id, Currency.code).all():
                     currency_map[cid] = (code or "").strip()
+                if Country is not None:
+                    for row in s.query(Country).all():
+                        name = (getattr(row, f"name_{lang}", None) or
+                                getattr(row, "name_ar", None) or
+                                getattr(row, "name_en", None) or "")
+                        country_map[row.id] = name
+                if Client is not None:
+                    for row in s.query(Client).all():
+                        name = (getattr(row, f"name_{lang}", None) or
+                                getattr(row, "name_ar", None) or
+                                getattr(row, "name_en", None) or
+                                getattr(row, "full_name", None) or "")
+                        owner_map[row.id] = name
         except Exception:
             pass
 
@@ -180,17 +206,19 @@ class CompaniesTab(BaseTab):
                     id_to_name[uid] = (full_name or username or str(uid))
 
         # تجهيز الصفوف
-        lang = self._lang
         self.data = []
         for c in items:
             cid = getattr(c, "id", None)
+            is_active = getattr(c, "is_active", True)
             row = {
-                "id": cid,
-                "name_local": _pick_by_lang(c, lang, "name_ar", "name_en", "name_tr"),
-                "address_local": _pick_by_lang(c, lang, "address_ar", "address_en", "address_tr"),
+                "id":            cid,
+                "name_local":    _pick_by_lang(c, lang, "name_ar", "name_en", "name_tr"),
+                "country_name":  country_map.get(getattr(c, "country_id", None), ""),
+                "owner_name":    owner_map.get(getattr(c, "owner_client_id", None), ""),
+                "phone":         getattr(c, "phone", "") or "",
                 "currency_code": currency_map.get(getattr(c, "default_currency_id", None), ""),
-                "notes": getattr(c, "notes", "") or "",
-                "actions": c,
+                "is_active_label": self._("active") if is_active else self._("inactive"),
+                "actions":       c,
             }
 
             if admin:
@@ -246,24 +274,8 @@ class CompaniesTab(BaseTab):
         self._open_edit_dialog(company)
 
     def _open_edit_dialog(self, company):
-        dlg = AddCompanyDialog(self, {
-            "name_ar": getattr(company, "name_ar", ""),
-            "name_en": getattr(company, "name_en", ""),
-            "name_tr": getattr(company, "name_tr", ""),
-            "address_ar": getattr(company, "address_ar", ""),
-            "address_en": getattr(company, "address_en", ""),
-            "address_tr": getattr(company, "address_tr", ""),
-            "bank_info": getattr(company, "bank_info", ""),
-            "default_currency_id": getattr(company, "default_currency_id", None),
-
-            # ✅ أضِف السطر/الأسطر التالية:
-            "country_id": (
-                    getattr(getattr(company, "country", None), "id", None)  # من العلاقة إن وُجدت
-                    or getattr(company, "country_id", None)  # أو العمود مباشرة
-            ),
-
-            "notes": getattr(company, "notes", ""),
-        })
+        # نمرر الـ ORM object مباشرة - _prefill_if_edit تقرأ منه كل الحقول
+        dlg = AddCompanyDialog(self, company)
         if dlg.exec():
             data = dlg.get_data()
             user_id = getattr(self.current_user, "id", None)

@@ -114,111 +114,198 @@ class TransactionsTab(BaseTab):
     # ── Filter bar ────────────────────────────────────────────────────────
 
     def _build_filter_bar(self):
-        """Inject a date-range + type filter bar above the base_tab search bar."""
+        """شريط فلترة احترافي مع تجميع منطقي للعناصر."""
+        from PySide6.QtWidgets import QGroupBox
+
         filter_bar = QWidget()
         filter_bar.setObjectName("filter-bar")
-        lay = QHBoxLayout(filter_bar)
-        lay.setContentsMargins(0, 4, 0, 4)
-        lay.setSpacing(8)
+        outer = QHBoxLayout(filter_bar)
+        outer.setContentsMargins(0, 4, 0, 4)
+        outer.setSpacing(10)
 
-        # ── Date From ──
-        lbl_from = QLabel("📅 " + self._("date_from") + ":")
-        lbl_from.setFont(QFont("Tajawal", 9))
-        lay.addWidget(lbl_from)
+        # ── مجموعة 1: نطاق التاريخ ──────────────────────────────────────
+        date_group = QWidget()
+        date_group.setObjectName("filter-group")
+        date_lay = QHBoxLayout(date_group)
+        date_lay.setContentsMargins(10, 4, 10, 4)
+        date_lay.setSpacing(6)
+
+        lbl_from = QLabel("📅")
+        lbl_from.setFixedWidth(18)
+        date_lay.addWidget(lbl_from)
 
         self._date_from = QDateEdit()
         self._date_from.setObjectName("form-input")
         self._date_from.setCalendarPopup(True)
         self._date_from.setDisplayFormat("yyyy-MM-dd")
         self._date_from.setDate(QDate.currentDate().addMonths(-3))
-        self._date_from.setMinimumWidth(110)
+        self._date_from.setFixedWidth(106)
         self._date_from.dateChanged.connect(self._on_filter_changed)
-        lay.addWidget(self._date_from)
+        date_lay.addWidget(self._date_from)
 
-        # ── Date To ──
-        lbl_to = QLabel("→ " + self._("date_to") + ":")
-        lbl_to.setFont(QFont("Tajawal", 9))
-        lay.addWidget(lbl_to)
+        arr = QLabel("→")
+        arr.setStyleSheet("color: #6b7280; font-weight: 600;")
+        date_lay.addWidget(arr)
 
         self._date_to = QDateEdit()
         self._date_to.setObjectName("form-input")
         self._date_to.setCalendarPopup(True)
         self._date_to.setDisplayFormat("yyyy-MM-dd")
         self._date_to.setDate(QDate.currentDate())
-        self._date_to.setMinimumWidth(110)
+        self._date_to.setFixedWidth(106)
         self._date_to.dateChanged.connect(self._on_filter_changed)
-        lay.addWidget(self._date_to)
+        date_lay.addWidget(self._date_to)
 
-        # separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
-        sep.setObjectName("separator")
-        sep.setFixedWidth(1)
-        sep.setFixedHeight(24)
-        lay.addWidget(sep)
+        outer.addWidget(date_group)
 
-        # ── Type combo ──
-        lbl_type = QLabel("🔖 " + self._("transaction_type") + ":")
-        lbl_type.setFont(QFont("Tajawal", 9))
-        lay.addWidget(lbl_type)
+        # ── أزرار Preset مدمجة ──────────────────────────────────────────
+        preset_group = QWidget()
+        preset_lay = QHBoxLayout(preset_group)
+        preset_lay.setContentsMargins(0, 0, 0, 0)
+        preset_lay.setSpacing(4)
 
-        self._type_combo = QComboBox()
-        self._type_combo.setObjectName("form-input")
-        self._type_combo.setMinimumWidth(110)
-        self._type_combo.addItem(self._("All"), "")
-        self._type_combo.addItem("📤 " + self._("export"), "export")
-        self._type_combo.addItem("📥 " + self._("import"), "import")
-        self._type_combo.addItem("🔄 " + self._("transit"), "transit")
-        self._type_combo.currentIndexChanged.connect(self._on_filter_changed)
-        lay.addWidget(self._type_combo)
-
-        # separator
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.VLine)
-        sep2.setObjectName("separator")
-        sep2.setFixedWidth(1)
-        sep2.setFixedHeight(24)
-        lay.addWidget(sep2)
-
-        # ── Quick presets ──
-        for label, slot in (
-            ("📅 " + self._("today"),        self._preset_today),
-            ("📅 " + self._("this_week"),    self._preset_week),
-            ("📅 " + self._("this_month"),   self._preset_month),
-        ):
-            btn = QPushButton(label)
-            btn.setObjectName("topbar-btn")
-            btn.setMinimumHeight(30)
-            btn.setFont(QFont("Tajawal", 9))
+        presets = [
+            (self._("today"),      self._preset_today,  "📅"),
+            (self._("this_week"),  self._preset_week,   "📆"),
+            (self._("this_month"), self._preset_month,  "🗓"),
+        ]
+        for label, slot, icon in presets:
+            btn = QPushButton(f"{icon} {label}")
+            btn.setObjectName("filter-preset-btn")
+            btn.setFixedHeight(32)
             btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("""
+                QPushButton#filter-preset-btn {
+                    background: transparent;
+                    border: 1.5px solid #D1D5DB;
+                    border-radius: 8px;
+                    padding: 0 10px;
+                    font-size: 11px;
+                    color: #374151;
+                }
+                QPushButton#filter-preset-btn:hover {
+                    background: #EFF6FF;
+                    border-color: #3B82F6;
+                    color: #1D4ED8;
+                }
+            """)
             btn.clicked.connect(slot)
-            lay.addWidget(btn)
+            preset_lay.addWidget(btn)
 
-        # Clear filters
-        clr = QPushButton("✖ " + self._("clear"))
-        clr.setObjectName("topbar-btn")
-        clr.setMinimumHeight(30)
-        clr.setFont(QFont("Tajawal", 9))
+        clr = QPushButton("✖")
+        clr.setObjectName("filter-preset-btn")
+        clr.setFixedSize(32, 32)
         clr.setCursor(Qt.PointingHandCursor)
+        clr.setToolTip(self._("clear"))
+        clr.setStyleSheet("""
+            QPushButton#filter-preset-btn {
+                background: transparent;
+                border: 1.5px solid #FCA5A5;
+                border-radius: 8px;
+                font-size: 12px; color: #DC2626;
+            }
+            QPushButton#filter-preset-btn:hover {
+                background: #FEF2F2; border-color: #DC2626;
+            }
+        """)
         clr.clicked.connect(self._preset_clear)
-        lay.addWidget(clr)
+        preset_lay.addWidget(clr)
 
-        # result count label
+        outer.addWidget(preset_group)
+
+        # ── فاصل ───────────────────────────────────────────────────────
+        vsep = QFrame()
+        vsep.setFrameShape(QFrame.VLine)
+        vsep.setObjectName("separator")
+        vsep.setFixedHeight(28)
+        outer.addWidget(vsep)
+
+        # ── نوع المعاملة — Pill buttons ─────────────────────────────────
+        type_group = QWidget()
+        type_lay = QHBoxLayout(type_group)
+        type_lay.setContentsMargins(0, 0, 0, 0)
+        type_lay.setSpacing(4)
+
+        self._type_btns = {}
+        type_defs = [
+            ("", "🔍 " + self._("All")),
+            ("export",  "📤 " + self._("export")),
+            ("import",  "📥 " + self._("import")),
+            ("transit", "🔄 " + self._("transit")),
+        ]
+
+        def _style_type_btn(btn, active):
+            if active:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background: #3B82F6; color: white;
+                        border: 1.5px solid #3B82F6;
+                        border-radius: 14px; padding: 0 12px;
+                        font-size: 11px; font-weight: 600;
+                    }
+                """)
+            else:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background: transparent; color: #374151;
+                        border: 1.5px solid #D1D5DB;
+                        border-radius: 14px; padding: 0 12px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        border-color: #3B82F6; color: #1D4ED8;
+                        background: #EFF6FF;
+                    }
+                """)
+
+        first_btn = None
+        for val, label in type_defs:
+            btn = QPushButton(label)
+            btn.setFixedHeight(30)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setProperty("type_val", val)
+            self._type_btns[val] = btn
+            if first_btn is None:
+                first_btn = btn
+                _style_type_btn(btn, True)
+            else:
+                _style_type_btn(btn, False)
+
+            def _on_type_click(checked=False, v=val):
+                for vv, b in self._type_btns.items():
+                    _style_type_btn(b, vv == v)
+                self._selected_type = v
+                self._on_filter_changed()
+            btn.clicked.connect(_on_type_click)
+            type_lay.addWidget(btn)
+
+        self._selected_type = ""
+        outer.addWidget(type_group)
+
+        # للتوافق مع الكود القديم
+        self._type_combo = QComboBox()
+        self._type_combo.setVisible(False)
+        self._type_combo.addItem("", "")
+        self._type_combo.addItem("export", "export")
+        self._type_combo.addItem("import", "import")
+        self._type_combo.addItem("transit", "transit")
+
+        outer.addStretch(1)
+
+        # ── عداد النتائج ────────────────────────────────────────────────
         self._count_lbl = QLabel()
-        self._count_lbl.setFont(QFont("Tajawal", 9))
         self._count_lbl.setObjectName("text-muted")
-        lay.addWidget(self._count_lbl)
+        self._count_lbl.setStyleSheet("font-size: 11px; color: #6B7280; padding: 0 4px;")
+        outer.addWidget(self._count_lbl)
 
-        # ── Rich Excel export ──
-        btn_rich = QPushButton("📊 " + self._("export_to_excel_rich"))
+        # ── تصدير Excel ─────────────────────────────────────────────────
+        btn_rich = QPushButton("📊  " + self._("export_to_excel_rich"))
         btn_rich.setObjectName("secondary-btn")
+        btn_rich.setFixedHeight(32)
         btn_rich.setToolTip(self._("export_transactions_tip"))
         btn_rich.clicked.connect(self._rich_export)
-        lay.addWidget(btn_rich)
+        outer.addWidget(btn_rich)
 
-        lay.addStretch()
-
-        # Insert before the table — base_tab exposes self.layout (QVBoxLayout)
         try:
             self.layout.insertWidget(1, filter_bar)
         except Exception:
@@ -257,7 +344,7 @@ class TransactionsTab(BaseTab):
         """Return (date_from_str, date_to_str, trx_type_str, search, status_str)."""
         d_from  = self._date_from.date().toString("yyyy-MM-dd") if hasattr(self, "_date_from")    else None
         d_to    = self._date_to.date().toString("yyyy-MM-dd")   if hasattr(self, "_date_to")      else None
-        t_type  = self._type_combo.currentData()                if hasattr(self, "_type_combo")   else ""
+        t_type  = getattr(self, "_selected_type", "") or (self._type_combo.currentData() if hasattr(self, "_type_combo") else "")
         status  = self._status_combo.currentData()              if hasattr(self, "_status_combo") else ""
         search  = self.search_bar.text().strip().lower()        if hasattr(self, "search_bar")    else ""
         return d_from, d_to, t_type or None, search, status or None
@@ -467,6 +554,35 @@ class TransactionsTab(BaseTab):
             ai = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
             if ai is not None: self.table.setColumnHidden(ai, not show_actions)
         except Exception: pass
+
+        # ── ضبط عروض الأعمدة ────────────────────────────────────────────────
+        COL_WIDTHS = {
+            "transaction_no":          110,
+            "transaction_type_badge":  160,
+            "transaction_date":        110,
+            "client":                  160,
+            "exporting_company":       160,
+            "importing_company":       160,
+            "relationship_label":       90,
+            "linked_entries_count":     70,
+            "total_value":             120,
+        }
+        hdr = self.table.horizontalHeader()
+        from PySide6.QtWidgets import QHeaderView
+        for ci, col in enumerate(self.columns):
+            key = col.get("key", "")
+            label = col.get("label", "")
+            w = COL_WIDTHS.get(key) or COL_WIDTHS.get(label)
+            if w:
+                hdr.resizeSection(ci, w)
+        # عمود الإجراءات: اجعل آخر عمود يمتد
+        try:
+            if show_actions and ai is not None:
+                hdr.setSectionResizeMode(ai, QHeaderView.Fixed)
+                hdr.resizeSection(ai, 220)
+        except Exception:
+            pass
+
         self._apply_admin_columns()
         self.update_pagination_label()
 
@@ -722,40 +838,50 @@ class TransactionsTab(BaseTab):
     }
 
     def _make_type_badge(self, code: str, label: str) -> QLabel:
-        icon, fg, bg = self._BADGE_STYLES.get(code, ("•", "#6b7280", "#f3f4f6"))
-        badge = QLabel(f"{icon} {label}")
+        ICONS = {"export": "📤", "import": "📥", "transit": "🔄"}
+        icon = ICONS.get(code, "•")
+        badge = QLabel(f"{icon}  {label}")
         badge.setAlignment(Qt.AlignCenter)
-        badge.setObjectName("type-badge")
+        # objectName يربطه بالثيم — يستخدم لون primary/accent حسب النوع
+        badge.setObjectName(f"badge-{code}" if code in ("export","import","transit") else "badge-default")
         badge.setProperty("badge_type", code)
+        # ألوان مدمجة بسيطة — لا تتعارض مع الثيم
+        COLORS = {
+            "export":  ("#065F46", "#D1FAE5"),
+            "import":  ("#1E3A5F", "#DBEAFE"),
+            "transit": ("#78350F", "#FEF3C7"),
+        }
+        fg, bg = COLORS.get(code, ("#374151", "#F3F4F6"))
         badge.setStyleSheet(
-            f"QLabel {{ color: {fg}; background: {bg}; border: 1px solid {fg}40;"
-            f"border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; }}"
+            f"QLabel {{ color: {fg}; background: {bg};"
+            f"border-radius: 10px; padding: 2px 10px; font-size: 11px; font-weight: 700;"
+            f"min-width: 70px; }}"
         )
         return badge
 
     # ── Footer / Totals ───────────────────────────────────────────────
     def _make_status_badge(self, status: str) -> QLabel:
-        """Badge ملوّن للحالة يُدمج مع badge النوع."""
-        STATUS_STYLES = {
-            "draft":    ("#6366f1", "#e0e7ff", "📝"),   # بنفسجي — مسودة
-            "active":   ("#10b981", "#d1fae5", "🟢"),   # أخضر   — نشطة
-            "closed":   ("#ef4444", "#fee2e2", "🔴"),   # أحمر   — مغلقة
-            "archived": ("#64748b", "#f1f5f9", "📦"),   # رمادي  — مؤرشفة
+        """Badge الحالة — بسيط وواضح."""
+        STATUS_MAP = {
+            "draft":    ("📝", "#4338CA", "#EEF2FF"),
+            "active":   ("✅", "#065F46", "#D1FAE5"),
+            "closed":   ("🔒", "#7F1D1D", "#FEE2E2"),
+            "archived": ("📦", "#374151", "#F3F4F6"),
         }
-        color, bg, icon = STATUS_STYLES.get(status, ("#64748b", "#f1f5f9", "⚪"))
-        label_text = self._(f"status_{status}") if f"status_{status}" in (self._("status_draft"), self._("status_active"), self._("status_closed"), self._("status_archived")) else self._(status)
-        lbl = QLabel(f"{icon} {label_text}")
-        lbl.setStyleSheet(f"""
-            QLabel {{
-                background: {bg};
-                color: {color};
-                border: 1px solid {color}40;
-                border-radius: 8px;
-                padding: 1px 6px;
-                font-size: 10px;
-                font-weight: 600;
-            }}
-        """)
+        icon, color, bg = STATUS_MAP.get(status, ("⚪", "#6B7280", "#F9FAFB"))
+        # ترجمة الحالة — جرب المفتاح بكلا الصيغتين
+        try:
+            label_text = self._(f"status_{status}")
+            if label_text == f"status_{status}":
+                label_text = self._(status)
+        except Exception:
+            label_text = status
+        lbl = QLabel(f"{icon}  {label_text}")
+        lbl.setStyleSheet(
+            f"QLabel {{ background: {bg}; color: {color};"
+            f"border-radius: 8px; padding: 2px 8px;"
+            f"font-size: 10px; font-weight: 700; }}"
+        )
         lbl.setAlignment(Qt.AlignCenter)
         return lbl
 

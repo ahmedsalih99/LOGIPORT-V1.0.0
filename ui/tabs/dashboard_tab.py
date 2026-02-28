@@ -35,7 +35,7 @@ class StatCard(QFrame):
         "import":       ("#3498DB", "#1F6FA4"),
         "export":       ("#1ABC9C", "#0E8C6F"),
         "transit":      ("#F39C12", "#B7770D"),
-        "documents":    ("#7F8C8D", "#4D6364"),
+        "documents":    ("#64748B", "#475569"),
     }
 
     def __init__(self, title, value, subtitle, card_key="transactions", icon="📊", parent=None):
@@ -45,43 +45,46 @@ class StatCard(QFrame):
         self.setStyleSheet(f"""
             QFrame#stat-card-gradient {{
                 background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {c1},stop:1 {c2});
-                border-radius: 16px;
-                min-height: 120px;
+                border-radius: 14px;
+                min-height: 110px;
                 border: none;
             }}
             QLabel {{ color: white; background: transparent; }}
         """)
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(18, 14, 18, 14)
-        lay.setSpacing(6)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(4)
 
         # ── الصف العلوي: أيقونة + عنوان ──
         top = QHBoxLayout()
+        top.setSpacing(0)
         icon_lbl = QLabel(icon)
-        icon_lbl.setFixedSize(36, 36)
+        icon_lbl.setFixedSize(32, 32)
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet(
-            "background: rgba(255,255,255,0.2); border-radius: 18px; font-size: 18px;"
+            "background: rgba(255,255,255,0.18); border-radius: 16px; font-size: 15px;"
         )
         top.addWidget(icon_lbl)
-        top.addSpacing(8)
+        top.addSpacing(10)
         self._title_lbl = QLabel(title)
-        self._title_lbl.setFont(QFont("Tajawal", 11, QFont.DemiBold))
-        self._title_lbl.setStyleSheet("color: rgba(255,255,255,0.9);")
-        top.addWidget(self._title_lbl)
-        top.addStretch()
+        self._title_lbl.setFont(QFont("Tajawal", 10, QFont.DemiBold))
+        self._title_lbl.setStyleSheet("color: rgba(255,255,255,0.88);")
+        top.addWidget(self._title_lbl, 1)
         lay.addLayout(top)
 
-        # ── القيمة الرئيسية ──
+        lay.addSpacing(2)
+
+        # ── القيمة الرئيسية — مصغّرة من 30 → 22 ──
         self.value_lbl = QLabel(str(value))
-        self.value_lbl.setFont(QFont("Tajawal", 30, QFont.Bold))
+        self.value_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
+        self.value_lbl.setStyleSheet("color: white; letter-spacing: 0.5px;")
         lay.addWidget(self.value_lbl)
 
         # ── الـ subtitle ──
         self._sub_lbl = QLabel(subtitle)
-        self._sub_lbl.setFont(QFont("Tajawal", 9))
-        self._sub_lbl.setStyleSheet("color: rgba(255,255,255,0.75);")
+        self._sub_lbl.setFont(QFont("Tajawal", 8))
+        self._sub_lbl.setStyleSheet("color: rgba(255,255,255,0.70);")
         lay.addWidget(self._sub_lbl)
 
     def update_value(self, v):    self.value_lbl.setText(str(v))
@@ -443,7 +446,18 @@ class DashboardTab(QWidget):
                 self._trans_table.setItem(r, 0, cell(t.transaction_no or "—"))
                 self._trans_table.setItem(r, 1, cell(date_str))
                 self._trans_table.setItem(r, 2, cell(TYPE_MAP.get(t.transaction_type, t.transaction_type or "—")))
-                self._trans_table.setItem(r, 3, cell(t.client.name_ar if t.client else "—"))
+                # اختيار اسم العميل حسب اللغة الحالية
+                lang = TranslationManager.get_instance().get_current_language()
+                if t.client:
+                    if lang == "en":
+                        client_display = t.client.name_en or t.client.name_ar or "—"
+                    elif lang == "tr":
+                        client_display = t.client.name_tr or t.client.name_ar or "—"
+                    else:
+                        client_display = t.client.name_ar or "—"
+                else:
+                    client_display = "—"
+                self._trans_table.setItem(r, 3, cell(client_display))
                 self._trans_table.setItem(r, 4, cell(wt, right=True))
                 self._trans_table.setItem(r, 5, cell(vl, right=True))
 

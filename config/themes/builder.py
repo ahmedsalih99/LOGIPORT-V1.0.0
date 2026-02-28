@@ -90,14 +90,10 @@ class ThemeBuilder:
         c = self.colors
         s = self.sizes
 
-        # RTL direction setting
-        rtl_direction = "qproperty-layoutDirection: RightToLeft;" if self.rtl else ""
-
         return f"""
-        /* ========== BASE STYLES WITH RTL & GRADIENTS ========== */
+        /* ========== BASE STYLES WITH GRADIENTS ========== */
         
         * {{
-            {rtl_direction}
         }}
         
         QWidget {{
@@ -105,7 +101,6 @@ class ThemeBuilder:
             color: {c["text_primary"]};
             font-size: {s["base"]}px;
             font-family: '{self.font_family}', 'Montserrat', 'Cairo', Arial, sans-serif;
-            {rtl_direction}
         }}
         
         QMainWindow {{
@@ -115,7 +110,6 @@ class ThemeBuilder:
                 stop: 0.5 {c["bg_main"]},
                 stop: 1 {c["bg_main_gradient_end"]}
             );
-            {rtl_direction}
         }}
         
         QWidget#main_widget {{
@@ -191,15 +185,11 @@ class ThemeBuilder:
         """
 
     def _get_rtl_fixes(self) -> str:
-        """Additional RTL-specific fixes"""
+        """Additional RTL-specific fixes (visual/alignment only — no qproperty-layoutDirection)"""
         c = self.colors
 
         return f"""
         /* ========== RTL SPECIFIC FIXES ========== */
-        
-        /* Text Inputs - Right aligned */
-        QLineEdit, QTextEdit, QPlainTextEdit {{
-        }}
         
         /* ComboBox - Arrow on left */
         QComboBox::drop-down {{
@@ -220,9 +210,6 @@ class ThemeBuilder:
         }}
         
         /* SpinBox - Buttons on left */
-        QSpinBox, QDoubleSpinBox {{
-        }}
-        
         QSpinBox::up-button, QDoubleSpinBox::up-button {{
             subcontrol-origin: border;
             subcontrol-position: left top;
@@ -263,50 +250,29 @@ class ThemeBuilder:
             border-top: 5px solid {c["text_secondary"]};
         }}
         
-        /* Tables - Right aligned */
-        QTableWidget, QTableView {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
+        /* Tables - header alignment */
         QTableWidget::item, QTableView::item {{
-            text-align: right;
             padding-right: 8px;
             padding-left: 8px;
         }}
         
         QHeaderView::section {{
-            text-align: right;
             padding-right: 10px;
             padding-left: 10px;
         }}
         
-        /* Lists - Right aligned */
-        QListWidget, QListView {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
+        /* Lists/Trees alignment */
         QListWidget::item, QListView::item {{
-            text-align: right;
             padding-right: 8px;
             padding-left: 8px;
         }}
         
-        /* Trees - Right aligned */
-        QTreeWidget, QTreeView {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
         QTreeWidget::item, QTreeView::item {{
-            text-align: right;
             padding-right: 4px;
             padding-left: 20px;
         }}
         
-        /* Tabs - RTL order */
-        QTabBar {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
+        /* Tabs */
         QTabBar::tab {{
             margin-left: 2px;
             margin-right: 0px;
@@ -317,12 +283,7 @@ class ThemeBuilder:
         }}
         
         /* Menus - Right aligned */
-        QMenu {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
         QMenu::item {{
-            text-align: right;
             padding-right: 12px;
             padding-left: 30px;
         }}
@@ -332,28 +293,9 @@ class ThemeBuilder:
             right: 8px;
         }}
         
-        /* CheckBox & RadioButton - Indicator on right */
-        QCheckBox, QRadioButton {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
+        /* CheckBox & RadioButton - Indicator spacing */
         QCheckBox::indicator, QRadioButton::indicator {{
             margin-right: 0px;
             margin-left: 8px;
-        }}
-        
-        /* Buttons - Text alignment */
-        QPushButton {{
-            text-align: center;
-        }}
-        
-        /* ToolBar - RTL layout */
-        QToolBar {{
-            qproperty-layoutDirection: RightToLeft;
-        }}
-        
-        /* StatusBar - RTL layout */
-        QStatusBar {{
-            qproperty-layoutDirection: RightToLeft;
         }}
         """

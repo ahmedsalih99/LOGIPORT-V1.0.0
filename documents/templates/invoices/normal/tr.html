@@ -4,4 +4,11 @@
 {% block content %}
 <h1>{{ title or "BELGE" }}</h1>
 <p style="opacity:.7">Placeholder template for <code>invoices/normal</code> [tr]</p>
+
+  {% if bank_info or exporter.bank_info %}
+  <div style="margin-top:16px;padding:10px;border:1px solid #ccc;border-radius:4px;">
+    <div style="font-weight:700;margin-bottom:4px;">Banka Bilgileri</div>
+    <div>{{ (bank_info or exporter.bank_info) | replace('\n','<br>') | safe }}</div>
+  </div>
+  {% endif %}
 {% endblock %}

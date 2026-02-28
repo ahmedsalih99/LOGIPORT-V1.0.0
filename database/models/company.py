@@ -45,7 +45,8 @@ class Company(Base):
     tax_id = Column(String(128), nullable=True)
     registration_number = Column(String(128), nullable=True)
 
-    # Other
+    # Bank & Other
+    bank_info = Column(Text, nullable=True)     # IBAN / SWIFT / account info
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="1")
 

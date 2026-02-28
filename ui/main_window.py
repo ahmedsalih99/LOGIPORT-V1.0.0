@@ -254,6 +254,11 @@ class MainWindow(BaseWindow):
 
             self.tabs[tab_key] = tab_instance
             logger.debug(f"Lazy loaded tab: {tab_key}")
+            # تطبيق الاتجاه الحالي فوراً على التبويبة المُنشأة حديثاً
+            lang = SettingsManager.get_instance().get("language", "ar")
+            direction = Qt.RightToLeft if lang == "ar" else Qt.LeftToRight
+            tab_instance.setLayoutDirection(direction)
+            self._apply_direction_recursive(tab_instance, direction)
             return tab_instance
 
         except Exception as e:
@@ -429,15 +434,51 @@ class MainWindow(BaseWindow):
     def update_layout_direction(self):
         lang = SettingsManager.get_instance().get("language", "ar")
         direction = Qt.RightToLeft if lang == "ar" else Qt.LeftToRight
-        # صحّح اتجاه QApplication أولاً — هذا ما يُورَث
+
         from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
             app.setLayoutDirection(direction)
-        if hasattr(self, "center_widget"):
-            self.center_widget.setLayoutDirection(direction)
-        if hasattr(self, "top_bar"):
-            self.top_bar.setLayoutDirection(direction)
+
+        # تطبيق على كل الـ widgets الحيوية في النافذة
+        for widget in [
+            self,
+            getattr(self, "center_widget", None),
+            getattr(self, "top_bar", None),
+            getattr(self, "sidebar", None),
+            getattr(self, "stack", None),
+        ]:
+            if widget is not None:
+                widget.setLayoutDirection(direction)
+
+        # تطبيق على التبويبات المُنشأة (الجداول والمحتوى)
+        for tab in getattr(self, "tabs", {}).values():
+            if tab is not None:
+                tab.setLayoutDirection(direction)
+                # الجداول داخل التبويبة
+                self._apply_direction_recursive(tab, direction)
+
+        # البروفايل إن كان مفتوحاً
+        profile = getattr(self, "_profile_tab", None)
+        if profile:
+            profile.setLayoutDirection(direction)
+            self._apply_direction_recursive(profile, direction)
+
+    @staticmethod
+    def _apply_direction_recursive(widget, direction):
+        """تطبيق الاتجاه على كل الـ widgets الداخلية (جداول، lists، إلخ)."""
+        from PySide6.QtWidgets import QTableWidget, QTableView, QListWidget, QListView, QHeaderView
+        for child in widget.findChildren(QTableWidget):
+            child.setLayoutDirection(direction)
+            hdr = child.horizontalHeader()
+            if hdr:
+                hdr.setLayoutDirection(direction)
+        for child in widget.findChildren(QTableView):
+            child.setLayoutDirection(direction)
+        for child in widget.findChildren(QListWidget):
+            child.setLayoutDirection(direction)
+        for child in widget.findChildren(QListView):
+            child.setLayoutDirection(direction)
 
     def retranslate_ui(self):
         self.set_translated_title("app_title")
@@ -453,5 +494,6 @@ class MainWindow(BaseWindow):
             profile.retranslate_ui()
 
     def _on_language_change(self):
-        self.retranslate_ui()
+        # الاتجاه أولاً قبل retranslate لأن بعض الـ widgets تُعاد بناؤها
         self.update_layout_direction()
+        self.retranslate_ui()

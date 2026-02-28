@@ -6,17 +6,18 @@ UserProfileTab - LOGIPORT
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QLineEdit, QMessageBox, QScrollArea, QGridLayout,
-    QSizePolicy, QApplication
+    QSizePolicy, QApplication, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap, QPainter, QBrush, QColor, QPainterPath
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
 from database.db_utils import format_local_dt
 from database.models import get_session_local, AuditLog, Transaction
 from sqlalchemy import func, desc
-
+import os
+import shutil
 
 def _current_user():
     return SettingsManager.get_instance().get("user")
@@ -165,16 +166,24 @@ class UserProfileTab(QWidget):
 
         user = _current_user()
 
-        avatar = QLabel("👤")
-        avatar.setFont(QFont("Segoe UI Emoji", 36))
-        avatar.setFixedSize(80, 80)
-        avatar.setAlignment(Qt.AlignCenter)
-        avatar.setStyleSheet("""
-            background: rgba(255,255,255,0.2);
-            border-radius: 40px;
-            border: 2px solid rgba(255,255,255,0.4);
-        """)
-        lay.addWidget(avatar)
+        # ── Avatar container ──────────────────────────────────
+        avatar_container = QWidget()
+        avatar_container.setFixedSize(80, 80)
+        avatar_container.setStyleSheet("background: transparent;")
+        avatar_vlay = QVBoxLayout(avatar_container)
+        avatar_vlay.setContentsMargins(0, 0, 0, 0)
+        avatar_vlay.setSpacing(0)
+
+        self._avatar_lbl = QLabel()
+        self._avatar_lbl.setFixedSize(80, 80)
+        self._avatar_lbl.setAlignment(Qt.AlignCenter)
+        self._avatar_lbl.setCursor(Qt.PointingHandCursor)
+        self._avatar_lbl.setToolTip(self._("change_avatar") if hasattr(self, "_") else "Change photo")
+        self._avatar_lbl.mousePressEvent = lambda e: self._pick_avatar()
+        avatar_vlay.addWidget(self._avatar_lbl)
+
+        self._refresh_avatar()
+        lay.addWidget(avatar_container)
 
         col = QVBoxLayout()
         col.setSpacing(4)
@@ -195,6 +204,24 @@ class UserProfileTab(QWidget):
         self._hero_role_lbl.setStyleSheet("color: rgba(255,255,255,0.85); background: transparent;")
         col.addWidget(self._hero_role_lbl)
 
+        # زر تغيير الصورة
+        self._btn_avatar = QPushButton("📷 " + (self._("change_avatar") if hasattr(self, "_") else ""))
+        self._btn_avatar.setObjectName("secondary-btn-small")
+        self._btn_avatar.setFixedHeight(26)
+        self._btn_avatar.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.2);
+                color: white;
+                border: 1px solid rgba(255,255,255,0.4);
+                border-radius: 8px;
+                padding: 2px 10px;
+                font-size: 11px;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.35); }
+        """)
+        self._btn_avatar.clicked.connect(self._pick_avatar)
+        col.addWidget(self._btn_avatar)
+
         lay.addLayout(col, 1)
 
         self._hero_badge = QLabel(self._("user_online"))
@@ -208,6 +235,87 @@ class UserProfileTab(QWidget):
         lay.addWidget(self._hero_badge, 0, Qt.AlignTop)
 
         return frame
+
+    def _refresh_avatar(self):
+        """تحديث صورة الأفاتار من مسار المستخدم أو emoji افتراضي."""
+        user = _current_user()
+        avatar_path = getattr(user, "avatar_path", None) if user else None
+
+        if avatar_path and os.path.isfile(avatar_path):
+            pixmap = QPixmap(avatar_path)
+            if not pixmap.isNull():
+                # اقتطاع دائري
+                size = 80
+                pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                rounded = QPixmap(size, size)
+                rounded.fill(Qt.transparent)
+                painter = QPainter(rounded)
+                painter.setRenderHint(QPainter.Antialiasing)
+                path = QPainterPath()
+                path.addEllipse(0, 0, size, size)
+                painter.setClipPath(path)
+                x = (pixmap.width() - size) // 2
+                y = (pixmap.height() - size) // 2
+                painter.drawPixmap(-x, -y, pixmap)
+                painter.end()
+                self._avatar_lbl.setPixmap(rounded)
+                self._avatar_lbl.setStyleSheet("""
+                    border-radius: 40px;
+                    border: 3px solid rgba(255,255,255,0.6);
+                """)
+                return
+
+        # Default emoji
+        self._avatar_lbl.setText("👤")
+        self._avatar_lbl.setFont(QFont("Segoe UI Emoji", 36))
+        self._avatar_lbl.setStyleSheet("""
+            background: rgba(255,255,255,0.2);
+            border-radius: 40px;
+            border: 2px solid rgba(255,255,255,0.4);
+        """)
+
+    def _pick_avatar(self):
+        """فتح نافذة اختيار صورة وحفظها."""
+        from database.models import get_session_local, User as UserModel
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self._("select_avatar_image"),
+            "",
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
+        )
+        if not file_path:
+            return
+
+        user = _current_user()
+        if not user:
+            return
+
+        # إنشاء مجلد الصور إن لم يكن موجوداً
+        avatars_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "avatars")
+        os.makedirs(avatars_dir, exist_ok=True)
+
+        # نسخ الملف مع اسم مميز
+        ext = os.path.splitext(file_path)[1].lower()
+        dest = os.path.join(avatars_dir, f"user_{user.id}{ext}")
+        shutil.copy2(file_path, dest)
+
+        # تحديث قاعدة البيانات
+        try:
+            with get_session_local()() as session:
+                db_user = session.get(UserModel, user.id)
+                if db_user:
+                    db_user.avatar_path = dest
+                    session.commit()
+
+            # تحديث كائن المستخدم في الإعدادات
+            user.avatar_path = dest
+
+            self._refresh_avatar()
+            QMessageBox.information(self, self._("success"), self._("avatar_updated"))
+        except Exception as e:
+            QMessageBox.warning(self, self._("error"), str(e))
+
+
 
     def _build_stats(self) -> QFrame:
         frame = QFrame()
@@ -500,6 +608,9 @@ class UserProfileTab(QWidget):
         # Hero
         self._hero_role_lbl.setText(self._("user_role").format(role=role_txt))
         self._hero_badge.setText(self._("user_online"))
+        if hasattr(self, "_btn_avatar"):
+            self._btn_avatar.setText("📷 " + self._("change_avatar"))
+            self._avatar_lbl.setToolTip(self._("change_avatar"))
 
         # Stats section title + card labels
         self._stats_title_lbl.setText(self._("my_stats_title"))

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QAbstractSpinBox
 )
 from PySide6.QtCore import Qt, QModelIndex, Signal, QTimer, QEvent, QObject
-from PySide6.QtGui import QKeySequence, QShortcut, QGuiApplication
+from PySide6.QtGui import QKeySequence, QShortcut, QGuiApplication, QFont
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
 from core.permissions import is_admin as _is_admin, has_perm as _has_perm, has_any_perm
@@ -12,6 +12,10 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 from PySide6.QtGui import QTextDocument
 import logging
+
+# ── فونت bold مشترك لكل خلايا الجداول ─────────────────────────────────────
+_BOLD_ITEM_FONT = QFont()
+_BOLD_ITEM_FONT.setBold(True)
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -185,6 +189,7 @@ class BaseTab(QWidget):
         self.layout.addLayout(self.top_bar)
 
         self.table = QTableWidget(0, 0, self)
+        self.table.setObjectName("data-table")
         self.layout.addWidget(self.table)
 
         self.pagination_bar = QHBoxLayout()
@@ -220,12 +225,16 @@ class BaseTab(QWidget):
         self.table.customContextMenuRequested.connect(self.show_context_menu)
         self.table.doubleClicked.connect(self.on_row_double_clicked)
 
-        # ✅ ضبط ارتفاع الصفوف - CRITICAL للأزرار
-        self.table.verticalHeader().setDefaultSectionSize(44)  # ارتفاع مريح للقراءة
-        self.table.verticalHeader().setMinimumSectionSize(40)
+        # ✅ ضبط ارتفاع الصفوف
+        self.table.verticalHeader().setDefaultSectionSize(46)
+        self.table.verticalHeader().setMinimumSectionSize(42)
 
-        # ضبط ارتفاع الهيدر
+        # ضبط ارتفاع الهيدر + bold font
         self.table.horizontalHeader().setMinimumHeight(44)
+        _hdr_font = self.table.horizontalHeader().font()
+        _hdr_font.setBold(True)
+        _hdr_font.setPointSize(_hdr_font.pointSize() + 0)  # نفس الحجم — bold فقط
+        self.table.horizontalHeader().setFont(_hdr_font)
 
         # منع QComboBox/QSpinBox من تغيير قيمتها بالعجلة بدون focus
         # (الـ filter يُنصَّب مرة واحدة في main.py على QApplication — يغطي كل الـ widgets)
@@ -479,6 +488,7 @@ class BaseTab(QWidget):
                 value = row.get(key, "")
                 item  = QTableWidgetItem(str(value) if value is not None else "")
                 item.setTextAlignment(col.get("align", Qt.AlignCenter))
+                item.setFont(_BOLD_ITEM_FONT)
                 self.table.setItem(i, j, item)
         self.stretch_all_columns()
 
@@ -560,6 +570,7 @@ class BaseTab(QWidget):
                     val = row.get(key, "")
                     item = QTableWidgetItem(str(val) if val is not None else "")
                     item.setTextAlignment(col.get("align", Qt.AlignCenter))
+                    item.setFont(_BOLD_ITEM_FONT)
                     self.table.setItem(row_idx, col_idx, item)
 
         # ── إخفاء عمود actions إذا لا صلاحية ───────────────────────────
@@ -764,6 +775,7 @@ class BaseTab(QWidget):
                         continue
                     item = QTableWidgetItem(str(value) if value is not None else "")
                     item.setTextAlignment(Qt.AlignCenter)
+                    item.setFont(_BOLD_ITEM_FONT)
                     self.table.setItem(i, j, item)
 
             QMessageBox.information(

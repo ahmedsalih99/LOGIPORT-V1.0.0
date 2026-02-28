@@ -47,7 +47,7 @@ def _company_obj(s, company_id, lang: str) -> Dict[str, Any]:
                name_ar, name_en, name_tr,
                address_ar, address_en, address_tr,
                country_id, city, phone, email, website, tax_id, registration_number,
-               bank_info  -- ✅ جديد
+               bank_info
         FROM companies WHERE id=:id
     """), {"id": company_id}).mappings().first()
     if not r:
@@ -57,14 +57,38 @@ def _company_obj(s, company_id, lang: str) -> Dict[str, Any]:
     address = (
         r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or r.get("address_tr") or ""
     )
-    if not address:
-        try:
-            r2 = s.execute(text("SELECT address FROM companies WHERE id=:id"),
-                           {"id": company_id}).mappings().first()
-            if r2 and r2.get("address"):
-                address = r2.get("address")
-        except Exception:
-            pass
+
+    # ── بنك المصدّر: يُجلب من company_banks (البنك الأساسي أو الأول)
+    # يُعطى الأولوية على companies.bank_info
+    bank_info_text = ""
+    try:
+        banks = s.execute(text("""
+            SELECT bank_name, branch, beneficiary_name, iban, swift_bic, account_number
+            FROM company_banks
+            WHERE company_id = :cid
+            ORDER BY is_primary DESC, id ASC
+            LIMIT 5
+        """), {"cid": int(company_id)}).mappings().all()
+
+        if banks:
+            # البنك الأساسي (أو الأول) بتفصيل كامل للفاتورة
+            primary = banks[0]
+            lines = []
+            if primary.get("beneficiary_name"): lines.append(primary["beneficiary_name"])
+            if primary.get("bank_name"):
+                line = primary["bank_name"]
+                if primary.get("branch"): line += f" — {primary['branch']}"
+                lines.append(line)
+            if primary.get("iban"):         lines.append(f"IBAN: {primary['iban']}")
+            if primary.get("swift_bic"):    lines.append(f"SWIFT/BIC: {primary['swift_bic']}")
+            if primary.get("account_number"): lines.append(f"A/C: {primary['account_number']}")
+            bank_info_text = "\n".join(lines)
+    except Exception:
+        pass
+
+    # fallback: نص companies.bank_info إذا لا يوجد جدول company_banks
+    if not bank_info_text:
+        bank_info_text = r.get("bank_info") or ""
 
     return {
         "name": name,
@@ -75,8 +99,11 @@ def _company_obj(s, company_id, lang: str) -> Dict[str, Any]:
         "email": r.get("email"),
         "website": r.get("website"),
         "tax_id": r.get("tax_id"),
+        "tax_no":  r.get("tax_id"),
+        "vat_no":  r.get("tax_id"),
+        "cr_no":   r.get("registration_number"),
         "registration_number": r.get("registration_number"),
-        "bank_info": r.get("bank_info") or "",  # ✅ جديد
+        "bank_info": bank_info_text,
     }
 
 def _client_obj(s, client_id, lang: str) -> Dict[str, Any]:
@@ -375,9 +402,25 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         gross_words  = _spell_non_monetary(totals_gross_display,  lang, weight_unit_for_display, kind="weight")
         net_words    = _spell_non_monetary(totals_net_display,    lang, weight_unit_for_display, kind="weight")
 
+        # incoterms / ports — إن كانت الأعمدة موجودة
+        incoterms = ""
+        port_of_loading = ""
+        port_of_discharge = ""
+        try:
+            tcols = {r["name"] for r in s.execute(text("PRAGMA table_info(transactions)")).mappings().all()}
+            if "incoterms" in tcols:
+                incoterms = str(t["incoterms"] or "") if "incoterms" in (t.keys() if hasattr(t, "keys") else {}) else ""
+            if "port_of_loading" in tcols:
+                port_of_loading = str(t["port_of_loading"] or "") if "port_of_loading" in (t.keys() if hasattr(t, "keys") else {}) else ""
+            if "port_of_discharge" in tcols:
+                port_of_discharge = str(t["port_of_discharge"] or "") if "port_of_discharge" in (t.keys() if hasattr(t, "keys") else {}) else ""
+        except Exception:
+            pass
+
         ctx: Dict[str, Any] = {
             "invoice_no": _coalesce(t["transaction_no"], str(t["id"])),
             "date": t["transaction_date"],
+            "issue_date": t["transaction_date"],   # alias — التمبليت يطلبه
 
             "exporter": exporter,
             "consignee": importer,
@@ -439,9 +482,13 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             "pricing_type": (uniq_pt_names[0] if len(uniq_pt_names) == 1 else ""),
             "pricing_types_label": " & ".join(uniq_pt_names),
 
-            # 🔹 بنك
-            "bank_info": "",                     # نص يدوي (إن أُرسل من الواجهة يأخذ أولوية)
-            "include_bank_from_company": True,   # استخدم بنك الشركة إذا bank_info اليدوي فارغ
+            "incoterms": incoterms,
+            "port_of_loading": port_of_loading,
+            "port_of_discharge": port_of_discharge,
+
+            # 🔹 بنك — يأتي من exporter.bank_info (company_banks) تلقائياً
+            "bank_info": exporter.get("bank_info", ""),
+            "include_bank_from_company": True,
         }
 
         return _blankify(ctx)

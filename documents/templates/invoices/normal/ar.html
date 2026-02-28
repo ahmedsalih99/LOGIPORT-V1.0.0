@@ -40,4 +40,11 @@
 </table>
 
 <div>{{ amount_in_words }}</div>
+
+  {% if bank_info or exporter.bank_info %}
+  <div style="margin-top:16px;padding:10px;border:1px solid #ccc;border-radius:4px;">
+    <div style="font-weight:700;margin-bottom:4px;">بيانات البنك</div>
+    <div>{{ (bank_info or exporter.bank_info) | replace('\n','<br>') | safe }}</div>
+  </div>
+  {% endif %}
 {% endblock %}
