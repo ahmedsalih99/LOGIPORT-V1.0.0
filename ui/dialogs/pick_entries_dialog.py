@@ -14,17 +14,8 @@ from PySide6.QtWidgets import (
 
 try:
     from core.translator import TranslationManager
-except:
-    class _DummyT:
-        @staticmethod
-        def get_instance():
-            return _DummyT()
-
-        def translate(self, x):
-            return x
-
-
-    TranslationManager = _DummyT
+except Exception:
+    from core.translator import _DummyTranslator as TranslationManager  # type: ignore
 
 try:
     from database.crud.entries_crud import EntriesCRUD

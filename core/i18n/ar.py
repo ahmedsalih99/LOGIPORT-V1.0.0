@@ -1144,6 +1144,12 @@ translations ={
 "certificate_no_placeholder": "مثال: SY-2025-00123",
 "issuing_authority": "الجهة المُصدِرة",
 "issuing_authority_placeholder": "مثال: غرفة تجارة دمشق",
+
+"origin_country_doc": "بلد المنشأ (في المستندات)",
+"origin_country_placeholder": "مثال: تركيا",
+"dest_country_doc": "بلد الوجهة (في المستندات)",
+"dest_country_placeholder": "مثال: العراق",
+"certificate_date": "تاريخ إصدار الشهادة",
 "import_report": "تقرير الاستيراد",
 "total_rows": "إجمالي الصفوف",
 "added_success": "مضاف بنجاح",

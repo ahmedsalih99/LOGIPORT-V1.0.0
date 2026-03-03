@@ -34,22 +34,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QTabWidget
 
 
-class _NoHoverTable(QTableWidget):
-    """
-    QTableWidget لا يغير الـ current row عند hover —
-    يمنع تلوين السطر بمجرد مرور الماوس فوق cellWidget (combo/date).
-    """
-    def mouseMoveEvent(self, event):
-        # نتجاهل mouseMoveEvent تماماً → لا تغيير للـ current item عند الـ hover
-        # المستخدم يحدد السطر فقط بالنقر
-        event.ignore()
-
-    def viewportEvent(self, event):
-        from PySide6.QtCore import QEvent
-        # نمنع HoverMove من الوصول للـ viewport
-        if event.type() == QEvent.Type.HoverMove:
-            return False
-        return super().viewportEvent(event)
+from ui.widgets.custom_table import _NoHoverTable
 
 
 class ItemsTabMixin:

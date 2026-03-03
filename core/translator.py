@@ -169,3 +169,17 @@ def get_current_language() -> str:
 
 def t(key: str, fallback: Optional[str] = None) -> str:
     return translate(key, fallback)
+
+
+# ── Fallback عند عدم توفر core.translator (يُستخدم في الـ UI) ──────────────
+class _DummyTranslator:
+    """Fallback محلي عند فشل import TranslationManager."""
+    @staticmethod
+    def get_instance() -> "_DummyTranslator":
+        return _DummyTranslator()
+
+    def translate(self, x: str) -> str:
+        return x
+
+    def get_current_language(self) -> str:
+        return "ar"

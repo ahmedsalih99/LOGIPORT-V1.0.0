@@ -27,7 +27,11 @@ DOC_CODES: Dict[str, str] = {
     "packing_list.export.with_line_id": "packing_list/export/with_line_id",
 
     # ── CMR — بوليصة الشحن البري الدولية (قالب EN فقط — معيار دولي) ─────────
-    "cmr": "cmr",
+    "cmr":                "cmr",            # النسخة الأساسية (بدون لون)
+    "cmr.copy1.sender":   "cmr",            # نسخة المرسِل    — أحمر
+    "cmr.copy2.consignee":"cmr",            # نسخة المستلِم   — أزرق
+    "cmr.copy3.carrier":  "cmr",            # نسخة الناقل     — أخضر
+    "cmr.copy4.archive":  "cmr",            # نسخة الأرشيف    — أسود
 
     # ── Form A — شهادة المنشأ (GSP) ───────────────────────────────────────────
     "form_a": "form_a",
@@ -37,7 +41,13 @@ DOC_CODES: Dict[str, str] = {
 LANG_SUFFIX = {"en": "en.html", "tr": "tr.html", "ar": "ar.html"}
 
 # doc_codes التي تستخدم قالب EN واحداً بغض النظر عن اللغة المطلوبة
-_ENGLISH_ONLY_DOCS = frozenset({"cmr"})
+_ENGLISH_ONLY_DOCS = frozenset({
+    "cmr",
+    "cmr.copy1.sender",
+    "cmr.copy2.consignee",
+    "cmr.copy3.carrier",
+    "cmr.copy4.archive",
+})
 
 
 @dataclass(frozen=True)
@@ -62,6 +72,18 @@ def resolve_template(doc_code: str, lang: str) -> TemplateSpec:
 
     # ── CMR وأي مستند English-only: دائماً en.html ────────────────────────────
     if doc_code in _ENGLISH_ONLY_DOCS:
+        # اختر الـ template حسب النسخة
+        _CMR_COPY_FILES = {
+            "cmr.copy1.sender":    "copy1_sender.html",
+            "cmr.copy2.consignee": "copy2_consignee.html",
+            "cmr.copy3.carrier":   "copy3_carrier.html",
+            "cmr.copy4.archive":   "copy4_archive.html",
+        }
+        template_file = _CMR_COPY_FILES.get(doc_code, "en.html")
+        path = TEMPLATES_DIR / rel_folder / template_file
+        if path.exists():
+            return TemplateSpec(doc_code, lang, path, None)
+        # fallback للـ en.html لو الملف غير موجود
         path = TEMPLATES_DIR / rel_folder / "en.html"
         if path.exists():
             return TemplateSpec(doc_code, lang, path, None)

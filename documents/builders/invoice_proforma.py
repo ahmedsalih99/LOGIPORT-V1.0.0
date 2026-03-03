@@ -3,169 +3,25 @@ from __future__ import annotations
 from typing import Dict, Any, List
 from sqlalchemy import text
 from database.models import get_session_local
-
-# ======================== helpers (مطابقة للمتوفر لديك) ========================
-
-def _blankify(v):
-    from collections.abc import Mapping, Sequence
-    if v is None:
-        return ""
-    if isinstance(v, str):
-        return v.strip()
-    if isinstance(v, Mapping):
-        return {k: _blankify(val) for k, val in v.items()}
-    if isinstance(v, Sequence) and not isinstance(v, (str, bytes, bytearray)):
-        return [_blankify(x) for x in v]
-    return v
-
-def _coalesce(*vals):
-    for v in vals:
-        if v not in (None, ""):
-            return v
-    return ""
-
-def _country_name(s, country_id, lang: str) -> str:
-    if not country_id:
-        return ""
-    r = s.execute(
-        text("SELECT name_ar, name_en, name_tr FROM countries WHERE id=:i"),
-        {"i": country_id}
-    ).mappings().first()
-    if not r:
-        return ""
-    return r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or r.get("name_tr") or ""
-
-def _company_obj(s, company_id, lang: str) -> Dict[str, Any]:
-    if not company_id:
-        return {"name": "", "address": ""}
-
-    r = s.execute(text("""
-        SELECT id,
-               name_ar, name_en, name_tr,
-               address_ar, address_en, address_tr,
-               country_id, city, phone, email, website, tax_id, registration_number,
-               bank_info
-        FROM companies WHERE id=:id
-    """), {"id": company_id}).mappings().first()
-    if not r:
-        return {"name": "", "address": ""}
-
-    name = r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or r.get("name_tr") or ""
-    address = (
-        r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or r.get("address_tr") or ""
-    )
-    if not address:
-        try:
-            r2 = s.execute(text("SELECT address FROM companies WHERE id=:id"),
-                           {"id": company_id}).mappings().first()
-            if r2 and r2.get("address"):
-                address = r2.get("address")
-        except Exception:
-            pass
-
-    return {
-        "name": name,
-        "address": address,
-        "city": r.get("city"),
-        "country": _country_name(s, r.get("country_id"), lang),
-        "phone": r.get("phone"),
-        "email": r.get("email"),
-        "website": r.get("website"),
-        "tax_id": r.get("tax_id"),
-        "registration_number": r.get("registration_number"),
-        "bank_info": r.get("bank_info") or "",
-    }
-
-def _client_obj(s, client_id, lang: str) -> Dict[str, Any]:
-    if not client_id:
-        return {"name": "", "address": ""}
-    r = s.execute(text("""
-        SELECT id,
-               name_ar, name_en, name_tr,
-               COALESCE(address_ar, address) AS address_ar,
-               COALESCE(address_en, address) AS address_en,
-               COALESCE(address_tr, address) AS address_tr,
-               country_id, city, phone, email, website, tax_id
-        FROM clients WHERE id=:id
-    """), {"id": client_id}).mappings().first()
-    if not r:
-        return {"name": "", "address": ""}
-
-    name = r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or r.get("name_tr") or ""
-    address = (
-        r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or r.get("address_tr") or ""
-    )
-    return {
-        "name": name,
-        "address": address,
-        "city": r.get("city"),
-        "country": _country_name(s, r.get("country_id"), lang),
-        "phone": r.get("phone"),
-        "email": r.get("email"),
-        "website": r.get("website"),
-        "tax_id": r.get("tax_id"),
-    }
-
-def _tafqit_amount(total_value: float, currency_code: str, lang: str) -> str:
-    try:
-        from services.tafqit_service import tafqit
-        return tafqit(total_value or 0.0, currency_code or "", (lang or "en").lower())
-    except Exception:
-        try:
-            from services.tafqit_service import TafqitService
-            return TafqitService().amount_in_words(total_value or 0.0, currency_code or "", (lang or "en").lower())
-        except Exception:
-            return ""
-
-def _num_words(n: float, lang: str) -> str:
-    n_int = int(round(float(n or 0)))
-    try:
-        if (lang or "en").lower() == "ar":
-            from services.tafqit_service import number_to_words_ar
-            return number_to_words_ar(n_int)
-        if (lang or "en").lower() == "tr":
-            from services.tafqit_service import number_to_words_tr
-            return number_to_words_tr(n_int)
-        from services.tafqit_service import number_to_words_en
-        return number_to_words_en(n_int)
-    except Exception:
-        return str(n_int)
-
-def _unit_word(unit_label: str | None, lang: str, *, kind: str = "qty") -> str:
-    u = (unit_label or "").strip().upper()
-    if (lang or "en").lower() == "ar":
-        if kind == "weight":
-            return "كيلوغرام" if u in ("", "KG", "KILOGRAM") else ("طن" if u in ("T", "TON", "TONS") else unit_label or "كيلوغرام")
-        return "وحدة" if not u else unit_label or "وحدة"
-    if (lang or "en").lower() == "tr":
-        if kind == "weight":
-            return "kilogram" if u in ("", "KG", "KILOGRAM") else ("ton" if u in ("T", "TON", "TONS") else unit_label or "kilogram")
-        return "birim" if not u else unit_label or "birim"
-    if kind == "weight":
-        return "kilograms" if u in ("", "KG", "KILOGRAM") else ("tons" if u in ("T", "TON", "TONS") else (unit_label or "kilograms"))
-    return "units" if not u else (unit_label or "units")
-
-def _spell_non_monetary(n: float, lang: str, unit_label: str | None, *, kind: str = "qty") -> str:
-    w = _num_words(n, lang)
-    uw = _unit_word(unit_label, lang, kind=kind)
-    return f"{w} {uw}".strip()
-
-def _dedup_preserve_order(seq: List[str]) -> List[str]:
-    seen = set()
-    out: List[str] = []
-    for v in seq:
-        k = (v or "").strip()
-        if not k or k in seen:
-            continue
-        seen.add(k)
-        out.append(k)
-    return out
-
-# يختار اسم عمود بلد الوجهة حسب المخطط الفعلي
-def _pick_dest_col(session) -> str:
-    rows = session.execute(text("PRAGMA table_info(transactions)")).mappings().all()
-    cols = {r["name"] for r in rows}
-    return "destination_country_id" if "destination_country_id" in cols else "dest_country_id"
+from documents.builders._shared import (
+    blankify, coalesce, dedup_preserve_order, join_with_and,
+    country_name   as _country_name,
+    company_obj    as _company_obj,
+    client_obj     as _client_obj,
+    get_bank_info,
+    tafqit_amount  as _tafqit_amount,
+    num_words      as _num_words,
+    unit_word      as _unit_word,
+    spell_non_monetary as _spell_non_monetary,
+    label_from_pricing_code,
+    compute_line_amount,
+    currency_info  as _currency_info,
+    delivery_method_name,
+    pick_dest_col  as _pick_dest_col,
+)
+_blankify  = blankify
+_coalesce  = coalesce
+_dedup_preserve_order = dedup_preserve_order
 
 # ======================== builder ========================
 # ابحث عن أول عمود موجود وقيمته غير NULL من بين مرشحين (ضمن جدول transactions)

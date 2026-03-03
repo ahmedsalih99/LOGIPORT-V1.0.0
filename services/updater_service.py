@@ -151,11 +151,12 @@ class UpdaterService(metaclass=SingletonMeta):
     def _fetch_latest(self) -> Optional[UpdateInfo]:
         """يتحقق من GitHub API."""
         import urllib.request
+        import urllib.error
         import json
 
         repo = _github_repo()
-        if not repo or repo == "YOUR_GITHUB_USERNAME/LOGIPORT":
-            logger.warning("GitHub repo not configured in version.py")
+        if not repo or repo in ("YOUR_GITHUB_USERNAME/LOGIPORT", ""):
+            logger.debug("GitHub repo not configured — update check skipped")
             return None
 
         url = f"https://api.github.com/repos/{repo}/releases/latest"
@@ -164,8 +165,15 @@ class UpdaterService(metaclass=SingletonMeta):
             headers={"User-Agent": f"LOGIPORT/{_current_version()}"}
         )
 
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                # الـ repo موجود لكن ما فيه releases بعد — هذا طبيعي
+                logger.debug(f"No releases found for {repo} (HTTP 404) — update check skipped")
+                return None
+            raise  # أي خطأ آخر نتركه يرتفع للـ _check_worker
 
         tag = data.get("tag_name", "").lstrip("v")
         notes = data.get("body", "")

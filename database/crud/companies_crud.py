@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, Iterable, List
 
 from database.models import get_session_local
-from database.crud.base_crud_v5 import BaseCRUD_V5 as BaseCRUD
+from database.crud.base_crud import BaseCRUD
 from database.models.company import Company, CompanyRoleLink
 
 

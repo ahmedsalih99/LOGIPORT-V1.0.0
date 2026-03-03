@@ -1,152 +1,166 @@
+"""
+database/bootstrap.py — LOGIPORT
+==================================
+نقطة التهيئة الوحيدة لقاعدة البيانات. بدون Alembic.
+
+  DB جديدة:
+    create_all()     → ينشئ كل الجداول مباشرة من SQLAlchemy Models
+    _seed_all()      → يُدرج البيانات الأساسية
+
+  DB موجودة:
+    _sync_columns()  → يفحص كل عمود في الـ Models مقابل الـ DB
+                       ويضيف الأعمدة الناقصة تلقائياً (ALTER TABLE)
+    _seed_all()      → يُحدّث البيانات الأساسية
+
+لإضافة عمود جديد في المستقبل:
+  1. أضفه في الـ Model فقط
+  2. شغّل التطبيق — يُضاف تلقائياً بدون أي migration
+"""
 from __future__ import annotations
 
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional
-from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# نفس بيانات scripts/seed_data.py — مصدر واحد للحقيقة
+# البيانات الأساسية (Seed Data)
 # =============================================================================
 
 _ROLES = [
-    (1, "Admin",       "Super Admin",          "مدير",          "Admin",           "Yönetici"),
-    (3, "Manager",     None,                   "مدير قسم",      "Manager",         "Müdür"),
-    (4, "User",        None,                   "مستخدم",        "User",            "Kullanıcı"),
-    (5, "Accountant",  "إدارة العمليات المالية","محاسب",          "Accountant",      "Muhasebeci"),
-    (6, "Operator",    "صلاحيات تنفيذية",      "موظف تشغيل",    "Operator",        "Operatör"),
-    (7, "Viewer",      "عرض البيانات فقط",     "مشاهد فقط",     "Viewer",          "Sadece Görüntüleyici"),
-    (8, "Client",      "مستخدم خارجي",         "عميل",          "Client",          "Müşteri"),
-    (9, "Customs",     "إجراءات جمركية",       "موظف جمركي",    "Customs Officer", "Gümrük Görevlisi"),
+    (1, "Admin",       "Super Admin",           "مدير",          "Admin",           "Yönetici"),
+    (3, "Manager",     None,                    "مدير قسم",      "Manager",         "Müdür"),
+    (4, "User",        None,                    "مستخدم",        "User",            "Kullanıcı"),
+    (5, "Accountant",  "إدارة العمليات المالية", "محاسب",          "Accountant",      "Muhasebeci"),
+    (6, "Operator",    "صلاحيات تنفيذية",       "موظف تشغيل",    "Operator",        "Operatör"),
+    (7, "Viewer",      "عرض البيانات فقط",      "مشاهد فقط",     "Viewer",          "Sadece Görüntüleyici"),
+    (8, "Client",      "مستخدم خارجي",          "عميل",          "Client",          "Müşteri"),
+    (9, "Customs",     "إجراءات جمركية",        "موظف جمركي",    "Customs Officer", "Gümrük Görevlisi"),
 ]
 
 _PERMISSIONS = [
-    (1,  "view_dashboard",        "Allows access to dashboard",   "عرض لوحة التحكم",   "View Dashboard",     "Kontrol Panelini Görüntüle", "DASHBOARD"),
-    (2,  "add_user",              "Add new user",                 "إضافة مستخدم",      "Add User",           "Kullanıcı Ekle",             "USERS"),
-    (3,  "view_users",            "View users list",              "عرض المستخدمين",    "View Users",         "Kullanıcıları Görüntüle",    "USERS"),
-    (4,  "edit_user",             "Edit user",                    "تعديل مستخدم",      "Edit User",          "Kullanıcıyı Düzenle",        "USERS"),
-    (5,  "delete_user",           "Delete user",                  "حذف مستخدم",        "Delete User",        "Kullanıcıyı Sil",            "USERS"),
-    (6,  "view_roles",            "View roles",                   "عرض الأدوار",       "View Roles",         "Rolleri Görüntüle",          "USERS"),
-    (7,  "add_role",              "Add role",                     "إضافة دور",         "Add Role",           "Rol Ekle",                   "USERS"),
-    (8,  "edit_role",             "Edit role",                    "تعديل دور",         "Edit Role",          "Rol Düzenle",                "USERS"),
-    (9,  "delete_role",           "Delete role",                  "حذف دور",           "Delete Role",        "Rol Sil",                    "USERS"),
-    (10, "view_permissions",      "View permissions",             "عرض الصلاحيات",     "View Permissions",   "Yetkileri Görüntüle",        "USERS"),
-    (11, "add_permission",        "Add permission",               "إضافة صلاحية",      "Add Permission",     "Yetki Ekle",                 "USERS"),
-    (12, "edit_permission",       "Edit permission",              "تعديل صلاحية",      "Edit Permission",    "Yetki Düzenle",              "USERS"),
-    (13, "delete_permission",     "Delete permission",            "حذف صلاحية",        "Delete Permission",  "Yetki Sil",                  "USERS"),
-    (14, "view_audit_log",        "View audit log",               "عرض سجل العمليات",  "View Audit Log",     "Kayıt Günlüğünü Görüntüle",  "AUDIT"),
-    (15, "manage_settings",       "Manage settings",              "إدارة الإعدادات",   "Manage Settings",    "Ayarları Yönet",             "SETTINGS"),
-    (16, "view_materials",        "View materials",               "عرض المواد",        "View Materials",     "Malzemeleri Görüntüle",      "MATERIALS"),
-    (17, "add_material",          "Add material",                 "إضافة مادة",        "Add Material",       "Malzeme Ekle",               "MATERIALS"),
-    (18, "edit_material",         "Edit material",                "تعديل مادة",        "Edit Material",      "Malzeme Düzenle",            "MATERIALS"),
-    (19, "delete_material",       "Delete material",              "حذف مادة",          "Delete Material",    "Malzeme Sil",                "MATERIALS"),
-    (20, "view_clients",          "View clients",                 "عرض العملاء",       "View Clients",       "Müşterileri Görüntüle",      "CLIENTS"),
-    (21, "view_companies",        "View companies",               "عرض الشركات",       "View Companies",     "Şirketleri Görüntüle",       "COMPANIES"),
-    (22, "view_countries",        "View countries",               "عرض الدول",         "View Countries",     "Ülkeleri Görüntüle",         "VALUES"),
-    (23, "view_pricing",          "View pricing",                 "عرض التسعير",       "View Pricing",       "Fiyatlandırmayı Görüntüle",  "PRICING"),
-    (24, "view_entries",          "View entries",                 "عرض الإدخالات",     "View Entries",       "Girişleri Görüntüle",        "ENTRIES"),
-    (25, "view_transactions",     "View transactions",            "عرض المعاملات",     "View Transactions",  "İşlemleri Görüntüle",        "TRANSACTIONS"),
-    (26, "view_documents",        "View documents",               "عرض المستندات",     "View Documents",     "Belgeleri Görüntüle",        "DOCUMENTS"),
-    (27, "view_values",           "View values",                  "عرض القيم",         "View Values",        "Değerleri Görüntüle",        "VALUES"),
-    (28, "view_users_roles",      "View users and roles",         "عرض المستخدمين والأدوار", "View Users & Roles", "Kullanıcıları ve Rolleri Görüntüle", "USERS"),
-    (29, "view_audit_trail",      "View audit trail",             "عرض سجل التدقيق",   "View Audit Trail",   "Denetim İzini Görüntüle",    "AUDIT"),
-    (30, "view_control_panel",    "View control panel",           "عرض لوحة الإدارة",  "View Control Panel", "Kontrol Panelini Görüntüle", "ADMIN"),
-    (31, "add_country",           None,                           "إضافة دولة",        "Add Country",        "Ülke Ekle",                  "VALUES"),
-    (32, "edit_country",          None,                           "تعديل دولة",        "Edit Country",       "Ülkeyi Düzenle",             "VALUES"),
-    (33, "delete_country",        None,                           "حذف دولة",          "Delete Country",     "Ülkeyi Sil",                 "VALUES"),
-    (34, "add_packaging_type",    None,                           "إضافة نوع تعبئة",   "Add Packaging Type", "Paketleme Türü Ekle",        "VALUES"),
-    (35, "edit_packaging_type",   None,                           "تعديل نوع تعبئة",   "Edit Packaging Type","Paketleme Türünü Düzenle",   "VALUES"),
-    (36, "delete_packaging_type", None,                           "حذف نوع تعبئة",     "Delete Packaging Type","Paketleme Türünü Sil",    "VALUES"),
-    (37, "add_delivery_method",   None,                           "إضافة طريقة توصيل", "Add Delivery Method","Teslimat Yöntemi Ekle",      "VALUES"),
-    (38, "edit_delivery_method",  None,                           "تعديل طريقة توصيل", "Edit Delivery Method","Teslimat Yöntemini Düzenle", "VALUES"),
-    (39, "delete_delivery_method",None,                           "حذف طريقة توصيل",   "Delete Delivery Method","Teslimat Yöntemini Sil",  "VALUES"),
-    (40, "add_currency",          None,                           "إضافة عملة",        "Add Currency",       "Para Birimi Ekle",           "VALUES"),
-    (41, "edit_currency",         None,                           "تعديل عملة",        "Edit Currency",      "Para Birimini Düzenle",      "VALUES"),
-    (42, "delete_currency",       None,                           "حذف عملة",          "Delete Currency",    "Para Birimini Sil",          "VALUES"),
-    (43, "add_material_type",     None,                           "إضافة نوع مادة",    "Add Material Type",  "Malzeme Türü Ekle",          "MATERIALS"),
-    (44, "edit_material_type",    None,                           "تعديل نوع مادة",    "Edit Material Type", "Malzeme Türünü Düzenle",     "MATERIALS"),
-    (45, "delete_material_type",  None,                           "حذف نوع مادة",      "Delete Material Type","Malzeme Türünü Sil",        "MATERIALS"),
-    (46, "view_packaging_types",  None,                           "عرض أنواع التغليف", "View Packaging Types","Ambalaj Türlerini Görüntüle","VALUES"),
-    (47, "view_delivery_methods", None,                           "عرض طرق التسليم",   "View Delivery Methods","Teslimat Yöntemlerini Görüntüle","VALUES"),
-    (48, "view_material_types",   None,                           "عرض أنواع المواد",  "View Material Types","Malzeme Türlerini Görüntüle", "MATERIALS"),
-    (49, "view_currencies",       None,                           "عرض العملات",       "View Currencies",    "Para Birimlerini Görüntüle", "VALUES"),
-    (50, "add_entry",             "Create new entry",             "إضافة إدخال",       "Add Entry",          "Giriş Ekle",                 "ENTRIES"),
-    (51, "edit_entry",            "Edit existing entry",          "تعديل إدخال",       "Edit Entry",         "Girişi Düzenle",             "ENTRIES"),
-    (52, "delete_entry",          "Delete entry",                 "حذف إدخال",         "Delete Entry",       "Girişi Sil",                 "ENTRIES"),
-    (53, "add_client",            "Add new client",               "إضافة عميل",        "Add Client",         "Müşteri Ekle",               "CLIENTS"),
-    (54, "edit_client",           "Edit client",                  "تعديل عميل",        "Edit Client",        "Müşteriyi Düzenle",          "CLIENTS"),
-    (55, "delete_client",         "Delete client",                "حذف عميل",          "Delete Client",      "Müşteriyi Sil",              "CLIENTS"),
-    (56, "add_company",           "Add new company",              "إضافة شركة",        "Add Company",        "Şirket Ekle",                "COMPANIES"),
-    (57, "edit_company",          "Edit company",                 "تعديل شركة",        "Edit Company",       "Şirketi Düzenle",            "COMPANIES"),
-    (58, "delete_company",        "Delete company",               "حذف شركة",          "Delete Company",     "Şirketi Sil",                "COMPANIES"),
-    (59, "add_pricing",           "Add pricing record",           "إضافة تسعيرة",      "Add Pricing",        "Fiyatlandırma Ekle",         "PRICING"),
-    (60, "edit_pricing",          "Edit pricing record",          "تعديل تسعيرة",      "Edit Pricing",       "Fiyatlandırmayı Düzenle",    "PRICING"),
-    (61, "delete_pricing",        "Delete pricing record",        "حذف تسعيرة",        "Delete Pricing",     "Fiyatlandırmayı Sil",        "PRICING"),
-    (62, "add_transaction",       "Create new transaction",       "إضافة معاملة",      "Add Transaction",    "İşlem Ekle",                 "TRANSACTIONS"),
-    (63, "edit_transaction",      "Edit transaction",             "تعديل معاملة",      "Edit Transaction",   "İşlemi Düzenle",             "TRANSACTIONS"),
-    (64, "delete_transaction",    "Delete transaction",           "حذف معاملة",        "Delete Transaction", "İşlemi Sil",                 "TRANSACTIONS"),
-    (65, "close_transaction",     "Close/archive transaction",    "إغلاق معاملة",      "Close Transaction",  "İşlemi Kapat",               "TRANSACTIONS"),
+    (1,  "view_dashboard",         "Allows access to dashboard",    "عرض لوحة التحكم",        "View Dashboard",       "Kontrol Panelini Görüntüle",              "DASHBOARD"),
+    (2,  "add_user",               "Add new user",                  "إضافة مستخدم",           "Add User",             "Kullanıcı Ekle",                          "USERS"),
+    (3,  "view_users",             "View users list",               "عرض المستخدمين",         "View Users",           "Kullanıcıları Görüntüle",                 "USERS"),
+    (4,  "edit_user",              "Edit user",                     "تعديل مستخدم",           "Edit User",            "Kullanıcıyı Düzenle",                     "USERS"),
+    (5,  "delete_user",            "Delete user",                   "حذف مستخدم",             "Delete User",          "Kullanıcıyı Sil",                         "USERS"),
+    (6,  "view_roles",             "View roles",                    "عرض الأدوار",            "View Roles",           "Rolleri Görüntüle",                       "USERS"),
+    (7,  "add_role",               "Add role",                      "إضافة دور",              "Add Role",             "Rol Ekle",                                "USERS"),
+    (8,  "edit_role",              "Edit role",                     "تعديل دور",              "Edit Role",            "Rol Düzenle",                             "USERS"),
+    (9,  "delete_role",            "Delete role",                   "حذف دور",                "Delete Role",          "Rol Sil",                                 "USERS"),
+    (10, "view_permissions",       "View permissions",              "عرض الصلاحيات",          "View Permissions",     "Yetkileri Görüntüle",                     "USERS"),
+    (11, "add_permission",         "Add permission",                "إضافة صلاحية",           "Add Permission",       "Yetki Ekle",                              "USERS"),
+    (12, "edit_permission",        "Edit permission",               "تعديل صلاحية",           "Edit Permission",      "Yetki Düzenle",                           "USERS"),
+    (13, "delete_permission",      "Delete permission",             "حذف صلاحية",             "Delete Permission",    "Yetki Sil",                               "USERS"),
+    (14, "view_audit_log",         "View audit log",                "عرض سجل العمليات",       "View Audit Log",       "Kayıt Günlüğünü Görüntüle",               "AUDIT"),
+    (15, "manage_settings",        "Manage settings",               "إدارة الإعدادات",        "Manage Settings",      "Ayarları Yönet",                          "SETTINGS"),
+    (16, "view_materials",         "View materials",                "عرض المواد",             "View Materials",       "Malzemeleri Görüntüle",                   "MATERIALS"),
+    (17, "add_material",           "Add material",                  "إضافة مادة",             "Add Material",         "Malzeme Ekle",                            "MATERIALS"),
+    (18, "edit_material",          "Edit material",                 "تعديل مادة",             "Edit Material",        "Malzeme Düzenle",                         "MATERIALS"),
+    (19, "delete_material",        "Delete material",               "حذف مادة",               "Delete Material",      "Malzeme Sil",                             "MATERIALS"),
+    (20, "view_clients",           "View clients",                  "عرض العملاء",            "View Clients",         "Müşterileri Görüntüle",                   "CLIENTS"),
+    (21, "view_companies",         "View companies",                "عرض الشركات",            "View Companies",       "Şirketleri Görüntüle",                    "COMPANIES"),
+    (22, "view_countries",         "View countries",                "عرض الدول",              "View Countries",       "Ülkeleri Görüntüle",                      "VALUES"),
+    (23, "view_pricing",           "View pricing",                  "عرض التسعير",            "View Pricing",         "Fiyatlandırmayı Görüntüle",               "PRICING"),
+    (24, "view_entries",           "View entries",                  "عرض الإدخالات",          "View Entries",         "Girişleri Görüntüle",                     "ENTRIES"),
+    (25, "view_transactions",      "View transactions",             "عرض المعاملات",          "View Transactions",    "İşlemleri Görüntüle",                     "TRANSACTIONS"),
+    (26, "view_documents",         "View documents",                "عرض المستندات",          "View Documents",       "Belgeleri Görüntüle",                     "DOCUMENTS"),
+    (27, "view_values",            "View values",                   "عرض القيم",              "View Values",          "Değerleri Görüntüle",                     "VALUES"),
+    (28, "view_users_roles",       "View users and roles",          "عرض المستخدمين والأدوار","View Users & Roles",   "Kullanıcıları ve Rolleri Görüntüle",      "USERS"),
+    (29, "view_audit_trail",       "View audit trail",              "عرض سجل التدقيق",        "View Audit Trail",     "Denetim İzini Görüntüle",                 "AUDIT"),
+    (30, "view_control_panel",     "View control panel",            "عرض لوحة الإدارة",       "View Control Panel",   "Kontrol Panelini Görüntüle",              "ADMIN"),
+    (31, "add_country",            None,                            "إضافة دولة",             "Add Country",          "Ülke Ekle",                               "VALUES"),
+    (32, "edit_country",           None,                            "تعديل دولة",             "Edit Country",         "Ülkeyi Düzenle",                          "VALUES"),
+    (33, "delete_country",         None,                            "حذف دولة",               "Delete Country",       "Ülkeyi Sil",                              "VALUES"),
+    (34, "add_packaging_type",     None,                            "إضافة نوع تعبئة",        "Add Packaging Type",   "Paketleme Türü Ekle",                     "VALUES"),
+    (35, "edit_packaging_type",    None,                            "تعديل نوع تعبئة",        "Edit Packaging Type",  "Paketleme Türünü Düzenle",                "VALUES"),
+    (36, "delete_packaging_type",  None,                            "حذف نوع تعبئة",          "Delete Packaging Type","Paketleme Türünü Sil",                    "VALUES"),
+    (37, "add_delivery_method",    None,                            "إضافة طريقة توصيل",      "Add Delivery Method",  "Teslimat Yöntemi Ekle",                   "VALUES"),
+    (38, "edit_delivery_method",   None,                            "تعديل طريقة توصيل",      "Edit Delivery Method", "Teslimat Yöntemini Düzenle",               "VALUES"),
+    (39, "delete_delivery_method", None,                            "حذف طريقة توصيل",        "Delete Delivery Method","Teslimat Yöntemini Sil",                 "VALUES"),
+    (40, "add_currency",           None,                            "إضافة عملة",             "Add Currency",         "Para Birimi Ekle",                        "VALUES"),
+    (41, "edit_currency",          None,                            "تعديل عملة",             "Edit Currency",        "Para Birimini Düzenle",                   "VALUES"),
+    (42, "delete_currency",        None,                            "حذف عملة",               "Delete Currency",      "Para Birimini Sil",                       "VALUES"),
+    (43, "add_material_type",      None,                            "إضافة نوع مادة",         "Add Material Type",    "Malzeme Türü Ekle",                       "MATERIALS"),
+    (44, "edit_material_type",     None,                            "تعديل نوع مادة",         "Edit Material Type",   "Malzeme Türünü Düzenle",                  "MATERIALS"),
+    (45, "delete_material_type",   None,                            "حذف نوع مادة",           "Delete Material Type", "Malzeme Türünü Sil",                      "MATERIALS"),
+    (46, "view_packaging_types",   None,                            "عرض أنواع التغليف",      "View Packaging Types", "Ambalaj Türlerini Görüntüle",             "VALUES"),
+    (47, "view_delivery_methods",  None,                            "عرض طرق التسليم",        "View Delivery Methods","Teslimat Yöntemlerini Görüntüle",         "VALUES"),
+    (48, "view_material_types",    None,                            "عرض أنواع المواد",       "View Material Types",  "Malzeme Türlerini Görüntüle",             "MATERIALS"),
+    (49, "view_currencies",        None,                            "عرض العملات",            "View Currencies",      "Para Birimlerini Görüntüle",              "VALUES"),
+    (50, "add_entry",              "Create new entry",              "إضافة إدخال",            "Add Entry",            "Giriş Ekle",                              "ENTRIES"),
+    (51, "edit_entry",             "Edit existing entry",           "تعديل إدخال",            "Edit Entry",           "Girişi Düzenle",                          "ENTRIES"),
+    (52, "delete_entry",           "Delete entry",                  "حذف إدخال",              "Delete Entry",         "Girişi Sil",                              "ENTRIES"),
+    (53, "add_client",             "Add new client",                "إضافة عميل",             "Add Client",           "Müşteri Ekle",                            "CLIENTS"),
+    (54, "edit_client",            "Edit client",                   "تعديل عميل",             "Edit Client",          "Müşteriyi Düzenle",                       "CLIENTS"),
+    (55, "delete_client",          "Delete client",                 "حذف عميل",               "Delete Client",        "Müşteriyi Sil",                           "CLIENTS"),
+    (56, "add_company",            "Add new company",               "إضافة شركة",             "Add Company",          "Şirket Ekle",                             "COMPANIES"),
+    (57, "edit_company",           "Edit company",                  "تعديل شركة",             "Edit Company",         "Şirketi Düzenle",                         "COMPANIES"),
+    (58, "delete_company",         "Delete company",                "حذف شركة",               "Delete Company",       "Şirketi Sil",                             "COMPANIES"),
+    (59, "add_pricing",            "Add pricing record",            "إضافة تسعيرة",           "Add Pricing",          "Fiyatlandırma Ekle",                      "PRICING"),
+    (60, "edit_pricing",           "Edit pricing record",           "تعديل تسعيرة",           "Edit Pricing",         "Fiyatlandırmayı Düzenle",                 "PRICING"),
+    (61, "delete_pricing",         "Delete pricing record",         "حذف تسعيرة",             "Delete Pricing",       "Fiyatlandırmayı Sil",                     "PRICING"),
+    (62, "add_transaction",        "Create new transaction",        "إضافة معاملة",           "Add Transaction",      "İşlem Ekle",                              "TRANSACTIONS"),
+    (63, "edit_transaction",       "Edit transaction",              "تعديل معاملة",           "Edit Transaction",     "İşlemi Düzenle",                          "TRANSACTIONS"),
+    (64, "delete_transaction",     "Delete transaction",            "حذف معاملة",             "Delete Transaction",   "İşlemi Sil",                              "TRANSACTIONS"),
+    (65, "close_transaction",      "Close/archive transaction",     "إغلاق معاملة",           "Close Transaction",    "İşlemi Kapat",                            "TRANSACTIONS"),
 ]
 
 _ROLE_PERMISSIONS = {
-    1: list(range(1, 66)),  # Admin → كل الصلاحيات (1-65)
-    3: [  # Manager
+    1: list(range(1, 66)),
+    3: [
         1,2,3,4,6,7,8,10,11,12,14,
-        16,17,18,19,          # materials
-        20,53,54,55,          # clients (view+add+edit+delete)
-        21,56,57,             # companies (view+add+edit) بدون delete
-        22,27,                # countries + values
-        23,59,60,             # pricing (view+add+edit) بدون delete
-        24,50,51,52,          # entries full
-        25,62,63,             # transactions (view+add+edit) بدون delete/close
-        31,32,33,             # countries crud
-        34,35,36,             # packaging types crud
-        37,38,39,             # delivery methods crud
-        40,41,42,             # currencies crud
-        43,44,45,             # material types crud
-        46,47,48,49,          # view lookups
+        16,17,18,19,
+        20,53,54,55,
+        21,56,57,
+        22,27,
+        23,59,60,
+        24,50,51,52,
+        25,62,63,
+        31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,
     ],
-    4: [16, 25, 49],         # User: view materials/transactions/currencies
-    5: [1, 3, 6, 10, 14, 16],# Accountant
-    6: [1, 16, 17, 18],      # Operator: view+add+edit materials
-    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49],  # Viewer
-    8: [1, 16],              # Client
-    9: [],                   # Customs
+    4: [16, 25, 49],
+    5: [1, 3, 6, 10, 14, 16],
+    6: [1, 16, 17, 18],
+    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49],
+    8: [1, 16],
+    9: [],
 }
 
 _COMPANY_ROLES = [
-    (1,  "supplier",       "مورد",        "Supplier",      "Tedarikçi",  1, 10),
-    (2,  "manufacturer",   "مصنّع",        "Manufacturer",  "Üretici",    1, 20),
-    (9,  "exporter",       "مصدّر",        "Exporter",      "İhracatçı",  1, 20),
-    (3,  "carrier",        "شركة نقل",    "Carrier",       "Taşıyıcı",   1, 30),
-    (10, "importer",       "مستورد",      "Importer",      "İthalatçı",  1, 30),
-    (4,  "forwarder",      "فورواردَر",    "Forwarder",     "Spedisyon",  1, 40),
-    (11, "trader",         "تاجر",        "Trader",        "Tüccar",     1, 40),
-    (5,  "customs_broker", "مخلّص جمركي", "Customs Broker","Gümrük",     1, 50),
-    (6,  "warehouse",      "مستودع",      "Warehouse",     "Depo",       1, 60),
-    (7,  "other",          "أخرى",        "Other",         "Diğer",      1, 100),
+    (1,  "supplier",       "مورد",        "Supplier",      "Tedarikçi", 1, 10),
+    (2,  "manufacturer",   "مصنّع",        "Manufacturer",  "Üretici",   1, 20),
+    (9,  "exporter",       "مصدّر",        "Exporter",      "İhracatçı", 1, 20),
+    (3,  "carrier",        "شركة نقل",    "Carrier",       "Taşıyıcı",  1, 30),
+    (10, "importer",       "مستورد",      "Importer",      "İthalatçı", 1, 30),
+    (4,  "forwarder",      "فورواردَر",    "Forwarder",     "Spedisyon", 1, 40),
+    (11, "trader",         "تاجر",        "Trader",        "Tüccar",    1, 40),
+    (5,  "customs_broker", "مخلّص جمركي", "Customs Broker","Gümrük",    1, 50),
+    (6,  "warehouse",      "مستودع",      "Warehouse",     "Depo",      1, 60),
+    (7,  "other",          "أخرى",        "Other",         "Diğer",     1, 100),
 ]
 
 _DOCUMENT_TYPES = [
-    (1,  "INV_EXT",              "فاتورة خارجية",              "External Invoice",         "Dış Fatura",                 1, None,              None,                                  0),
-    (2,  "INV_SY",               "فاتورة سورية",               "Syrian Invoice",            "Suriye Faturası",            1, None,              None,                                  0),
-    (3,  "INV_INDIRECT",         "فاتورة بالواسطة",             "Intermediary Invoice",      "Aracı Fatura",               1, None,              None,                                  0),
-    (4,  "PACKING",              "قائمة تعبئة",                "Packing List",              "Çeki Listesi",               1, None,              None,                                  0),
-    (10, "invoice.syrian.entry", "فاتورة سورية إدخال",          "Syrian Entry Invoice",      "Suriye Giriş Faturası",      1, "invoice.syrian",  "invoices/syrian/entry",               0),
-    (11, "INV_SYR_TRANS",        "فاتورة سورية – عبور",         "Syrian Invoice – Transit",  "Suriye Faturası – Transit",  1, "invoice.syrian.transit",       "invoices/syrian/transit",     5),
-    (12, "INV_SYR_INTERM",       "فاتورة سورية – وسيط",        "Syrian Invoice – Intermediary","Suriye Faturası – Aracı",  1, "invoice.syrian.intermediary",  "invoices/syrian/intermediary",6),
-    (20, "INV_SYR_ENTRY",        "فاتورة سورية – إدخال",       "Syrian Invoice – Entry",    "Suriye Faturası – Giriş",    1, "invoice.syrian.entry",         "invoices/syrian/entry",       4),
-    (13, "PL_EXPORT_SIMPLE",     "قائمة تعبئة – بدون تواريخ", "Packing List – Simple",     "Ambalaj Listesi – Basit",    1, None,              None,                                  0),
-    (14, "PL_EXPORT_WITH_DATES", "قائمة تعبئة – مع تواريخ",   "Packing List – With Dates", "Ambalaj Listesi – Tarihli",  1, None,              None,                                  0),
-    (15, "INV_PROFORMA",         "بروفورما إنفويس",             "Proforma Invoice",          "Proforma Fatura",            1, "invoice.proforma", "invoices/proforma",                   10),
-    (16, "INV_NORMAL",           "فاتورة عادية",               "Normal Invoice",            "Normal Fatura",              1, None,              None,                                  0),
-    (17, "PL_EXPORT_WITH_LINE_ID","قائمة تعبئة مع رقم السطر",  "Packing List with Line ID", "Hat No'lu Paketleme Listesi",1, None,             None,                                  0),
-    (18, "cmr",                   "بوليصة شحن CMR",             "CMR Consignment Note",      "CMR Taşıma Senedi",          1, "cmr",            "cmr",                                 20),
-    (19, "form_a",                "شهادة المنشأ نموذج أ",       "Form A Certificate of Origin","Form A Menşe Şahadetnamesi", 1, "form_a",         "form_a",                              21),
+    (1,  "INV_EXT",                "فاتورة خارجية",               "External Invoice",              "Dış Fatura",                  1, None,                          None,                           0),
+    (2,  "INV_SY",                 "فاتورة سورية",                "Syrian Invoice",                "Suriye Faturası",             1, None,                          None,                           0),
+    (3,  "INV_INDIRECT",           "فاتورة بالواسطة",             "Intermediary Invoice",          "Aracı Fatura",                1, None,                          None,                           0),
+    (4,  "PACKING",                "قائمة تعبئة",                 "Packing List",                  "Çeki Listesi",                1, None,                          None,                           0),
+    (10, "invoice.syrian.entry",   "فاتورة سورية إدخال",          "Syrian Entry Invoice",          "Suriye Giriş Faturası",       1, "invoice.syrian",              "invoices/syrian/entry",        0),
+    (11, "INV_SYR_TRANS",          "فاتورة سورية – عبور",         "Syrian Invoice – Transit",      "Suriye Faturası – Transit",   1, "invoice.syrian.transit",      "invoices/syrian/transit",      5),
+    (12, "INV_SYR_INTERM",         "فاتورة سورية – وسيط",         "Syrian Invoice – Intermediary", "Suriye Faturası – Aracı",     1, "invoice.syrian.intermediary", "invoices/syrian/intermediary", 6),
+    (20, "INV_SYR_ENTRY",          "فاتورة سورية – إدخال",        "Syrian Invoice – Entry",        "Suriye Faturası – Giriş",     1, "invoice.syrian.entry",        "invoices/syrian/entry",        4),
+    (13, "PL_EXPORT_SIMPLE",       "قائمة تعبئة – بدون تواريخ",  "Packing List – Simple",         "Ambalaj Listesi – Basit",     1, None,                          None,                           0),
+    (14, "PL_EXPORT_WITH_DATES",   "قائمة تعبئة – مع تواريخ",    "Packing List – With Dates",     "Ambalaj Listesi – Tarihli",   1, None,                          None,                           0),
+    (15, "INV_PROFORMA",           "بروفورما إنفويس",             "Proforma Invoice",              "Proforma Fatura",             1, "invoice.proforma",            "invoices/proforma",            10),
+    (16, "INV_NORMAL",             "فاتورة عادية",                "Normal Invoice",                "Normal Fatura",               1, None,                          None,                           0),
+    (17, "PL_EXPORT_WITH_LINE_ID", "قائمة تعبئة مع رقم السطر",   "Packing List with Line ID",     "Hat No'lu Paketleme Listesi", 1, None,                          None,                           0),
+    (18, "cmr.copy1.sender",       "CMR – نسخة المرسِل (أحمر)",   "CMR – Copy 1: Sender",          "CMR – 1. Kopya: Gönderici",   1, "cmr",                         "cmr/copy1_sender.html",        20),
+    (21, "cmr.copy2.consignee",    "CMR – نسخة المستلِم (أزرق)", "CMR – Copy 2: Consignee",       "CMR – 2. Kopya: Alıcı",       1, "cmr",                         "cmr/copy2_consignee.html",     21),
+    (22, "cmr.copy3.carrier",      "CMR – نسخة الناقل (أخضر)",   "CMR – Copy 3: Carrier",         "CMR – 3. Kopya: Taşıyıcı",    1, "cmr",                         "cmr/copy3_carrier.html",       22),
+    (23, "cmr.copy4.archive",      "CMR – نسخة الأرشيف (أسود)",  "CMR – Copy 4: Archive",         "CMR – 4. Kopya: Arşiv",       1, "cmr",                         "cmr/copy4_archive.html",       23),
+    (19, "form_a",                 "شهادة المنشأ نموذج أ",        "Form A Certificate of Origin",  "Form A Menşe Şahadetnamesi",  1, "form_a",                      "form_a",                       21),
 ]
 
 _PRICING_TYPES = [
@@ -158,240 +172,95 @@ _PRICING_TYPES = [
 ]
 
 _APP_SETTINGS = [
-    ("transaction_last_number",        "0",    "numbering", "آخر رقم معاملة"),
-    ("transaction_prefix",             "",     "numbering", "بادئة رقم المعاملة"),
-    ("transaction_auto_increment",     "true", "numbering", "تفعيل الترقيم التلقائي"),
-    ("document_naming_use_transaction","true", "numbering", "استخدام رقم المعاملة"),
-    ("documents_output_path",          "",     "storage",   "مسار حفظ المستندات"),
+    ("transaction_last_number",         "0",    "numbering", "آخر رقم معاملة"),
+    ("transaction_prefix",              "",     "numbering", "بادئة رقم المعاملة"),
+    ("transaction_auto_increment",      "true", "numbering", "تفعيل الترقيم التلقائي"),
+    ("document_naming_use_transaction", "true", "numbering", "استخدام رقم المعاملة"),
+    ("documents_output_path",           "",     "storage",   "مسار حفظ المستندات"),
 ]
 
 
 # =============================================================================
-# دالة التهيئة الرئيسية
+# مزامنة الأعمدة — بديل Alembic
 # =============================================================================
 
-def _run_migrations(conn) -> None:
+# خريطة أنواع SQLAlchemy → SQLite
+_SA_TYPE_MAP = {
+    "INTEGER": "INTEGER", "BIGINT": "INTEGER", "SMALLINT": "INTEGER",
+    "VARCHAR": "TEXT",    "TEXT":    "TEXT",    "STRING":   "TEXT",    "CHAR": "TEXT",
+    "FLOAT":   "REAL",    "DOUBLE":  "REAL",    "NUMERIC":  "REAL",    "DECIMAL": "REAL",
+    "BOOLEAN": "INTEGER",
+    "DATE":    "TEXT",    "DATETIME":"TEXT",    "TIMESTAMP":"TEXT",
+}
+
+def _sa_type_to_sqlite(sa_type_str: str) -> str:
+    base = sa_type_str.split("(")[0].strip().upper()
+    return _SA_TYPE_MAP.get(base, "TEXT")
+
+
+def _sync_columns(conn: sqlite3.Connection) -> None:
     """
-    تُشغَّل في كل بداية تشغيل — تُنشئ الجداول/الأعمدة الناقصة في الـ DB الموجودة.
-    آمنة تماماً: تستخدم IF NOT EXISTS / IF NOT column.
+    يفحص كل جدول في الـ Models مقابل الـ DB ويضيف الأعمدة الناقصة.
+
+    - آمن تماماً: لا يحذف ولا يعدّل أعمدة موجودة
+    - يعمل على DB قديمة وجديدة
+    - يُشغَّل في كل بداية تشغيل (سريع جداً لأنه PRAGMA فقط)
     """
-    # Migration 1: جدول app_settings (لم يكن موجوداً في الإصدارات الأولى)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS app_settings (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            key         TEXT NOT NULL UNIQUE,
-            value       TEXT,
-            category    TEXT,
-            description TEXT,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # Seed القيم الافتراضية إن لم تكن موجودة
-    for key, value, category, description in _APP_SETTINGS:
-        conn.execute(
-            "INSERT OR IGNORE INTO app_settings (key, value, category, description) VALUES (?,?,?,?)",
-            (key, value, category, description)
-        )
-    # Migration: bank_info column for companies
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
-        if "bank_info" not in cols:
-            conn.execute("ALTER TABLE companies ADD COLUMN bank_info TEXT")
-            conn.commit()
-            logger.info("Bootstrap: added bank_info to companies")
-    except Exception as _e:
-        logger.warning("Bootstrap: bank_info migration skipped: %s", _e)
+    from database.models.base import Base
+    import database.models  # noqa — يُحمّل كل الـ models
 
-    # Migration: avatar_path column for users
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "avatar_path" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(500)")
-            conn.commit()
-            logger.info("Bootstrap: added avatar_path to users")
-    except Exception as _e:
-        logger.warning("Bootstrap: avatar_path migration skipped: %s", _e)
+    cur = conn.cursor()
+    added = 0
 
-    conn.commit()
-    logger.info("Bootstrap: migrations تمت بنجاح")
+    for table_name, table in Base.metadata.tables.items():
+        # تخطّ الجداول غير الموجودة في DB — create_all ستُنشئها
+        exists = cur.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,)
+        ).fetchone()
+        if not exists:
+            continue
 
+        # الأعمدة الموجودة في DB
+        db_cols = {row[1].lower() for row in cur.execute(f"PRAGMA table_info('{table_name}')").fetchall()}
 
+        for col in table.columns:
+            if col.name.lower() in db_cols:
+                continue  # موجود — لا شيء
 
-def _run_alembic_upgrade() -> None:
-    """
-    يُشغّل alembic upgrade head تلقائياً عند كل بداية تشغيل.
-    - آمن: إذا كانت DB على آخر migration، لا يفعل شيء
-    - إذا كانت DB جديدة، يُطبّق كل الـ migrations
-    - إذا كانت DB قديمة (بدون alembic_version)، يُنشئ الـ stamp ويُكمل
-    """
-    try:
-        from pathlib import Path
-        from alembic.config import Config as AlembicConfig
-        from alembic import command as alembic_command
+            # عمود جديد غير موجود → نضيفه
+            sqlite_type = _sa_type_to_sqlite(str(col.type))
 
-        # مسار alembic.ini بالنسبة لجذر المشروع
-        project_root = Path(__file__).resolve().parent.parent
-        ini_path = project_root / "alembic.ini"
+            # حساب DEFAULT مناسب
+            if col.server_default is not None:
+                default_clause = f" DEFAULT {col.server_default.arg}"
+            elif not col.nullable:
+                default_clause = " DEFAULT 0" if sqlite_type == "INTEGER" else " DEFAULT ''"
+            else:
+                default_clause = ""
 
-        if not ini_path.exists():
-            logger.warning(f"Bootstrap: alembic.ini غير موجود في {ini_path} — تخطّي Alembic")
-            return
+            try:
+                sql = f"ALTER TABLE \"{table_name}\" ADD COLUMN \"{col.name}\" {sqlite_type}{default_clause}"
+                cur.execute(sql)
+                conn.commit()
+                logger.info(f"DB sync ✚ {table_name}.{col.name} ({sqlite_type})")
+                added += 1
+            except Exception as exc:
+                logger.warning(f"DB sync ✗ {table_name}.{col.name}: {exc}")
 
-        alembic_cfg = AlembicConfig(str(ini_path))
-        alembic_cfg.set_main_option("script_location", str(project_root / "migrations"))
-
-        alembic_command.upgrade(alembic_cfg, "head")
-        logger.info("Bootstrap: Alembic upgrade head تم بنجاح")
-
-    except Exception as exc:
-        # لا نوقف التطبيق — نُسجّل الخطأ فقط
-        logger.error(f"Bootstrap: فشل تشغيل Alembic migrations: {exc}", exc_info=True)
-
-
-def run_bootstrap() -> bool:
-
-    try:
-        # ① إنشاء الجداول
-        from database.models import init_db
-        init_db()
-        logger.info("Bootstrap: جداول قاعدة البيانات جاهزة")
-
-        # ① ب) تشغيل Alembic migrations تلقائياً
-        _run_alembic_upgrade()
-
-        # ① ج) الـ migrations اليدوية القديمة (app_settings — للتوافق الخلفي)
-        from database.db_utils import get_db_path
-        import sqlite3 as _sqlite3
-        with _sqlite3.connect(get_db_path()) as _conn:
-            _run_migrations(_conn)
-
-        # ② إدراج البيانات الأساسية
-        _seed_all()
-        logger.info("Bootstrap: البيانات الأساسية جاهزة")
-
-        # ③ هل يوجد مستخدمون؟
-        needs_setup = _no_users_exist()
-        if needs_setup:
-            logger.warning("Bootstrap: لا يوجد أي مستخدم — يجب عرض SetupWizard")
-        else:
-            logger.info("Bootstrap: يوجد مستخدمون، التطبيق جاهز")
-
-        return needs_setup
-
-    except Exception as exc:
-        logger.error(f"Bootstrap فشل: {exc}", exc_info=True)
-        # في حالة الفشل الكامل، نظهر نافذة الدخول العادية بدل التعليق
-        return False
-
-
-def create_superadmin(username: str, password: str, full_name: str) -> bool:
-    """
-    ينشئ مستخدم SuperAdmin (role_id=1).
-    """
-    try:
-        from database.crud.users_crud import UsersCRUD
-
-        crud = UsersCRUD()
-
-        # تحقق هل المستخدم موجود مسبقاً
-        existing = crud.get_by_username(username)
-        if existing:
-            logger.warning(f"Bootstrap: المستخدم '{username}' موجود مسبقاً")
-            return True
-
-        user = crud.add_user(
-            username=username,
-            password=password,
-            full_name=full_name,
-            role_id=1,
-            is_active=True,
-            user_id=None,  # لا يوجد مستخدم حالي لأنه أول مستخدم
-        )
-
-        if user:
-            logger.info(
-                f"Bootstrap: تم إنشاء SuperAdmin '{username}' بنجاح (id={user.id})"
-            )
-            return True
-
-        logger.error("Bootstrap: add_user أعاد None")
-        return False
-
-    except Exception as exc:
-        logger.error(
-            f"Bootstrap: خطأ أثناء إنشاء SuperAdmin: {exc}",
-            exc_info=True
-        )
-        return False
-
-
+    if added:
+        logger.info(f"DB sync: أُضيفت {added} أعمدة جديدة")
+    else:
+        logger.debug("DB sync: قاعدة البيانات محدّثة بالكامل")
 
 
 # =============================================================================
-# الدوال الداخلية
+# Seed functions
 # =============================================================================
-
-def _get_db_path() -> Path:
-    """يحصل على مسار قاعدة البيانات من db_utils."""
-    from database.db_utils import get_db_path
-    return get_db_path()
-
-
-def _no_users_exist() -> bool:
-    try:
-        from database.db_utils import get_session_local
-        from database.models.user import User
-        from sqlalchemy import func as sa_func
-
-        SessionLocal = get_session_local()
-        session = SessionLocal()
-        try:
-            count = session.query(sa_func.count(User.id)).scalar()
-            return (count or 0) == 0
-        finally:
-            session.close()
-
-    except Exception as exc:
-        logger.error(f"Bootstrap._no_users_exist خطأ: {exc}")
-        return False
-
-
-def _seed_all() -> None:
-    from database.db_utils import get_session_local
-
-    SessionLocal = get_session_local()
-    session = SessionLocal()
-
-    try:
-        conn = session.connection().connection  # raw sqlite connection
-        conn.execute("PRAGMA foreign_keys = ON")
-        cur = conn.cursor()
-
-        _seed_roles(cur)
-        _seed_permissions(cur)
-        _seed_role_permissions(cur)
-        _seed_company_roles(cur)
-        _seed_document_types(cur)
-        _seed_pricing_types(cur)
-        _seed_app_settings(cur)
-
-        session.commit()
-        logger.info("Bootstrap: seed_all تم بنجاح")
-
-    except Exception as exc:
-        session.rollback()
-        logger.error(f"Bootstrap._seed_all خطأ: {exc}", exc_info=True)
-        raise
-    finally:
-        session.close()
-
-
 
 def _seed_roles(cur: sqlite3.Cursor) -> None:
     for rid, name, desc, label_ar, label_en, label_tr in _ROLES:
-        exists = cur.execute("SELECT 1 FROM roles WHERE id=?", (rid,)).fetchone()
-        if exists:
+        if cur.execute("SELECT 1 FROM roles WHERE id=?", (rid,)).fetchone():
             cur.execute(
                 "UPDATE roles SET name=?, description=?, label_ar=?, label_en=?, label_tr=? WHERE id=?",
                 (name, desc, label_ar, label_en, label_tr, rid)
@@ -404,14 +273,11 @@ def _seed_roles(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_permissions(cur: sqlite3.Cursor) -> None:
-    # تحقق هل العمود category موجود
     cols = {row[1] for row in cur.execute("PRAGMA table_info(permissions)").fetchall()}
     has_category = "category" in cols
 
-    for row in _PERMISSIONS:
-        pid, code, desc, label_ar, label_en, label_tr, category = row
-        exists = cur.execute("SELECT 1 FROM permissions WHERE id=?", (pid,)).fetchone()
-        if exists:
+    for pid, code, desc, label_ar, label_en, label_tr, category in _PERMISSIONS:
+        if cur.execute("SELECT 1 FROM permissions WHERE id=?", (pid,)).fetchone():
             if has_category:
                 cur.execute(
                     "UPDATE permissions SET code=?, description=?, label_ar=?, label_en=?, label_tr=?, category=? WHERE id=?",
@@ -438,11 +304,10 @@ def _seed_permissions(cur: sqlite3.Cursor) -> None:
 def _seed_role_permissions(cur: sqlite3.Cursor) -> None:
     for role_id, perm_ids in _ROLE_PERMISSIONS.items():
         for perm_id in perm_ids:
-            exists = cur.execute(
+            if not cur.execute(
                 "SELECT 1 FROM role_permissions WHERE role_id=? AND permission_id=?",
                 (role_id, perm_id)
-            ).fetchone()
-            if not exists:
+            ).fetchone():
                 cur.execute(
                     "INSERT INTO role_permissions (role_id, permission_id) VALUES (?,?)",
                     (role_id, perm_id)
@@ -450,16 +315,10 @@ def _seed_role_permissions(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_company_roles(cur: sqlite3.Cursor) -> None:
-    # تحقق هل الجدول موجود
-    exists_tbl = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='company_roles'"
-    ).fetchone()
-    if not exists_tbl:
+    if not cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company_roles'").fetchone():
         return
-
     for rid, code, name_ar, name_en, name_tr, is_active, sort_order in _COMPANY_ROLES:
-        exists = cur.execute("SELECT 1 FROM company_roles WHERE id=?", (rid,)).fetchone()
-        if exists:
+        if cur.execute("SELECT 1 FROM company_roles WHERE id=?", (rid,)).fetchone():
             cur.execute(
                 "UPDATE company_roles SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, sort_order=? WHERE id=?",
                 (code, name_ar, name_en, name_tr, is_active, sort_order, rid)
@@ -472,15 +331,10 @@ def _seed_company_roles(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_document_types(cur: sqlite3.Cursor) -> None:
-    exists_tbl = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='document_types'"
-    ).fetchone()
-    if not exists_tbl:
+    if not cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='document_types'").fetchone():
         return
-
     for did, code, name_ar, name_en, name_tr, is_active, group_code, template_path, sort_order in _DOCUMENT_TYPES:
-        exists = cur.execute("SELECT 1 FROM document_types WHERE id=?", (did,)).fetchone()
-        if exists:
+        if cur.execute("SELECT 1 FROM document_types WHERE id=?", (did,)).fetchone():
             cur.execute(
                 "UPDATE document_types SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, group_code=?, template_path=?, sort_order=? WHERE id=?",
                 (code, name_ar, name_en, name_tr, is_active, group_code, template_path, sort_order, did)
@@ -493,19 +347,13 @@ def _seed_document_types(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_pricing_types(cur: sqlite3.Cursor) -> None:
-    exists_tbl = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='pricing_types'"
-    ).fetchone()
-    if not exists_tbl:
+    if not cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pricing_types'").fetchone():
         return
-
-    # تحقق هل الأعمدة الممتدة موجودة
     cols = {row[1] for row in cur.execute("PRAGMA table_info(pricing_types)").fetchall()}
     has_extended = "compute_by" in cols
 
     for pid, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor in _PRICING_TYPES:
-        exists = cur.execute("SELECT 1 FROM pricing_types WHERE id=?", (pid,)).fetchone()
-        if exists:
+        if cur.execute("SELECT 1 FROM pricing_types WHERE id=?", (pid,)).fetchone():
             if has_extended:
                 cur.execute(
                     "UPDATE pricing_types SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, sort_order=?, compute_by=?, price_unit=?, divisor=? WHERE id=?",
@@ -530,7 +378,6 @@ def _seed_pricing_types(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_app_settings(cur: sqlite3.Cursor) -> None:
-    # أنشئ الجدول إذا لم يكن موجوداً (ليس ORM model)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -542,11 +389,129 @@ def _seed_app_settings(cur: sqlite3.Cursor) -> None:
             updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
     for key, value, category, description in _APP_SETTINGS:
-        exists = cur.execute("SELECT 1 FROM app_settings WHERE key=?", (key,)).fetchone()
-        if not exists:
+        if not cur.execute("SELECT 1 FROM app_settings WHERE key=?", (key,)).fetchone():
             cur.execute(
                 "INSERT INTO app_settings (key, value, category, description) VALUES (?,?,?,?)",
                 (key, value, category, description)
             )
+
+
+def _seed_all() -> None:
+    from database.models import get_session_local
+    SessionLocal = get_session_local()
+    session = SessionLocal()
+    try:
+        conn = session.connection().connection
+        conn.execute("PRAGMA foreign_keys = ON")
+        cur = conn.cursor()
+        _seed_roles(cur)
+        _seed_permissions(cur)
+        _seed_role_permissions(cur)
+        _seed_company_roles(cur)
+        _seed_document_types(cur)
+        _seed_pricing_types(cur)
+        _seed_app_settings(cur)
+        session.commit()
+        logger.info("Bootstrap: seed_all تم بنجاح")
+    except Exception as exc:
+        session.rollback()
+        logger.error(f"Bootstrap._seed_all خطأ: {exc}", exc_info=True)
+        raise
+    finally:
+        session.close()
+
+
+# =============================================================================
+# دالة التهيئة الرئيسية
+# =============================================================================
+
+def run_bootstrap() -> bool:
+    """
+    نقطة الدخول الوحيدة عند بدء التطبيق.
+
+    الخطوات:
+      1. create_all()    → ينشئ الجداول الجديدة (آمن تماماً على DB موجودة)
+      2. _sync_columns() → يضيف الأعمدة الناقصة تلقائياً بدون Alembic
+      3. _seed_all()     → يُدرج/يُحدّث البيانات الأساسية
+
+    Returns:
+      True  → لا يوجد مستخدمون، يجب عرض SetupWizard
+      False → التطبيق جاهز للدخول
+    """
+    try:
+        # ① إنشاء الجداول الجديدة من Models
+        from database.models import init_db
+        init_db()
+        logger.info("Bootstrap: الجداول جاهزة")
+
+        # ② مزامنة الأعمدة الناقصة (بديل Alembic)
+        from database.db_utils import get_db_path
+        with sqlite3.connect(str(get_db_path())) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            _sync_columns(conn)
+
+        # ③ بيانات أساسية
+        _seed_all()
+        logger.info("Bootstrap: البيانات الأساسية جاهزة")
+
+        # ④ هل يوجد مستخدمون؟
+        needs_setup = _no_users_exist()
+        if needs_setup:
+            logger.warning("Bootstrap: لا يوجد مستخدم — يجب عرض SetupWizard")
+        else:
+            logger.info("Bootstrap: التطبيق جاهز")
+
+        return needs_setup
+
+    except Exception as exc:
+        logger.error(f"Bootstrap فشل: {exc}", exc_info=True)
+        return False
+
+
+def create_superadmin(username: str, password: str, full_name: str) -> bool:
+    """ينشئ مستخدم SuperAdmin (role_id=1)."""
+    try:
+        from database.crud.users_crud import UsersCRUD
+        crud = UsersCRUD()
+        existing = crud.get_by_username(username)
+        if existing:
+            logger.warning(f"Bootstrap: المستخدم '{username}' موجود مسبقاً")
+            return True
+        user = crud.add_user(
+            username=username,
+            password=password,
+            full_name=full_name,
+            role_id=1,
+            is_active=True,
+            user_id=None,
+        )
+        if user:
+            logger.info(f"Bootstrap: تم إنشاء SuperAdmin '{username}' (id={user.id})")
+            return True
+        logger.error("Bootstrap: add_user أعاد None")
+        return False
+    except Exception as exc:
+        logger.error(f"Bootstrap: خطأ أثناء إنشاء SuperAdmin: {exc}", exc_info=True)
+        return False
+
+
+# =============================================================================
+# دوال داخلية
+# =============================================================================
+
+def _no_users_exist() -> bool:
+    try:
+        from database.models import get_session_local
+        from database.models.user import User
+        from sqlalchemy import func as sa_func
+        SessionLocal = get_session_local()
+        session = SessionLocal()
+        try:
+            count = session.query(sa_func.count(User.id)).scalar()
+            return (count or 0) == 0
+        finally:
+            session.close()
+    except Exception as exc:
+        logger.error(f"Bootstrap._no_users_exist خطأ: {exc}")
+        return False

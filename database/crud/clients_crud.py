@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 from database.models import get_session_local, Client, ClientContact
-from database.crud.base_crud_v5 import BaseCRUD_V5 as BaseCRUD
+from database.crud.base_crud import BaseCRUD
 from sqlalchemy import select, func, cast, Integer
 
 class ClientsCRUD(BaseCRUD):

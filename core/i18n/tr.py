@@ -1142,6 +1142,12 @@ translations ={
 "certificate_no_placeholder": "örn. SY-2025-00123",
 "issuing_authority": "Düzenleyen Kurum",
 "issuing_authority_placeholder": "örn. Şam Ticaret Odası",
+
+"origin_country_doc": "Menşe Ülkesi (Belgeler)",
+"origin_country_placeholder": "örn. Türkiye",
+"dest_country_doc": "Varış Ülkesi (Belgeler)",
+"dest_country_placeholder": "örn. Irak",
+"certificate_date": "Sertifika Tarihi",
 "import_report": "İçe Aktarma Raporu",
 "total_rows": "Toplam Satır",
 "added_success": "Başarıyla Eklendi",

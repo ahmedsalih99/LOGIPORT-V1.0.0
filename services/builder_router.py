@@ -37,6 +37,10 @@ _RULES = {
     "packing_list.": "documents.builders.packing_list",
 
     # ── CMR — بوليصة الشحن البري الدولية ─────────────────────────────────────
+    "cmr.copy1.sender":    "documents.builders.cmr_builder",
+    "cmr.copy2.consignee": "documents.builders.cmr_builder",
+    "cmr.copy3.carrier":   "documents.builders.cmr_builder",
+    "cmr.copy4.archive":   "documents.builders.cmr_builder",
     "cmr": "documents.builders.cmr_builder",
 
     # ── Form A — شهادة المنشأ (GSP) ───────────────────────────────────────────

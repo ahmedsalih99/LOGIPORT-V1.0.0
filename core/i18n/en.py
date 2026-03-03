@@ -1142,6 +1142,12 @@ translations ={
 "certificate_no_placeholder": "e.g. SY-2025-00123",
 "issuing_authority": "Issuing Authority",
 "issuing_authority_placeholder": "e.g. Damascus Chamber of Commerce",
+
+"origin_country_doc": "Origin Country (Documents)",
+"origin_country_placeholder": "e.g. Turkey",
+"dest_country_doc": "Destination Country (Documents)",
+"dest_country_placeholder": "e.g. Iraq",
+"certificate_date": "Certificate Date",
 "import_report": "Import Report",
 "total_rows": "Total Rows",
 "added_success": "Added Successfully",

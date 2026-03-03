@@ -20,3 +20,18 @@ class CustomTable(QTableWidget):
     def retranslate_ui(self):
         if self.header_keys and self.columnCount() == len(self.header_keys):
             self.setHorizontalHeaderLabels([self._(key) for key in self.header_keys])
+
+
+class _NoHoverTable(QTableWidget):
+    """
+    QTableWidget لا يغير الـ current row عند hover —
+    يمنع تلوين السطر بمجرد مرور الماوس فوق cellWidget (combo/date).
+    """
+    def mouseMoveEvent(self, event):
+        event.ignore()
+
+    def viewportEvent(self, event):
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.HoverMove:
+            return False
+        return super().viewportEvent(event)

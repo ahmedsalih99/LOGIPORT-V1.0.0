@@ -19,13 +19,8 @@ except Exception:
 
 # ------------------------- utils -------------------------
 
-def _blankify(v):
-    from collections.abc import Mapping, Sequence
-    if v is None: return ""
-    if isinstance(v, str): return v.strip()
-    if isinstance(v, Mapping): return {k: _blankify(val) for k, val in v.items()}
-    if isinstance(v, Sequence) and not isinstance(v, (str, bytes, bytearray)): return [_blankify(x) for x in v]
-    return v
+# _blankify من _shared
+from documents.builders._shared import blankify as _blankify
 
 
 def _normalize_call(args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Dict[str, Any]:

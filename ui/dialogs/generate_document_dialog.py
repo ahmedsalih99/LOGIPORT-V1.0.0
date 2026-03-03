@@ -50,15 +50,25 @@ _DB_CODE_TO_DOC_CODE: Dict[str, str] = {
     "PL_EXPORT_WITH_DATES":   "packing_list.export.with_dates",
     "PL_EXPORT_WITH_LINE_ID": "packing_list.export.with_line_id",
     "cmr":                    "cmr",
+    "cmr.copy1.sender":       "cmr.copy1.sender",
+    "cmr.copy2.consignee":    "cmr.copy2.consignee",
+    "cmr.copy3.carrier":      "cmr.copy3.carrier",
+    "cmr.copy4.archive":      "cmr.copy4.archive",
     "form_a":                 "form_a",
 }
 _INVOICE_PREFIXES  = ("INV_", "invoice.")
 _PACKING_PREFIXES  = ("PL_", "PACKING", "packing")
-_TRANSPORT_CODES   = ("cmr",)
+_TRANSPORT_CODES   = ("cmr", "cmr.copy1.sender", "cmr.copy2.consignee", "cmr.copy3.carrier", "cmr.copy4.archive")
 _ORIGIN_CERT_CODES = ("form_a", "form.a")
 
 # doc codes that are always English-only (no language choice)
-_ENGLISH_ONLY_CODES = frozenset({"cmr"})
+_ENGLISH_ONLY_CODES = frozenset({
+    "cmr",
+    "cmr.copy1.sender",
+    "cmr.copy2.consignee",
+    "cmr.copy3.carrier",
+    "cmr.copy4.archive",
+})
 
 
 def _classify_doc_type(code: str) -> str:
@@ -627,7 +637,12 @@ class GenerateDocumentDialog(_BaseDialog):
 
         if not invoices:   self._load_fallback_invoices_list(invoices)
         if not packings:   self._load_fallback_packings_list(packings)
-        if not transports: transports = [("CMR", "cmr")]
+        if not transports: transports = [
+            ("CMR — Copy 1 (Sender / Red)", "cmr.copy1.sender"),
+            ("CMR — Copy 2 (Consignee / Blue)", "cmr.copy2.consignee"),
+            ("CMR — Copy 3 (Carrier / Green)", "cmr.copy3.carrier"),
+            ("CMR — Copy 4 (Archive / Black)", "cmr.copy4.archive"),
+        ]
         if not origin_certs: origin_certs = [("Form A (GSP)", "form_a")]
 
         self._card_invoice   = self._add_card("🧾", _("invoice"),       _("invoice_type"),       invoices)
@@ -664,7 +679,12 @@ class GenerateDocumentDialog(_BaseDialog):
         self._load_fallback_packings_list(pl)
         self._card_invoice = self._add_card("🧾", _("invoice"),     _("invoice_type"),      inv)
         self._card_packing = self._add_card("📦", _("packing_list"), _("packing_list_type"), pl)
-        self._card_cmr     = self._add_card("🚚", "CMR",             _("cmr_section_title"), [("CMR", "cmr")], english_only=True, right_col=True)
+        self._card_cmr     = self._add_card("🚚", "CMR",             _("cmr_section_title"), [
+            ("CMR — Copy 1 (Sender / Red)", "cmr.copy1.sender"),
+            ("CMR — Copy 2 (Consignee / Blue)", "cmr.copy2.consignee"),
+            ("CMR — Copy 3 (Carrier / Green)", "cmr.copy3.carrier"),
+            ("CMR — Copy 4 (Archive / Black)", "cmr.copy4.archive"),
+        ], english_only=True, right_col=True)
         self._card_forma   = self._add_card("📋", "Form A",          _("forma_section_title"), [("Form A (GSP)", "form_a")], right_col=True)
 
     # =========================================================================
@@ -769,8 +789,10 @@ class GenerateDocumentDialog(_BaseDialog):
             langs = ["en"] if card.english_only else selected_langs
             for code in codes:
                 for lg in langs:
+                    # CMR copies → doc_type = "cmr" (لا "cmr.copy1" إلخ)
+                    doc_type = "cmr" if code.startswith("cmr") else code.split(".")[0]
                     jobs.append(_JobSpec(
-                        doc_type=code.split(".")[0],
+                        doc_type=doc_type,
                         lang=lg, doc_code=code, options={}))
         return jobs
 
@@ -789,7 +811,7 @@ class GenerateDocumentDialog(_BaseDialog):
                 {"tid": int(self.trx_id)}).mappings().all()
             if not rows: raise ValueError(_("transaction_has_no_items"))
 
-            is_transport_only = all(c in ("cmr", "form_a") for c in doc_codes)
+            is_transport_only = all(c in ("cmr", "form_a") or c.startswith("cmr.copy") for c in doc_codes)
             # العملة per-item — لا نطلب currency_id على مستوى المعاملة
             missing_price = []
             for r in rows:
@@ -802,7 +824,7 @@ class GenerateDocumentDialog(_BaseDialog):
             if missing_price:
                 warnings.append("⚠  " + _("row_missing_price").format(id=", ".join(missing_price[:5])))
 
-            if any(c == "cmr" for c in doc_codes):
+            if any(c == "cmr" or c.startswith("cmr.copy") for c in doc_codes):
                 td = s.execute(_sql(
                     "SELECT truck_plate, carrier_company_id FROM transport_details WHERE transaction_id=:i"),
                     {"i": int(self.trx_id)}).mappings().first()
@@ -848,7 +870,7 @@ class GenerateDocumentDialog(_BaseDialog):
         types_in_jobs = {j.doc_type for j in jobs}
         prefix = "INVPL" if len(types_in_jobs) > 1 else (
             "INV" if "invoice" in types_in_jobs else (
-            "CMR" if "cmr"     in types_in_jobs else (
+            "CMR" if any(t == "cmr" or t.startswith("cmr.copy") for t in types_in_jobs) else (
             "FA"  if "form_a"  in types_in_jobs else "PL")))
         try:
             shared_no = allocate_group_doc_no(self.trx_id, prefix=prefix)

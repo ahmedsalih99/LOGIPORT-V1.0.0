@@ -31,13 +31,14 @@ class LoginWindow(BaseDialog):
     """
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent)   # BaseDialog يستدعي _restore_geometry هنا
         self.setObjectName("LoginDialog")
         self._ = TranslationManager.get_instance().translate
         self.user = None
 
-        # ✅ حجم الـ dialog يتناسب مع حجم الشاشة
-        self._set_responsive_size()
+        # إذا لم تكن هناك geometry محفوظة، نضع الحجم الافتراضي
+        if not self.settings.get("dialog_geometry_LoginWindow"):
+            self._set_responsive_size()
 
         self._ui_built = False
         self.init_ui()
@@ -46,33 +47,31 @@ class LoginWindow(BaseDialog):
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
 
     def _set_responsive_size(self):
-        """Set dialog size based on screen size"""
-        # Get screen geometry
+        """Set dialog initial size based on screen — resizable by user"""
         screen = QApplication.primaryScreen()
         screen_geometry = screen.availableGeometry()
         screen_width = screen_geometry.width()
         screen_height = screen_geometry.height()
 
-        # ✅ حجم الـ dialog = نسبة من الشاشة
-        # للشاشات الصغيرة: أكبر نسبة
-        # للشاشات الكبيرة: نسبة أصغر
-
-        if screen_width < 1366:  # Small screens
+        # الحجم الافتراضي حسب الشاشة
+        if screen_width < 1366:
             width = min(420, int(screen_width * 0.8))
             height = min(550, int(screen_height * 0.85))
-        elif screen_width < 1920:  # Medium screens (HD)
+        elif screen_width < 1920:
             width = 420
             height = 520
-        else:  # Large screens (Full HD+)
+        else:
             width = 450
             height = 550
 
-        self.setFixedSize(width, height)
+        # حد أدنى للقياس — لا fixed
+        self.setMinimumSize(340, 460)
+        self.resize(width, height)
 
-        # Center on screen
+        # توسيط
         self.move(
-            (screen_width - width) // 2,
-            (screen_height - height) // 2
+            screen_geometry.left() + (screen_width - width) // 2,
+            screen_geometry.top() + (screen_height - height) // 2
         )
 
     def init_ui(self):

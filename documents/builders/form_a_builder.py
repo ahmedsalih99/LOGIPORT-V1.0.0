@@ -23,6 +23,11 @@ from typing import Dict, Any, List
 from decimal import Decimal
 from sqlalchemy import text
 from database.models import get_session_local
+from documents.builders._shared import (
+    blankify as _blankify,
+    company_obj as _company_obj_full,
+    country_name as _country_name,
+)
 
 
 def _val(x) -> str:
@@ -31,38 +36,11 @@ def _val(x) -> str:
     return str(x).strip()
 
 
-def _company_block(s, company_id, lang: str) -> Dict[str, str]:
-    if not company_id:
-        return {"name": "", "address": "", "city": "", "country": "", "tax_id": ""}
-    r = s.execute(text("""
-        SELECT name_ar, name_en, name_tr,
-               address_ar, address_en, address_tr,
-               city, country_id, phone, tax_id
-        FROM companies WHERE id = :id
-    """), {"id": company_id}).mappings().first()
-    if not r:
-        return {"name": "", "address": "", "city": "", "country": "", "tax_id": ""}
-
-    name    = r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or ""
-    address = r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or ""
-
-    country = ""
-    if r.get("country_id"):
-        cr = s.execute(
-            text("SELECT name_ar, name_en, name_tr FROM countries WHERE id=:id"),
-            {"id": r["country_id"]}
-        ).mappings().first()
-        if cr:
-            country = cr.get(f"name_{lang}") or cr.get("name_en") or cr.get("name_ar") or ""
-
-    return {
-        "name":    name,
-        "address": address,
-        "city":    _val(r.get("city")),
-        "country": country,
-        "tax_id":  _val(r.get("tax_id")),
+def _company_block(s, company_id, lang: str) -> dict:
+    """wrapper → _shared.company_obj (unified)."""
+    return _company_obj_full(s, company_id, lang) or {
+        "name": "", "address": "", "city": "", "country": "", "tax_id": ""
     }
-
 
 def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
     """
@@ -95,9 +73,10 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
 
         # ── transport_details ─────────────────────────────────────────────────
         td = s.execute(text("""
-            SELECT certificate_no, issuing_authority,
+            SELECT certificate_no, issuing_authority, certificate_date,
                    shipment_date, carrier_company_id,
-                   truck_plate, loading_place, delivery_place
+                   truck_plate, loading_place, delivery_place,
+                   origin_country, dest_country
             FROM transport_details WHERE transaction_id = :i
         """), {"i": int(transaction_id)}).mappings().first()
 
@@ -117,8 +96,13 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
                 return ""
             return r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or ""
 
-        origin_country = _country(t["origin_country_id"])
-        dest_country   = _country(t["dest_country_id"])
+        # الدول: من TransportDetails إن عبّأها المستخدم، وإلا من المعاملة
+        origin_country = (
+            (td.get("origin_country") or "") if td else ""
+        ) or _country(t["origin_country_id"])
+        dest_country = (
+            (td.get("dest_country") or "") if td else ""
+        ) or _country(t["dest_country_id"])
 
         # ── العملة ────────────────────────────────────────────────────────────
         currency_code = ""
@@ -192,7 +176,9 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         # ── بيانات الشهادة ────────────────────────────────────────────────────
         certificate_no    = _val(td["certificate_no"])    if td else ""
         issuing_authority = _val(td["issuing_authority"]) if td else ""
-        shipment_date     = td["shipment_date"]            if td else None
+        # تاريخ الشهادة (certificate_date) مستقل — يُعبأ يدوياً في تبويب الشحن
+        certificate_date  = td["certificate_date"] if td else None
+        shipment_date     = td["shipment_date"]     if td else None
         transport_info    = _val(t["transport_ref"])
 
         if td and td.get("loading_place") and td.get("delivery_place"):
@@ -204,7 +190,9 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             # ── رقم الشهادة ────────────────────────────────────────────────
             "certificate_no":    certificate_no or _val(t["no"]),
             "reference_no":      _val(t["no"]),
-            "date":              shipment_date or t["transaction_date"],
+            # date في Form A = تاريخ الشهادة إن وُجد، ثم الشحن، ثم تاريخ المعاملة
+            # التاريخ في Form A = certificate_date إن وُجد، ثم shipment_date (كلاهما يدوي)
+            "date":              certificate_date or shipment_date or "",
             "trx_date":          t["transaction_date"],
 
             # ── Box 1: المُصدِّر ──────────────────────────────────────────
@@ -239,6 +227,7 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
 
             # ── Box 11: الجهة المُصدِرة ────────────────────────────────────
             "issuing_authority": issuing_authority,
+            "issuing_place":     _val(td["loading_place"]) if td else "",
 
             # ── تحذيرات (للـ UI، لا تظهر في المستند) ─────────────────────
             "_warnings": _build_warnings(

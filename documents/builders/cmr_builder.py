@@ -1,5 +1,5 @@
 """
-documents/builders/cmr.py — LOGIPORT
+documents/builders/cmr_builder.py — LOGIPORT
 ======================================
 يبني سياق مستند CMR (Convention on the Contract for the International
 Carriage of Goods by Road) من بيانات المعاملة + transport_details.
@@ -27,6 +27,12 @@ from typing import Dict, Any, List
 from decimal import Decimal
 from sqlalchemy import text
 from database.models import get_session_local
+from documents.builders._shared import (
+    blankify as _blankify,
+    company_obj as _company_obj_full,
+    country_name as _country_name,
+    pick_dest_col as _pick_dest_col,
+)
 
 
 def _val(x) -> str:
@@ -35,41 +41,11 @@ def _val(x) -> str:
     return str(x).strip()
 
 
-def _company_block(s, company_id, lang: str) -> Dict[str, str]:
-    """يُعيد اسم + عنوان الشركة."""
-    if not company_id:
-        return {"name": "", "address": "", "city": "", "country": "", "phone": ""}
-    r = s.execute(text("""
-        SELECT name_ar, name_en, name_tr,
-               address_ar, address_en, address_tr,
-               city, country_id, phone, tax_id
-        FROM companies WHERE id = :id
-    """), {"id": company_id}).mappings().first()
-    if not r:
-        return {"name": "", "address": "", "city": "", "country": "", "phone": ""}
-
-    name = r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or ""
-    address = (
-        r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or ""
-    )
-    country = ""
-    if r.get("country_id"):
-        cr = s.execute(
-            text("SELECT name_ar, name_en, name_tr FROM countries WHERE id=:id"),
-            {"id": r["country_id"]}
-        ).mappings().first()
-        if cr:
-            country = cr.get(f"name_{lang}") or cr.get("name_en") or cr.get("name_ar") or ""
-
-    return {
-        "name":    name,
-        "address": address,
-        "city":    _val(r.get("city")),
-        "country": country,
-        "phone":   _val(r.get("phone")),
-        "tax_id":  _val(r.get("tax_id")),
+def _company_block(s, company_id, lang: str) -> dict:
+    """wrapper → _shared.company_obj (unified)."""
+    return _company_obj_full(s, company_id, lang) or {
+        "name": "", "address": "", "city": "", "country": "", "phone": ""
     }
-
 
 def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
     """
@@ -102,8 +78,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         td = s.execute(text("""
             SELECT carrier_company_id, truck_plate, driver_name,
                    loading_place, delivery_place, shipment_date,
-                   attached_documents,
-                   certificate_no, issuing_authority
+                   attached_documents, certificate_no, issuing_authority,
+                   origin_country, dest_country
             FROM transport_details WHERE transaction_id = :i
         """), {"i": int(transaction_id)}).mappings().first()
 
@@ -124,8 +100,13 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
                 return ""
             return r.get(f"name_{lang}") or r.get("name_en") or r.get("name_ar") or ""
 
-        origin_country = _country(t["origin_country_id"])
-        dest_country   = _country(t["dest_country_id"])
+        # الدول: من TransportDetails إن عبّأها المستخدم، وإلا من المعاملة
+        origin_country = (
+            (td.get("origin_country") or "") if td else ""
+        ) or _country(t["origin_country_id"])
+        dest_country = (
+            (td.get("dest_country") or "") if td else ""
+        ) or _country(t["dest_country_id"])
 
         # ── بنود المعاملة ─────────────────────────────────────────────────────
         rows = s.execute(text(f"""
@@ -172,18 +153,15 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         delivery_place = _val(td["delivery_place"]) if td else ""
         shipment_date  = td["shipment_date"]         if td else None
 
-        # إذا لم يُحدَّد مكان التحميل، استخدم بلد المنشأ
-        if not loading_place:
-            loading_place = origin_country
-        # إذا لم يُحدَّد مكان التسليم، استخدم بلد الوجهة
-        if not delivery_place:
-            delivery_place = dest_country
+        # إذا لم يُحدَّد مكان التحميل/التسليم، يُترك فارغاً
+        # (المستخدم يعبّئهم في تبويب الشحن)
 
         return {
             # ── معرّف المستند ─────────────────────────────────────────────────
             "cmr_no":       _val(t["no"]),
-            "date":         shipment_date or t["transaction_date"],
-            "trx_date":     t["transaction_date"],
+            # التاريخ من shipment_date التي يعبّئها المستخدم يدوياً
+            "date":          shipment_date,
+            "trx_date":      t["transaction_date"],
             "shipment_date": shipment_date,
 
             # ── Box 1: المُرسِل ───────────────────────────────────────────────

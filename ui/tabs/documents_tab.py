@@ -13,7 +13,7 @@ import os
 import platform
 import subprocess
 
-from PySide6.QtCore import Qt, QTimer, QUrl, QPoint
+from PySide6.QtCore import Qt, QTimer, QUrl, QPoint, QDate
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
@@ -32,19 +32,7 @@ except Exception:
 try:
     from core.translator import TranslationManager
 except Exception:
-    class _DummyT:
-        @staticmethod
-        def get_instance():
-            return _DummyT()
-
-        def translate(self, x):
-            return x
-
-        def get_current_language(self):
-            return "ar"
-
-
-    TranslationManager = _DummyT
+    from core.translator import _DummyTranslator as TranslationManager  # type: ignore
 
 # Database access
 try:
@@ -108,6 +96,16 @@ def _table_has_column(table: str, column: str) -> bool:
             pass
 
 
+# Schema column cache - checked once per session
+_schema_cache = {}
+
+def _table_has_column_cached(table, column):
+    key = table + "." + column
+    if key not in _schema_cache:
+        _schema_cache[key] = _table_has_column(table, column)
+    return _schema_cache[key]
+
+
 # -------------------------------------------------------------------------
 # Enhanced DocumentsTab - NO BaseTab UI Overlap
 # -------------------------------------------------------------------------
@@ -144,6 +142,9 @@ class DocumentsTab(BaseTab):
         self._build_ui()
         self._wire()
 
+        # إعادة تحميل البيانات عند تغيير اللغة (أسماء العملاء وأنواع المستندات)
+        TranslationManager.get_instance().language_changed.connect(self._on_language_changed)
+
         # Initial load
         self._refresh_transactions_seed()
         self._reload_docs(reset_page=True)
@@ -159,8 +160,8 @@ class DocumentsTab(BaseTab):
 
     def retranslate_ui(self):
         """Override to handle translation updates"""
-        # Update UI texts when language changes
         try:
+            # Top bar
             if hasattr(self, 'txt_search'):
                 self.txt_search.setPlaceholderText(_tr("search_documents"))
             if hasattr(self, 'btn_generate'):
@@ -170,7 +171,22 @@ class DocumentsTab(BaseTab):
             if hasattr(self, 'btn_clear_transaction'):
                 self.btn_clear_transaction.setText(_tr("show_all"))
 
-            # Update table headers
+            # فلتر نوع المستند
+            if hasattr(self, 'cmb_type'):
+                self.cmb_type.setItemText(0, _tr("all_types"))
+                self.cmb_type.setItemText(1, _tr("document_invoice"))
+                self.cmb_type.setItemText(2, _tr("document_packing_list"))
+                # CMR (index 3) — اسم علمي ثابت، لا يُترجم
+                self.cmb_type.setItemText(4, _tr("form_a_certificate"))
+
+            # فلتر اللغة
+            if hasattr(self, 'cmb_lang'):
+                self.cmb_lang.setItemText(0, _tr("all_languages"))
+                self.cmb_lang.setItemText(1, _tr("arabic"))
+                self.cmb_lang.setItemText(2, _tr("english"))
+                self.cmb_lang.setItemText(3, _tr("turkish"))
+
+            # ترويسات الجدول
             if hasattr(self, 'tbl'):
                 self.tbl.setHorizontalHeaderLabels([
                     _tr("doc_no"),
@@ -181,10 +197,16 @@ class DocumentsTab(BaseTab):
                     _tr("actions")
                 ])
 
-            # Reload to refresh button texts
-            self._reload_docs(reset_page=False)
         except Exception:
-            pass  # Ignore translation errors
+            pass
+
+    def _on_language_changed(self):
+        """Reload tables and transaction picker on language change."""
+        self._ = TranslationManager.get_instance().translate
+        self._refresh_transactions_seed()
+        self.retranslate_ui()
+        # reload once after retranslate (not inside retranslate to avoid double call)
+        self._reload_docs(reset_page=False)
 
     # ---------------- UI -----------------
     def _build_ui(self):
@@ -407,7 +429,7 @@ class DocumentsTab(BaseTab):
         header.setSectionResizeMode(self.COL_LANG, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(self.COL_PATH, QHeaderView.Stretch)
         header.setSectionResizeMode(self.COL_ACTIONS, QHeaderView.Fixed)
-        header.setDefaultAlignment(Qt.AlignCenter)
+        # لا نضع setDefaultAlignment هنا — يتحكم فيه الثيم العام
 
         # Fixed width for actions column
         self.tbl.setColumnWidth(self.COL_ACTIONS, 220)
@@ -502,20 +524,24 @@ class DocumentsTab(BaseTab):
 
     # ── Date presets for documents tab ──────────────────────────────────────
     def _doc_preset_today(self):
-        from PySide6.QtCore import QDate
         today = QDate.currentDate()
+        # فصل الإشارة لمنع reload مزدوج
+        self.doc_date_from.dateChanged.disconnect()
         self.doc_date_from.setDate(today)
+        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
         self.doc_date_to.setDate(today)
 
     def _doc_preset_month(self):
-        from PySide6.QtCore import QDate
         today = QDate.currentDate()
+        self.doc_date_from.dateChanged.disconnect()
         self.doc_date_from.setDate(QDate(today.year(), today.month(), 1))
+        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
         self.doc_date_to.setDate(today)
 
     def _doc_preset_clear(self):
-        from PySide6.QtCore import QDate
+        self.doc_date_from.dateChanged.disconnect()
         self.doc_date_from.setDate(QDate.currentDate().addMonths(-3))
+        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
         self.doc_date_to.setDate(QDate.currentDate())
 
     def _refresh_transactions_seed(self):
@@ -855,14 +881,22 @@ class DocumentsTab(BaseTab):
     # ---------------- DB Layer -----------------
     @staticmethod
     def _db_find_transactions(limit: int = 50) -> List[Tuple[int, str]]:
-        """Find recent transactions"""
+        """Find recent transactions — client name follows app language"""
         if get_session_local is None or text is None:
             return [(i, f"T{i:04d} • Client X • 2026-01-{i:02d}") for i in range(1, min(limit, 20))]
 
-        sql = text("""
+        lang = TranslationManager.get_instance().get_current_language()
+        if lang == "en":
+            name_expr = "COALESCE(c.name_en, c.name_ar, c.name_tr, '')"
+        elif lang == "tr":
+            name_expr = "COALESCE(c.name_tr, c.name_ar, c.name_en, '')"
+        else:
+            name_expr = "COALESCE(c.name_ar, c.name_en, c.name_tr, '')"
+
+        sql = text(f"""
             SELECT t.id,
                    COALESCE(t.transaction_no, CAST(t.id AS TEXT)) || ' • ' ||
-                   COALESCE(c.name_ar, c.name_en, c.name_tr, '') || ' • ' ||
+                   {name_expr} || ' • ' ||
                    COALESCE(substr(t.created_at, 1, 10), '') AS label
             FROM transactions t
             LEFT JOIN clients c ON c.id = t.client_id
@@ -909,12 +943,12 @@ class DocumentsTab(BaseTab):
             return rows, len(rows)
 
         # detect group column name dynamically
-        group_col = "group_id" if _table_has_column("documents", "group_id") else (
-            "doc_group_id" if _table_has_column("documents", "doc_group_id") else None)
+        group_col = "group_id" if _table_has_column_cached("documents", "group_id") else (
+            "doc_group_id" if _table_has_column_cached("documents", "doc_group_id") else None)
         join_groups = f" LEFT JOIN doc_groups g ON g.id = d.{group_col} " if group_col else " LEFT JOIN doc_groups g ON 1=0 "
 
         # join to transactions via documents.transaction_id if exists, else via groups.transaction_id
-        if _table_has_column("documents", "transaction_id"):
+        if _table_has_column_cached("documents", "transaction_id"):
             tran_join = " LEFT JOIN transactions t ON t.id = d.transaction_id "
             tid_field = "d.transaction_id"
         elif group_col:
@@ -968,6 +1002,10 @@ class DocumentsTab(BaseTab):
             params["d_to_end"] = str(date_to) + " 23:59:59"
         where_sql = " AND ".join(where)
 
+        # عمود الاسم حسب اللغة الحالية
+        app_lang = TranslationManager.get_instance().get_current_language()
+        lang_col = {"en": "en", "tr": "tr"}.get(app_lang, "ar")
+
         sql_data = text(f"""
                 SELECT d.id,
                        COALESCE(g.doc_no, '') AS doc_no,
@@ -1006,7 +1044,7 @@ class DocumentsTab(BaseTab):
                             WHEN 'coo'                   THEN :lbl_coo
                             WHEN 'certificate_of_origin' THEN :lbl_coo
                             WHEN 'form_a'                THEN :lbl_fa
-                            ELSE COALESCE(dt.name_ar, dt.code, '')
+                            ELSE COALESCE(dt.name_{lang_col}, dt.name_ar, dt.code, '')
                        END AS doc_type_label
                 FROM documents d
                 {join_groups}
@@ -1020,8 +1058,6 @@ class DocumentsTab(BaseTab):
         sql_cnt = text(
             f"SELECT COUNT(1) FROM documents d {join_groups} LEFT JOIN document_types dt ON dt.id=d.document_type_id {tran_join} WHERE {where_sql}"
         )
-        params_data = dict(params)
-        # جلب أوسع قليلاً لتعويض الفلترة المحلية بسبب وجود الملف
         params_data = dict(params)
         params_data.update({
             "lbl_inv_com": _tr("document_invoice_commercial"),
@@ -1046,8 +1082,6 @@ class DocumentsTab(BaseTab):
             # -----------------------------
             collected: List[Dict[str, Any]] = []
             offset = (page - 1) * page_size
-            batch_size = page_size
-            current_offset = offset
 
             # جلب مباشر بدون فلترة filesystem — يمنع التجميد
             batch_params = dict(params_data)

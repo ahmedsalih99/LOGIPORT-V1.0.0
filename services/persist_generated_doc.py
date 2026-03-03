@@ -34,7 +34,11 @@ DOC_TYPE_MAP: dict[str, str] = {
     "packing_list.export.with_line_id": "PL_EXPORT_WITH_LINE_ID",# DB id=17
 
     # ─── CMR ──────────────────────────────────────────────────────────────────
-    "cmr": "cmr",                                     # DB id=18
+    "cmr":                "cmr",                      # DB id=18 (legacy)
+    "cmr.copy1.sender":   "cmr.copy1.sender",         # DB id=18 (updated)
+    "cmr.copy2.consignee":"cmr.copy2.consignee",      # DB id=21
+    "cmr.copy3.carrier":  "cmr.copy3.carrier",        # DB id=22
+    "cmr.copy4.archive":  "cmr.copy4.archive",        # DB id=23
 
     # ─── Form A (شهادة المنشأ) ────────────────────────────────────────────────
     "form_a": "form_a",                               # DB id=19

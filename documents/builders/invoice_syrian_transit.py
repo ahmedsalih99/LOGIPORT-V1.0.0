@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 try:
     # نعيد استخدام بلدر الإدخالات كأساس كما هو
@@ -9,24 +9,16 @@ except Exception:
     _entry_build_ctx = None  # type: ignore
 
 
-def _normalize_call(args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    نقبل positional/keyword مثل استدعاءات النظام الحالية.
-    أمثلة:
-      build_ctx("invoice.syrian.transit", 123, "en")
-      build_ctx(doc_code="invoice.syrian.transit", transaction_id=123, lang="en")
-    """
+def _normalize_call(args, kwargs):
+    """تحليل positional/keyword calls."""
     out = dict(kwargs)
-    # doc_code
     if "doc_code" not in out and len(args) >= 1 and isinstance(args[0], str):
         out["doc_code"] = args[0]
-    # transaction_id
     if "transaction_id" not in out:
         for a in args:
             if isinstance(a, int):
                 out["transaction_id"] = a
                 break
-    # lang
     if "lang" not in out and len(args) >= 3 and isinstance(args[2], str):
         out["lang"] = args[2]
     if "lang" not in out and len(args) >= 2 and isinstance(args[1], str):

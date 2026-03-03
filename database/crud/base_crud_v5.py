@@ -8,11 +8,13 @@ database/crud/base_crud_v5.py
         from database.crud.base_crud import BaseCRUD
 """
 import warnings
+warnings.simplefilter("once", DeprecationWarning)  # اعرض مرة واحدة فقط
 
 from database.crud.base_crud import BaseCRUD
 
+# تحذير هاديء — يظهر فقط مرة واحدة لكل process
 warnings.warn(
-    "base_crud_v5 is deprecated. Import BaseCRUD from database.crud.base_crud directly.",
+    "base_crud_v5 is deprecated. Use: from database.crud.base_crud import BaseCRUD",
     DeprecationWarning,
     stacklevel=2,
 )

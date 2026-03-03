@@ -12,16 +12,7 @@ from PySide6.QtWidgets import (
 from core.base_dialog import BaseDialog
 
 
-class _NoHoverTable(QTableWidget):
-    """يمنع تحديد السطر بمجرد مرور الماوس فوق cellWidget."""
-    def mouseMoveEvent(self, event):
-        event.ignore()
-
-    def viewportEvent(self, event):
-        from PySide6.QtCore import QEvent
-        if event.type() == QEvent.Type.HoverMove:
-            return False
-        return super().viewportEvent(event)
+from ui.widgets.custom_table import _NoHoverTable
 from core.translator import TranslationManager
 
 if TYPE_CHECKING:

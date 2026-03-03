@@ -1,21 +1,39 @@
 # documents/builders/invoice.py
 from __future__ import annotations
 from typing import Dict, Any, List
-from decimal import Decimal
-
 from sqlalchemy import text
 from database.models import get_session_local
+from decimal import Decimal
+from documents.builders._shared import (
+    blankify, coalesce, dedup_preserve_order, join_with_and,
+    country_name   as _country_name,
+    company_obj    as _company_obj,
+    client_obj     as _client_obj,
+    get_bank_info,
+    tafqit_amount  as _tafqit_amount,
+    num_words      as _num_words,
+    unit_word      as _unit_word,
+    spell_non_monetary as _spell_non_monetary,
+    label_from_pricing_code,
+    compute_line_amount,
+    currency_info  as _currency_info,
+    delivery_method_name,
+    pick_dest_col  as _pick_dest_col,
+)
+_blankify  = blankify
+_coalesce  = coalesce
+_dedup_preserve_order = dedup_preserve_order
 
+# local helpers خاصة بـ invoice.py (تستخدم Decimal للدقة)
 def _money(x) -> Decimal:
     return Decimal(str(x or "0")).quantize(Decimal("0.000"))
 
 def _name(d: dict, lang: str) -> str:
-    return d.get({ "ar":"name_ar", "en":"name_en", "tr":"name_tr" }[lang]) or ""
+    return (d or {}).get({"ar": "name_ar", "en": "name_en", "tr": "name_tr"}.get(lang, "name_en")) or ""
 
 def _addr(d: dict, lang: str) -> str:
-    # بعض الجداول قد لا تحتوي address_tr مثلًا، فنعتمد address عند اللزوم
-    key = { "ar":"address_ar", "en":"address_en", "tr":"address_tr" }[lang]
-    return d.get(key) or d.get("address") or ""
+    key = {"ar": "address_ar", "en": "address_en", "tr": "address_tr"}.get(lang, "address_en")
+    return (d or {}).get(key) or (d or {}).get("address") or ""
 
 def _ensure(val, msg: str):
     if val in (None, "", 0):
@@ -91,33 +109,7 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         exp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
                         {"id": t["exporter_company_id"]}).mappings().first()
 
-        # جلب بيانات البنك من company_banks (البنك الأساسي)
-        def _get_bank_info(company_id):
-            if not company_id:
-                return ""
-            try:
-                banks = s.execute(text("""
-                    SELECT bank_name, branch, beneficiary_name, iban, swift_bic, account_number
-                    FROM company_banks
-                    WHERE company_id = :cid
-                    ORDER BY is_primary DESC, id ASC
-                    LIMIT 1
-                """), {"cid": int(company_id)}).mappings().all()
-                if banks:
-                    b = banks[0]
-                    lines = []
-                    if b.get("beneficiary_name"): lines.append(b["beneficiary_name"])
-                    if b.get("bank_name"):
-                        line = b["bank_name"]
-                        if b.get("branch"): line += f" — {b['branch']}"
-                        lines.append(line)
-                    if b.get("iban"):         lines.append(f"IBAN: {b['iban']}")
-                    if b.get("swift_bic"):    lines.append(f"SWIFT/BIC: {b['swift_bic']}")
-                    if b.get("account_number"): lines.append(f"A/C: {b['account_number']}")
-                    return "\n".join(lines)
-            except Exception:
-                pass
-            return ""
+        # get_bank_info from _shared
         _ensure(exp, "شركة المصدّر غير موجودة.")
         imp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
                         {"id": t["importer_company_id"]}).mappings().first()

@@ -17,7 +17,6 @@ from core.admin_columns import apply_admin_columns_to_table
 
 from database.crud.transactions_crud import TransactionsCRUD
 from database.models import get_session_local, User
-from sqlalchemy import func
 
 try:
     from database.models import Client, Company, Country, Currency
@@ -42,6 +41,17 @@ from datetime import date, timedelta
 
 
 class TransactionsTab(BaseTab):
+    # ثابت على مستوى الكلاس — لا يُعاد بناؤه عند كل render
+    _COL_WIDTHS = {
+        "transaction_no":         110,
+        "transaction_type_badge": 160,
+        "transaction_date":       110,
+        "client":                 160,
+        "exporting_company":      160,
+        "importing_company":      160,
+        "total_value":            120,
+    }
+
     required_permissions = {
         "view":    ["view_transactions"],
         "add":     ["add_transaction"],
@@ -70,8 +80,6 @@ class TransactionsTab(BaseTab):
                 {"label": "client",               "key": "client_name"},
                 {"label": "exporting_company",    "key": "exporter_name"},
                 {"label": "importing_company",    "key": "importer_name"},
-                {"label": "relationship_type",    "key": "relationship_label"},
-                {"label": "linked_entries_count", "key": "entries_count"},
                 {"label": "total_value",          "key": "totals_value_label"},
                 {"label": "actions",              "key": "actions"},
             ],
@@ -227,12 +235,14 @@ class TransactionsTab(BaseTab):
         type_lay.setSpacing(4)
 
         self._type_btns = {}
-        type_defs = [
-            ("", "🔍 " + self._("All")),
+        # تُعرَّف كـ lambda حتى يمكن إعادة استخدامها في retranslate_ui
+        self._type_defs = lambda: [
+            ("",        "🔍 " + self._("all_types")),
             ("export",  "📤 " + self._("export")),
             ("import",  "📥 " + self._("import")),
             ("transit", "🔄 " + self._("transit")),
         ]
+        type_defs = self._type_defs()
 
         def _style_type_btn(btn, active):
             if active:
@@ -286,9 +296,9 @@ class TransactionsTab(BaseTab):
         self._type_combo = QComboBox()
         self._type_combo.setVisible(False)
         self._type_combo.addItem("", "")
-        self._type_combo.addItem("export", "export")
-        self._type_combo.addItem("import", "import")
-        self._type_combo.addItem("transit", "transit")
+        self._type_combo.addItem(self._("export"), "export")
+        self._type_combo.addItem(self._("import"), "import")
+        self._type_combo.addItem(self._("transit"), "transit")
 
         outer.addStretch(1)
 
@@ -315,21 +325,29 @@ class TransactionsTab(BaseTab):
 
     def _preset_today(self):
         today = QDate.currentDate()
+        self._date_from.dateChanged.disconnect(self._on_filter_changed)
         self._date_from.setDate(today)
-        self._date_to.setDate(today)
+        self._date_from.dateChanged.connect(self._on_filter_changed)
+        self._date_to.setDate(today)  # هذا وحده يطلق reload_data
 
     def _preset_week(self):
         today = QDate.currentDate()
+        self._date_from.dateChanged.disconnect(self._on_filter_changed)
         self._date_from.setDate(today.addDays(-today.dayOfWeek() + 1))
+        self._date_from.dateChanged.connect(self._on_filter_changed)
         self._date_to.setDate(today)
 
     def _preset_month(self):
         today = QDate.currentDate()
+        self._date_from.dateChanged.disconnect(self._on_filter_changed)
         self._date_from.setDate(QDate(today.year(), today.month(), 1))
+        self._date_from.dateChanged.connect(self._on_filter_changed)
         self._date_to.setDate(today)
 
     def _preset_clear(self):
+        self._date_from.dateChanged.disconnect(self._on_filter_changed)
         self._date_from.setDate(QDate.currentDate().addMonths(-3))
+        self._date_from.dateChanged.connect(self._on_filter_changed)
         self._date_to.setDate(QDate.currentDate())
         self._type_combo.setCurrentIndex(0)
         if hasattr(self, "search_bar"):
@@ -381,7 +399,7 @@ class TransactionsTab(BaseTab):
             if isinstance(getattr(t, "updated_by_id",       None), int): updated_ids.add(t.updated_by_id)
 
         id_to_user = {}; id_to_client = {}; id_to_company = {}
-        id_to_currency = {}; entries_count = {}
+        id_to_currency = {}
 
         s = get_session_local()()
         try:
@@ -397,20 +415,10 @@ class TransactionsTab(BaseTab):
             if currency_ids and Currency:
                 for cid, code, sym in s.query(Currency.id, Currency.code, Currency.symbol).filter(Currency.id.in_(currency_ids)):
                     id_to_currency[cid] = {"code": code, "symbol": sym}
-            try:
-                from database.models.transaction import TransactionEntry
-                trx_ids = [getattr(t, "id") for t in items if getattr(t, "id", None)]
-                for tid, cnt in s.query(TransactionEntry.transaction_id, func.count(TransactionEntry.id)).filter(TransactionEntry.transaction_id.in_(trx_ids)).group_by(TransactionEntry.transaction_id):
-                    entries_count[int(tid)] = int(cnt)
-            except Exception:
-                pass
         finally:
             s.close()
 
         lang = TranslationManager.get_instance().get_current_language()
-        rel_map = {"direct": self._("direct"), "intermediary": self._("intermediary"),
-                   "by_request": self._("by_request"), "on_behalf": self._("on_behalf"),
-                   "via_broker": self._("via_broker")}
 
         def _pick(d):
             return d.get(lang) or d.get("en") or d.get("ar") or d.get("tr") or ""
@@ -436,8 +444,6 @@ class TransactionsTab(BaseTab):
                 "client_name":           client_name,
                 "exporter_name":         _pick(id_to_company.get(getattr(t, "exporter_company_id", None) or -1, {})),
                 "importer_name":         _pick(id_to_company.get(getattr(t, "importer_company_id", None) or -1, {})),
-                "relationship_label":    rel_map.get(str(getattr(t, "relationship_type", "") or ""), str(getattr(t, "relationship_type", "") or "")),
-                "entries_count":         entries_count.get(getattr(t, "id", 0), 0),
                 "totals_value_label":    tlbl,
                 "status":                trx_status,
                 "actions":               t,
@@ -465,9 +471,11 @@ class TransactionsTab(BaseTab):
         self.table.setRowCount(0)
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels([self._(c.get("label", "")) for c in self.columns])
-        can_edit   = has_perm(self.current_user, self.required_permissions.get("edit",   []))
-        can_delete = has_perm(self.current_user, self.required_permissions.get("delete", []))
+        # استخدام القيم المحسوبة مرة واحدة في __init__ — لا حاجة لإعادة الحساب
+        can_edit   = getattr(self, "can_edit",   False)
+        can_delete = getattr(self, "can_delete", False)
 
+        self._can_workflow = None  # يُحسب مرة واحدة داخل loop الصفوف
         for ri, row in enumerate(data):
             self.table.insertRow(ri)
             for ci, col in enumerate(self.columns):
@@ -488,9 +496,10 @@ class TransactionsTab(BaseTab):
                         al.addWidget(b)
 
                     # ── Workflow buttons ────────────────────────────────
-                    can_workflow = has_perm(self.current_user, "close_transaction") or is_admin(self.current_user)
+                    if getattr(self, "_can_workflow", None) is None:
+                        self._can_workflow = has_perm(self.current_user, "close_transaction") or is_admin(self.current_user)
 
-                    if can_workflow:
+                    if self._can_workflow:
                         if status == "draft":
                             b = QPushButton("▶ " + self._("activate"))
                             b.setObjectName("success-btn")
@@ -556,23 +565,12 @@ class TransactionsTab(BaseTab):
         except Exception: pass
 
         # ── ضبط عروض الأعمدة ────────────────────────────────────────────────
-        COL_WIDTHS = {
-            "transaction_no":          110,
-            "transaction_type_badge":  160,
-            "transaction_date":        110,
-            "client":                  160,
-            "exporting_company":       160,
-            "importing_company":       160,
-            "relationship_label":       90,
-            "linked_entries_count":     70,
-            "total_value":             120,
-        }
         hdr = self.table.horizontalHeader()
         from PySide6.QtWidgets import QHeaderView
         for ci, col in enumerate(self.columns):
             key = col.get("key", "")
             label = col.get("label", "")
-            w = COL_WIDTHS.get(key) or COL_WIDTHS.get(label)
+            w = self._COL_WIDTHS.get(key) or self._COL_WIDTHS.get(label)
             if w:
                 hdr.resizeSection(ci, w)
         # عمود الإجراءات: اجعل آخر عمود يمتد
@@ -713,6 +711,7 @@ class TransactionsTab(BaseTab):
         if not trx_id: return
         from database.models import get_session_local
         from database.models.transaction import Transaction, TransactionItem, TransactionEntry
+        from database.models.transport_details import TransportDetails
         from sqlalchemy.orm import Session
         from datetime import datetime
 
@@ -770,6 +769,27 @@ class TransactionsTab(BaseTab):
             for e in session.query(TransactionEntry).filter(TransactionEntry.transaction_id == trx_id).all():
                 session.add(TransactionEntry(transaction_id=new_trx.id, entry_id=e.entry_id))
 
+            # ── نسخ بيانات تبويب الشحن (TransportDetails) ──────────────────
+            orig_td = session.query(TransportDetails).filter(
+                TransportDetails.transaction_id == trx_id
+            ).first()
+            if orig_td and not orig_td.is_empty():
+                session.add(TransportDetails(
+                    transaction_id=new_trx.id,
+                    carrier_company_id=orig_td.carrier_company_id,
+                    truck_plate=orig_td.truck_plate,
+                    driver_name=orig_td.driver_name,
+                    loading_place=orig_td.loading_place,
+                    delivery_place=orig_td.delivery_place,
+                    origin_country=orig_td.origin_country,
+                    dest_country=orig_td.dest_country,
+                    shipment_date=orig_td.shipment_date,
+                    attached_documents=orig_td.attached_documents,
+                    certificate_no=orig_td.certificate_no,
+                    issuing_authority=orig_td.issuing_authority,
+                    certificate_date=orig_td.certificate_date,
+                ))
+
             session.commit()
             self._open_add_window(transaction=new_trx.id)
 
@@ -806,11 +826,7 @@ class TransactionsTab(BaseTab):
             # Get active date filter
             date_from = self._date_from.date().toPython() if hasattr(self, "_date_from") else None
             date_to   = self._date_to.date().toPython()   if hasattr(self, "_date_to")   else None
-            trx_type  = None
-            if hasattr(self, "_type_combo"):
-                v = self._type_combo.currentData()
-                if v and v != "all":
-                    trx_type = v
+            trx_type  = getattr(self, "_selected_type", None) or None
 
             svc = _ExcelSvc(lang=lang)
             svc.export_transactions(
@@ -976,6 +992,20 @@ class TransactionsTab(BaseTab):
                 idx = parent.indexOf(self)
                 if idx != -1: parent.setTabText(idx, self._("transactions"))
         except Exception: pass
+
+        # تحديث نصوص أزرار نوع المعاملة
+        if hasattr(self, "_type_btns") and hasattr(self, "_type_defs"):
+            for val, label in self._type_defs():
+                btn = self._type_btns.get(val)
+                if btn:
+                    btn.setText(label)
+
+        # تحديث الـ combo الاحتياطي
+        if hasattr(self, "_type_combo"):
+            self._type_combo.setItemText(1, self._("export"))
+            self._type_combo.setItemText(2, self._("import"))
+            self._type_combo.setItemText(3, self._("transit"))
+
         self._apply_columns_for_current_role()
         self.reload_data()
 
