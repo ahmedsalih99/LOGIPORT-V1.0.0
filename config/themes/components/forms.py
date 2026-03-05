@@ -126,34 +126,7 @@ def get_styles(theme):
         border-top-color: {c["primary"]};
     }}
 
-    QComboBox QAbstractItemView {{
-        background  : {c["bg_card"]};
-        color       : {c["text_primary"]};
-        border      : 1px solid {c["border"]};
-        border-radius: {BorderRadius.SM};
-        selection-background-color: {c["primary_light"]};
-        selection-color: {c["primary"]};
-        padding     : {Spacing.XS};
-        font-weight : 600;
-        outline     : none;
-    }}
-
-    QComboBox QAbstractItemView::item {{
-        padding      : {Spacing.XS} {Spacing.SM};
-        border-radius: {BorderRadius.SM};
-        min-height   : 28px;
-    }}
-
-    QComboBox QAbstractItemView::item:hover {{
-        background: {c["bg_hover"]};
-    }}
-
-    QComboBox QAbstractItemView::item:selected {{
-        background: {c["primary_light"]};
-        color     : {c["primary"]};
-    }}
-
-    /* ComboBox داخل الجداول — padding مضغوط */
+    QComboBox     /* ComboBox داخل الجداول — padding مضغوط */
     QTableWidget QComboBox,
     QTableView  QComboBox {{
         padding      : 2px 4px;

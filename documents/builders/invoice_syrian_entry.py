@@ -22,6 +22,7 @@ from documents.builders._shared import (
 _blankify  = blankify
 _coalesce  = coalesce
 _dedup_preserve_order = dedup_preserve_order
+_join_with_and = join_with_and
 
 # ------------------------- builder -------------------------
 

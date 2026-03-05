@@ -287,6 +287,8 @@ class LoginWindow(BaseDialog):
         """Change application language"""
         code = self.language_box.currentData()
         TranslationManager.get_instance().set_language(code)
+        # احفظ في SettingsManager حتى يبدأ MainWindow باللغة الصحيحة
+        SettingsManager.get_instance().set("language", code)
 
     def toggle_password_visibility(self, checked):
         """Toggle password visibility"""
@@ -328,6 +330,22 @@ class LoginWindow(BaseDialog):
         if user:
             self.user = user
             SettingsManager.get_instance().set("user", user)
+
+            # ── تحميل المكتب وتفعيل OfficeContext ──────────────────────────
+            try:
+                from core.office_context import OfficeContext
+                office_id = getattr(user, "office_id", None)
+                office    = getattr(user, "office", None)
+                # إذا كان office lazy-loaded، نحمّله الآن
+                if office_id and office is None:
+                    from database.crud.offices_crud import OfficesCRUD
+                    raw = OfficesCRUD().get_by_id(office_id)
+                    office = raw
+                OfficeContext.set(office_id, office)
+            except Exception as _oc_err:
+                import logging
+                logging.getLogger(__name__).warning(f"OfficeContext load failed: {_oc_err}")
+
             self.log_event(f"User login success: {username}")
             self.accept()
         else:

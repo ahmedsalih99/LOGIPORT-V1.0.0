@@ -57,6 +57,11 @@ _ICONS: dict[str, str] = {
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>""",
 
+    "bell": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>""",
+
     "logout": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
         <polyline points="16 17 21 12 16 7"/>
@@ -158,13 +163,27 @@ _ICONS: dict[str, str] = {
 
 # fallback text للـ SVG إذا QtSvg غير متوفر
 _FALLBACK_TEXT: dict[str, str] = {
-    "settings": "⚙",
-    "language": "⊕",
-    "theme":    "◑",
-    "info":     "i",
-    "search":   "⌕",
-    "logout":   "→",
-    "user":     "◉",
+    "settings":          "⚙",
+    "language":          "⊕",
+    "theme":             "◑",
+    "info":              "i",
+    "search":            "⌕",
+    "logout":            "→",
+    "user":              "◉",
+    # sidebar tabs
+    "dashboard":         "⊞",
+    "materials":         "▣",
+    "clients":           "◎",
+    "companies":         "⊟",
+    "pricing":           "$",
+    "entries":           "≡",
+    "transactions":      "⇄",
+    "documents":         "▤",
+    "values":            "◈",
+    "audit_trail":       "◷",
+    "control_panel":     "⚙",
+    "users_permissions": "◉",
+    "menu_burger":       "≡",
 }
 
 
@@ -251,15 +270,17 @@ def refresh_icons(topbar) -> None:
 
 
 def get_sidebar_icon(key: str, size: int = 20, color: str | None = None) -> QIcon:
-    """يُعيد QIcon لزر السايدبار حسب مفتاح التبويب."""
-    return get_icon(key, size, color)
+    """يُعيد QIcon لزر السايدبار — أبيض دائماً لأن خلفية السايدبار دائماً داكنة."""
+    # يجب استخدام hex وليس rgba — SVG لا يفهم rgba في stroke attribute
+    sidebar_icon_color = color or "#FFFFFF"
+    return get_icon(key, size, sidebar_icon_color)
 
 
 def refresh_sidebar_icons(sidebar) -> None:
-    """يُعيد رسم أيقونات السايدبار بالألوان الجديدة — استدعِها عند تغيير الـ theme."""
+    """يُعيد رسم أيقونات السايدبار — أبيض دائماً."""
     if not hasattr(sidebar, "buttons"):
         return
-    color = _get_icon_color()
+    color = "#FFFFFF"  # hex — SVG لا يقبل rgba في stroke
     btn_height = max(32, getattr(sidebar, "expanded_width", 210) * 16 // 100)
     icon_size = max(18, int(btn_height * 0.6))
     for key, btn in sidebar.buttons.items():

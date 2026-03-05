@@ -1,11 +1,4 @@
-"""
-TopBar Component Styles - Clean Modern
-=======================================
-إصلاح: على الـ light theme كانت الخلفية glass على أبيض = مش مرئي
-الحل: خلفية صلبة واضحة مع shadow خفيف تحت
-"""
-
-from ..spacing import Spacing
+"""TopBar Component Styles"""
 from ..border_radius import BorderRadius
 
 
@@ -13,100 +6,113 @@ def get_styles(theme):
     c = theme.colors
     s = theme.sizes
 
-    # نحدد إذا dark أو light للتعامل مع الـ topbar بشكل مختلف
-    is_dark = c.get("bg_main", "#fff").startswith("#1") or c.get("bg_main", "#fff").startswith("#0")
-
     return f"""
-    /* ========== TOPBAR ========== */
-
+    /* ── CONTAINER ── */
     QWidget#TopBar {{
-        background  : {c["bg_topbar"]};
+        background   : {c["bg_topbar"]};
         border-bottom: 1px solid {c["border_subtle"]};
     }}
 
-    /* ========== TOPBAR BUTTONS ========== */
+    /* ── TOOL BUTTONS ── */
+    QPushButton#topbar-tool-btn {{
+        min-width    : 32px; max-width: 32px;
+        min-height   : 32px; max-height: 32px;
+        background   : transparent;
+        border       : none;
+        border-radius: 8px;
+        padding      : 0;
+    }}
+    QPushButton#topbar-tool-btn:hover  {{ background: {c["bg_hover"]};    }}
+    QPushButton#topbar-tool-btn:pressed{{ background: {c["primary_light"]}; }}
 
-    QPushButton#topbar-btn {{
-        min-height  : 34px;
-        background  : {c["bg_hover"]};
-        border      : 1px solid {c["border"]};
-        border-radius: {BorderRadius.MD};
-        padding     : 5px 14px;
+    /* ── LANGUAGE ── */
+    QPushButton#topbar-lang-btn {{
+        min-height  : 26px; max-height: 26px;
+        min-width   : 30px;
+        padding     : 0 8px;
+        background  : transparent;
+        border      : none;
+        border-radius: 6px;
         color       : {c["topbar_text"]};
-        font-weight : 500;
         font-size   : {s["sm"]}px;
-    }}
-
-    QPushButton#topbar-btn:hover {{
-        background  : {c["bg_active"]};
-        border-color: {c["border_hover"]};
-        color       : {c["primary"]};
-    }}
-
-    QPushButton#topbar-btn:pressed {{
-        background  : {c["primary_light"]};
-        border-color: {c["primary"]};
-    }}
-
-    /* ========== CLOCK ========== */
-
-    QLabel#topbar-clock {{
-        min-height  : 34px;
-        padding     : 5px 14px;
-        background  : {c["primary_light"]};
-        border      : 1px solid {c["border"]};
-        border-radius: {BorderRadius.MD};
-        color       : {c["primary"]};
-        font-size   : {s["md"]}px;
         font-weight : 700;
     }}
+    QPushButton#topbar-lang-btn:hover {{ background: {c["bg_hover"]}; color: {c["primary"]}; }}
 
-    /* ========== USER BOX ========== */
-
-    QWidget#topbar-user-box {{
-        min-height  : 34px;
-        background  : {c["bg_hover"]};
-        border      : 1px solid {c["border"]};
-        border-radius: {BorderRadius.LG};
-        padding     : 4px 12px;
+    /* ── SEARCH BAR ── */
+    QPushButton#topbar-search-bar {{
+        min-height   : 34px; max-height: 34px;
+        padding      : 0 14px;
+        background   : {c["bg_hover"]};
+        border       : 1px solid {c["border"]};
+        border-radius: 17px;
+        color        : {c["text_muted"]};
+        font-size    : {s["sm"]}px;
+        text-align   : right;
     }}
-
-    QLabel#topbar-username {{
-        font-size   : {s["sm"]}px;
-        font-weight : 600;
-        color       : {c["topbar_text"]};
-        padding     : 0 6px;
-    }}
-
-    QLabel#topbar-user-pic {{
-        min-width   : 22px;
-        min-height  : 22px;
-        font-size   : {s["lg"]}px;
-        text-align  : center;
-    }}
-
-    /* ── Icon-only topbar buttons ── */
-
-    QPushButton#topbar-btn-icon {{
-        min-width   : 34px;
-        min-height  : 34px;
-        max-width   : 34px;
-        max-height  : 34px;
-        background  : {c["bg_hover"]};
-        border      : 1px solid {c["border"]};
-        border-radius: {BorderRadius.MD};
-        padding     : 0;
-        color       : {c["topbar_icon"]};
-    }}
-
-    QPushButton#topbar-btn-icon:hover {{
+    QPushButton#topbar-search-bar:hover {{
         background  : {c["bg_active"]};
-        border-color: {c["border_hover"]};
-        color       : {c["primary"]};
+        border-color: {c["primary"]};
     }}
 
-    QPushButton#topbar-btn-icon:pressed {{
-        background  : {c["primary_light"]};
-        border-color: {c["primary"]};
+    /* ── CLOCK ── */
+    QLabel#topbar-clock {{
+        background : transparent;
+        border     : none;
+        color      : {c["text_secondary"]};
+        font-size  : {s["base"]}px;
+        font-weight: 600;
+        padding    : 0 6px;
+        min-width  : 44px;
+    }}
+
+    /* ── SEPARATOR ── */
+    QFrame#topbar-sep {{
+        background : {c["border_subtle"]};
+        border     : none;
+        max-width  : 1px; min-width: 1px;
+        min-height : 18px; max-height: 18px;
+        margin     : 0 3px;
+    }}
+
+    /* ── USER CHIP (QFrame) ── */
+    QFrame#topbar-user-chip {{
+        background   : transparent;
+        border       : none;
+        border-radius: 18px;
+    }}
+    QFrame#topbar-user-chip:hover {{
+        background: {c["bg_hover"]};
+    }}
+
+    /* اسم المستخدم داخل الـ chip */
+    QLabel#topbar-username-lbl {{
+        background : transparent;
+        color      : {c["topbar_text"]};
+        font-size  : {s["sm"]}px;
+        font-weight: 600;
+    }}
+
+    /* ── backward compat ── */
+    QPushButton#topbar-btn      {{ background: transparent; border: none; color: {c["topbar_text"]}; padding: 0 8px; min-height: 32px; }}
+    QPushButton#topbar-btn-icon {{ background: transparent; border: none; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; }}
+    QPushButton#topbar-user-widget {{ background: transparent; border: none; border-radius: 18px; min-height: 36px; }}
+    QPushButton#topbar-user-widget:hover {{ background: {c["bg_hover"]}; }}
+    """
+
+
+def office_badge_style(c: dict, s: dict) -> str:
+    """CSS badge المكتب في TopBar."""
+    return f"""
+    #topbar-office-badge {{
+        background-color: {c["primary"]}18;
+        border: 1px solid {c["primary"]}40;
+        border-radius: 12px;
+        padding: 0 6px;
+    }}
+    #topbar-office-lbl {{
+        color: {c["primary"]};
+        font-size: {s["sm"]}px;
+        font-weight: 600;
     }}
     """

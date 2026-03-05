@@ -20,6 +20,7 @@ from .entry import Entry
 from .entry_item import EntryItem
 from .transaction import Transaction
 from .transport_details import TransportDetails
+from .office import Office
 
 # ---- Optional/where-available models ------------------------------------
 # TransactionItem قد يكون في ملف مستقل أو ضمن transaction.py
@@ -58,6 +59,7 @@ __all__ = [
     "RolePermission", "AuditLog", "Material", "Client", "ClientContact", "Company",
     "PricingType", "DeliveryMethod", "Pricing", "Entry", "EntryItem", "Transaction",
     # optional
+    "Office",
     "TransactionItem", "TransactionItems", "DocumentGroup", "DocumentType", "Document", "DocumentTemplate",
 ]
 

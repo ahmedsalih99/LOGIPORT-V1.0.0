@@ -37,6 +37,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
+
+# فونت bold مشترك لخلايا الجدول
+_BOLD_ITEM_FONT = QFont()
+_BOLD_ITEM_FONT.setBold(True)
 from datetime import date, timedelta
 
 
@@ -308,6 +312,35 @@ class TransactionsTab(BaseTab):
         self._count_lbl.setStyleSheet("font-size: 11px; color: #6B7280; padding: 0 4px;")
         outer.addWidget(self._count_lbl)
 
+        # ── فلتر المكتب ─────────────────────────────────────────────────
+        try:
+            from core.office_context import OfficeContext
+            _has_office = OfficeContext.get_id() is not None
+        except Exception:
+            _has_office = False
+
+        if _has_office:
+            vsep2 = QFrame()
+            vsep2.setFrameShape(QFrame.VLine)
+            vsep2.setObjectName("separator")
+            vsep2.setFixedHeight(28)
+            outer.addWidget(vsep2)
+
+            self._my_office_btn = QPushButton()
+            self._my_office_btn.setFixedHeight(30)
+            self._my_office_btn.setCursor(Qt.PointingHandCursor)
+            self._my_office_btn.setCheckable(True)
+            # افتراضي: مكتبي فقط — ما عدا Admin يرى الكل دائماً
+            _default_my_office = not is_admin(self.current_user)
+            self._office_filter_active = _default_my_office
+            self._my_office_btn.setChecked(_default_my_office)
+            self._refresh_office_btn_text()
+            self._my_office_btn.toggled.connect(self._on_office_filter_toggled)
+            outer.addWidget(self._my_office_btn)
+        else:
+            self._my_office_btn = None
+            self._office_filter_active = False
+
         # ── تصدير Excel ─────────────────────────────────────────────────
         btn_rich = QPushButton("📊  " + self._("export_to_excel_rich"))
         btn_rich.setObjectName("secondary-btn")
@@ -359,20 +392,28 @@ class TransactionsTab(BaseTab):
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _get_filter_values(self):
-        """Return (date_from_str, date_to_str, trx_type_str, search, status_str)."""
+        """Return (date_from_str, date_to_str, trx_type_str, search, status_str, office_id)."""
         d_from  = self._date_from.date().toString("yyyy-MM-dd") if hasattr(self, "_date_from")    else None
         d_to    = self._date_to.date().toString("yyyy-MM-dd")   if hasattr(self, "_date_to")      else None
         t_type  = getattr(self, "_selected_type", "") or (self._type_combo.currentData() if hasattr(self, "_type_combo") else "")
         status  = self._status_combo.currentData()              if hasattr(self, "_status_combo") else ""
         search  = self.search_bar.text().strip().lower()        if hasattr(self, "search_bar")    else ""
-        return d_from, d_to, t_type or None, search, status or None
+        # office filter — Admin يرى الكل دائماً بغض النظر عن الزر
+        office_id = None
+        if getattr(self, "_office_filter_active", False) and not is_admin(self.current_user):
+            try:
+                from core.office_context import OfficeContext
+                office_id = OfficeContext.get_id()
+            except Exception:
+                pass
+        return d_from, d_to, t_type or None, search, status or None, office_id
 
     # ── Data ──────────────────────────────────────────────────────────
 
     def reload_data(self):
         self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
         self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
-        d_from, d_to, t_type, search, status = self._get_filter_values()
+        d_from, d_to, t_type, search, status, office_id = self._get_filter_values()
         admin = is_admin(self.current_user)
 
         # كل الفلاتر server-side الآن
@@ -384,6 +425,7 @@ class TransactionsTab(BaseTab):
                 transaction_type=t_type or None,
                 search=search or None,
                 status=status or None,
+                office_id=office_id,
             ) or []
         except TypeError:
             items = self.trx_crud.list_transactions(limit=1000) or []
@@ -468,118 +510,127 @@ class TransactionsTab(BaseTab):
         self.render_table(self.data, show_actions=bool(self.can_edit or self.can_delete))
 
     def render_table(self, data, show_actions=True):
-        self.table.setRowCount(0)
-        self.table.setColumnCount(len(self.columns))
-        self.table.setHorizontalHeaderLabels([self._(c.get("label", "")) for c in self.columns])
-        # استخدام القيم المحسوبة مرة واحدة في __init__ — لا حاجة لإعادة الحساب
-        can_edit   = getattr(self, "can_edit",   False)
-        can_delete = getattr(self, "can_delete", False)
-
-        self._can_workflow = None  # يُحسب مرة واحدة داخل loop الصفوف
-        for ri, row in enumerate(data):
-            self.table.insertRow(ri)
-            for ci, col in enumerate(self.columns):
-                key = col.get("key")
-                if key == "actions":
-                    if not show_actions: continue
-                    obj    = row["actions"]
-                    status = str(row.get("status", "active") or "active")
-                    al = QHBoxLayout(); al.setContentsMargins(4, 2, 4, 2); al.setSpacing(4)
-
-                    # ── Edit (مسموح فقط للمسودة والنشطة) ─────────────
-                    if can_edit and status in ("draft", "active"):
-                        b = QPushButton(self._("edit"))
-                        b.setObjectName("primary-btn")
-                        b.setFixedHeight(28)
-                        b.setCursor(Qt.PointingHandCursor)
-                        b.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        al.addWidget(b)
-
-                    # ── Workflow buttons ────────────────────────────────
-                    if getattr(self, "_can_workflow", None) is None:
-                        self._can_workflow = has_perm(self.current_user, "close_transaction") or is_admin(self.current_user)
-
-                    if self._can_workflow:
-                        if status == "draft":
-                            b = QPushButton("▶ " + self._("activate"))
-                            b.setObjectName("success-btn")
-                            b.setFixedHeight(28)
-                            b.setCursor(Qt.PointingHandCursor)
-                            b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
-                            al.addWidget(b)
-                        elif status == "active":
-                            b = QPushButton("🔒 " + self._("close"))
-                            b.setObjectName("warning-btn")
-                            b.setFixedHeight(28)
-                            b.setCursor(Qt.PointingHandCursor)
-                            b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "closed"))
-                            al.addWidget(b)
-                        elif status == "closed":
-                            b_reopen = QPushButton("🔓 " + self._("reopen"))
-                            b_reopen.setObjectName("secondary-btn")
-                            b_reopen.setFixedHeight(28)
-                            b_reopen.setCursor(Qt.PointingHandCursor)
-                            b_reopen.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
-                            al.addWidget(b_reopen)
-                            b_arch = QPushButton("📦 " + self._("archive"))
-                            b_arch.setObjectName("muted-btn")
-                            b_arch.setFixedHeight(28)
-                            b_arch.setCursor(Qt.PointingHandCursor)
-                            b_arch.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "archived"))
-                            al.addWidget(b_arch)
-
-                    # ── Delete ──────────────────────────────────────────
-                    if can_delete and status not in ("closed", "archived"):
-                        b = QPushButton(self._("delete"))
-                        b.setObjectName("danger-btn")
-                        b.setFixedHeight(28)
-                        b.setCursor(Qt.PointingHandCursor)
-                        b.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        al.addWidget(b)
-
-                    w = QWidget(); w.setLayout(al)
-                    self.table.setCellWidget(ri, ci, w)
-                elif key == "transaction_type_badge":
-                    code   = str(row.get("transaction_type_badge", ""))
-                    label  = str(row.get("transaction_type_label", code))
-                    status = str(row.get("status", "active") or "active")
-                    type_badge   = self._make_type_badge(code, label)
-                    status_badge = self._make_status_badge(status)
-                    container = QWidget()
-                    cl = QHBoxLayout(container)
-                    cl.setContentsMargins(4, 2, 4, 2)
-                    cl.setSpacing(4)
-                    cl.addStretch()
-                    cl.addWidget(type_badge)
-                    cl.addWidget(status_badge)
-                    cl.addStretch()
-                    self.table.setCellWidget(ri, ci, container)
-                else:
-                    item = QTableWidgetItem(str(row.get(key, "")))
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(ri, ci, item)
-
-        try:
-            ai = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
-            if ai is not None: self.table.setColumnHidden(ai, not show_actions)
-        except Exception: pass
-
-        # ── ضبط عروض الأعمدة ────────────────────────────────────────────────
         hdr = self.table.horizontalHeader()
         from PySide6.QtWidgets import QHeaderView
-        for ci, col in enumerate(self.columns):
-            key = col.get("key", "")
-            label = col.get("label", "")
-            w = self._COL_WIDTHS.get(key) or self._COL_WIDTHS.get(label)
-            if w:
-                hdr.resizeSection(ci, w)
-        # عمود الإجراءات: اجعل آخر عمود يمتد
+
+        # ── تجميد الرسم أثناء التحميل — يمنع redraw مع كل صف ──────────
+        self.table.setSortingEnabled(False)
+        self.table.setUpdatesEnabled(False)
         try:
-            if show_actions and ai is not None:
+            self.table.setColumnCount(len(self.columns))
+            self.table.setHorizontalHeaderLabels([self._(c.get("label", "")) for c in self.columns])
+            self.table.setRowCount(len(data))
+
+            can_edit   = getattr(self, "can_edit",   False)
+            can_delete = getattr(self, "can_delete", False)
+            can_wf     = has_perm(self.current_user, "close_transaction") or is_admin(self.current_user)
+
+            for ri, row in enumerate(data):
+                status = str(row.get("status", "active") or "active")
+                obj    = row.get("actions")
+
+                for ci, col in enumerate(self.columns):
+                    key = col.get("key")
+
+                    if key == "actions":
+                        if not show_actions:
+                            continue
+                        al = QHBoxLayout()
+                        al.setContentsMargins(4, 2, 4, 2)
+                        al.setSpacing(4)
+
+                        if can_edit and status in ("draft", "active"):
+                            b = QPushButton(self._("edit"))
+                            b.setObjectName("primary-btn")
+                            b.setFixedHeight(28)
+                            b.setCursor(Qt.PointingHandCursor)
+                            b.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
+                            al.addWidget(b)
+
+                        if can_wf:
+                            if status == "draft":
+                                b = QPushButton("▶ " + self._("activate"))
+                                b.setObjectName("success-btn")
+                                b.setFixedHeight(28)
+                                b.setCursor(Qt.PointingHandCursor)
+                                b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
+                                al.addWidget(b)
+                            elif status == "active":
+                                b = QPushButton("🔒 " + self._("close"))
+                                b.setObjectName("warning-btn")
+                                b.setFixedHeight(28)
+                                b.setCursor(Qt.PointingHandCursor)
+                                b.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "closed"))
+                                al.addWidget(b)
+                            elif status == "closed":
+                                b_reopen = QPushButton("🔓 " + self._("reopen"))
+                                b_reopen.setObjectName("secondary-btn")
+                                b_reopen.setFixedHeight(28)
+                                b_reopen.setCursor(Qt.PointingHandCursor)
+                                b_reopen.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "active"))
+                                al.addWidget(b_reopen)
+                                b_arch = QPushButton("📦 " + self._("archive"))
+                                b_arch.setObjectName("muted-btn")
+                                b_arch.setFixedHeight(28)
+                                b_arch.setCursor(Qt.PointingHandCursor)
+                                b_arch.clicked.connect(lambda _=False, o=obj: self._workflow_action(o, "archived"))
+                                al.addWidget(b_arch)
+
+                        if can_delete and status not in ("closed", "archived"):
+                            b = QPushButton(self._("delete"))
+                            b.setObjectName("danger-btn")
+                            b.setFixedHeight(28)
+                            b.setCursor(Qt.PointingHandCursor)
+                            b.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
+                            al.addWidget(b)
+
+                        w = QWidget()
+                        w.setLayout(al)
+                        self.table.setCellWidget(ri, ci, w)
+
+                    elif key == "transaction_type_badge":
+                        # ✅ نص + لون بـ QTableWidgetItem بدل setCellWidget (أسرع بكثير)
+                        code   = str(row.get("transaction_type_badge", ""))
+                        label  = str(row.get("transaction_type_label", code))
+                        status_label = self._(status) if status else ""
+                        item = QTableWidgetItem(f"{label}  |  {status_label}")
+                        item.setTextAlignment(Qt.AlignCenter)
+                        # لون الخلفية حسب النوع والحالة
+                        from PySide6.QtGui import QColor, QBrush
+                        bg = {"export": "#E8F5E9", "import": "#E3F2FD", "transit": "#FFF8E1"}.get(code, "#F5F5F5")
+                        if status == "closed":    bg = "#ECEFF1"
+                        elif status == "archived": bg = "#F3E5F5"
+                        elif status == "draft":    bg = "#FFF9C4"
+                        item.setBackground(QBrush(QColor(bg)))
+                        item.setFont(_BOLD_ITEM_FONT)
+                        self.table.setItem(ri, ci, item)
+
+                    else:
+                        item = QTableWidgetItem(str(row.get(key, "") or ""))
+                        item.setTextAlignment(Qt.AlignCenter)
+                        item.setFont(_BOLD_ITEM_FONT)
+                        self.table.setItem(ri, ci, item)
+
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.setSortingEnabled(True)
+
+        # ── إخفاء/إظهار عمود actions ────────────────────────────────────
+        try:
+            ai = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
+            if ai is not None:
+                self.table.setColumnHidden(ai, not show_actions)
                 hdr.setSectionResizeMode(ai, QHeaderView.Fixed)
                 hdr.resizeSection(ai, 220)
         except Exception:
             pass
+
+        # ── عروض الأعمدة ────────────────────────────────────────────────
+        for ci, col in enumerate(self.columns):
+            key = col.get("key", "")
+            w = self._COL_WIDTHS.get(key) or self._COL_WIDTHS.get(col.get("label", ""))
+            if w:
+                hdr.resizeSection(ci, w)
 
         self._apply_admin_columns()
         self.update_pagination_label()

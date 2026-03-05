@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from core.translator import TranslationManager
 from database.crud.permissions_crud import RolesCRUD
+from database.crud.offices_crud import OfficesCRUD
 
 
 from utils.password_utils import password_strength as _password_strength
@@ -31,6 +32,7 @@ class UserDialog(BaseDialog):
         self.init_ui()
         self.retranslate_ui()
         self.load_roles()
+        self.load_offices()
         self.load_user_data()
         TranslationManager.get_instance().language_changed.connect(self.on_language_change)
 
@@ -93,6 +95,12 @@ class UserDialog(BaseDialog):
         self.combo_role.setObjectName("form-input")
         _field_row(self.lbl_role, self.combo_role)
 
+        # Office
+        self.lbl_office = QLabel()
+        self.combo_office = QComboBox()
+        self.combo_office.setObjectName("form-input")
+        _field_row(self.lbl_office, self.combo_office)
+
         # Active checkbox
         self.chk_active = QCheckBox()
         self.chk_active.setChecked(True)
@@ -141,6 +149,18 @@ class UserDialog(BaseDialog):
         for role in self.roles:
             self.combo_role.addItem(role["label"], role["id"])
 
+    def load_offices(self):
+        lang = TranslationManager.get_instance().get_current_language()
+        self.combo_office.clear()
+        self.combo_office.addItem("— " + self._("no_office") + " —", None)
+        try:
+            offices = OfficesCRUD().get_all(active_only=True, language=lang) or []
+            for o in offices:
+                label = o.get("name", o.get("name_ar", "")) or o.get("code", "")
+                self.combo_office.addItem(label, o.get("id"))
+        except Exception:
+            pass
+
     def load_user_data(self):
         is_edit = bool(self.user.get("username"))
         if is_edit:
@@ -157,6 +177,12 @@ class UserDialog(BaseDialog):
                 idx = self.combo_role.findData(role_id)
                 if idx >= 0:
                     self.combo_role.setCurrentIndex(idx)
+            # office
+            office_id = self.user.get("office_id")
+            if office_id:
+                idx = self.combo_office.findData(office_id)
+                if idx >= 0:
+                    self.combo_office.setCurrentIndex(idx)
         else:
             self.edit_username.setReadOnly(False)
             for w in (self.edit_username, self.edit_fullname,
@@ -174,6 +200,7 @@ class UserDialog(BaseDialog):
         )
         self.lbl_confirm.setText(self._("confirm_password"))
         self.lbl_role.setText(self._("role"))
+        self.lbl_office.setText(self._("office"))
         self.chk_active.setText(self._("active"))
         self.btn_save.setText(self._("save"))
         self.btn_cancel.setText(self._("cancel"))
@@ -181,6 +208,7 @@ class UserDialog(BaseDialog):
     def on_language_change(self):
         self.retranslate_ui()
         self.load_roles()
+        self.load_offices()
         self.load_user_data()
 
     def get_data(self):
@@ -190,6 +218,7 @@ class UserDialog(BaseDialog):
             "password":  self.edit_password.text(),
             "role":      self.combo_role.currentData(),
             "is_active": self.chk_active.isChecked(),
+            "office_id": self.combo_office.currentData(),
         }
 
     def accept(self):

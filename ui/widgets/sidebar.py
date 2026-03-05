@@ -22,17 +22,18 @@ from core.paths import resource_path
 from ui.utils.svg_icons import get_sidebar_icon, refresh_sidebar_icons, get_icon, QSize as _QSize
 
 ICON_PATHS = {
-    "dashboard": "icons/dashboard.png",
-    "materials": "icons/materials.png",
-    "clients": "icons/clients.png",
-    "companies": "icons/companies.png",
-    "pricing": "icons/pricing.png",
-    "entries": "icons/entries.png",
-    "transactions": "icons/transactions.png",
-    "documents": "icons/documents.png",
-    "values": "icons/values.png",
-    "audit_trail": "icons/audit_trail.png",
-    "control_panel": "icons/settings.png",
+    "dashboard":         "icons/dashboard.png",
+    "materials":         "icons/materials.png",
+    "clients":           "icons/clients.png",
+    "companies":         "icons/companies.png",
+    "pricing":           "icons/pricing.png",
+    "entries":           "icons/entries.png",
+    "transactions":      "icons/transactions.png",
+    "documents":         "icons/documents.png",
+    "values":            "icons/values.png",
+    "offices":           "icons/settings.png",      # offices tab — يستخدم settings icon مؤقتاً
+    "audit_trail":       "icons/audit_trail.png",
+    "control_panel":     "icons/settings.png",
     "users_permissions": "icons/users.png",
 }
 
@@ -60,6 +61,8 @@ class Sidebar(QFrame):
         self.expanded = True
         self.setMinimumWidth(self.expanded_width)
         self.setMaximumWidth(self.expanded_width)
+        # يمتد لكامل ارتفاع النافذة
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
         # لياوت رئيسي
         self.main_layout = QVBoxLayout(self)
@@ -72,10 +75,10 @@ class Sidebar(QFrame):
         # شعـار + اسم
         self._build_header()
 
-        # الأزرار حسب الصلاحيات
-        self.main_layout.addStretch(1)   # مسافة مرنة فوق الأزرار
+        # الأزرار تبدأ مباشرة بعد الهيدر
+        self.main_layout.addSpacing(4)
         self._build_buttons_from_permissions()
-        self.main_layout.addStretch(1)   # مسافة مرنة تحت الأزرار
+        self.main_layout.addStretch(1)   # مسافة مرنة تحت فقط
 
         self._build_footer_toggle()
 
@@ -123,57 +126,42 @@ class Sidebar(QFrame):
     # ==================== UI Parts ====================
 
     def _build_header(self):
-        """Build logo and app name header"""
-
+        """Logo (أيقونة) فوق + اسم التطبيق تحته — عمودي مريح"""
         self.logo_box = QFrame(self)
         self.logo_box.setObjectName("SidebarLogoBox")
-
-        # ✅ Logo box height proportional
-        logo_height = max(60, int(self.expanded_width * 0.35))  # 35% of width
-        self.logo_box.setFixedHeight(logo_height)
+        self.logo_box.setFixedHeight(80)
 
         logo_layout = QVBoxLayout(self.logo_box)
-
-        # ✅ Margins proportional
-        margin_top = max(8, int(logo_height * 0.15))  # 15% of logo box height
-        logo_layout.setContentsMargins(0, margin_top, 0, 0)
-        logo_layout.setSpacing(2)
+        logo_layout.setContentsMargins(0, 10, 0, 10)
+        logo_layout.setSpacing(4)
+        logo_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
         # Logo image
         self.logo_img = QLabel()
         self.logo_img.setObjectName("sidebar-logo-img")
         pix = QPixmap(resource_path("icons", "logo.png"))
-
-        # ✅ Logo size proportional
-        logo_img_size = max(40, int(self.expanded_width * 0.23))  # 23% of width
-
         if not pix.isNull():
             self.logo_img.setPixmap(
-                pix.scaled(
-                    logo_img_size, logo_img_size,
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation
-                )
+                pix.scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
-        self.logo_img.setAlignment(Qt.AlignHCenter)
-        logo_layout.addWidget(self.logo_img)
+        self.logo_img.setFixedSize(36, 36)
+        self.logo_img.setAlignment(Qt.AlignCenter)
+        logo_layout.addWidget(self.logo_img, 0, Qt.AlignHCenter)
 
         # App name
         self.logo_label = QLabel(self._("app_name"))
         self.logo_label.setObjectName("sidebar-app-name")
-        self.logo_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        logo_layout.addWidget(self.logo_label)
+        self.logo_label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        logo_layout.addWidget(self.logo_label, 0, Qt.AlignHCenter)
 
         self.main_layout.addWidget(self.logo_box)
 
         # Separator
-        self.main_layout.addSpacing(6)
         line = QFrame()
         line.setObjectName("sidebar-separator")
         line.setFrameShape(QFrame.HLine)
         line.setFixedHeight(1)
         self.main_layout.addWidget(line)
-        self.main_layout.addSpacing(5)
 
     def _build_footer_toggle(self):
         """Build toggle button at bottom"""
@@ -240,6 +228,7 @@ class Sidebar(QFrame):
 
         lang = self.settings.get("language", "ar")
         is_rtl = (lang == "ar")
+        # ✅ setLayoutDirection على الزر الفردي فقط (ليس على الـ Sidebar container)
         btn.setLayoutDirection(Qt.RightToLeft if is_rtl else Qt.LeftToRight)
         btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
@@ -305,10 +294,14 @@ class Sidebar(QFrame):
 
             if self.expanded:
                 btn.setText(label)
+                # ✅ setLayoutDirection على الزر الفردي فقط (ليس على الـ Sidebar)
+                # هذا يُحرّك الأيقونة ليمين والنص ليساره عند RTL
+                # بدون أن يُعكس الـ Sidebar container نفسه
                 btn.setLayoutDirection(Qt.RightToLeft if is_rtl else Qt.LeftToRight)
                 btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             else:
                 btn.setText("")
+                btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
 
             # ✅ Icon size stays proportional
             btn_height = btn.minimumHeight()
@@ -338,9 +331,11 @@ class Sidebar(QFrame):
             for key, btn in self.buttons.items():
                 btn.setToolTip(self._(key))
 
-        # Update layout direction
-        lang = self.settings.get("language", "ar")
-        self.setLayoutDirection(Qt.RightToLeft if lang == "ar" else Qt.LeftToRight)
+        # *** لا نستخدم self.setLayoutDirection هنا ***
+        # سبب المشكلة: setLayoutDirection(RTL) على الـ Sidebar يعكس ترتيب
+        # icon+text داخل كل QToolButton، فتظهر الأيقونة بعد النص أو تختفي.
+        # موضع الـ Sidebar (يمين/يسار) يُتحكم به حصراً من _reposition_sidebar()
+        # في MainWindow. محتوى الأزرار الداخلي (نص RTL) يُضبط بـ _apply_expand_state_to_buttons
 
         self._apply_expand_state_to_buttons()
 

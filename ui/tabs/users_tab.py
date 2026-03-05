@@ -179,6 +179,7 @@ class UsersTab(BaseTab):
                 password=data["password"],
                 full_name=data.get("full_name"),
                 role_id=data.get("role"),
+                office_id=data.get("office_id"),
                 is_active=True,
                 user_id=self._user_id(),
             )
@@ -225,6 +226,8 @@ class UsersTab(BaseTab):
                 update_data["role_id"] = data["role"]
             if data.get("password"):
                 update_data["password"] = data["password"]
+            # office_id — None يعني "بدون مكتب" وهو تحديث صالح
+            update_data["office_id"] = data.get("office_id")
 
             self.users_crud.update_user(
                 user.get("id") if isinstance(user, dict) else user.id,

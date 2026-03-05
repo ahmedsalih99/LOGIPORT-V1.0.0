@@ -40,9 +40,10 @@ _TAB_IMPORT_MAP = {
     "documents":         ("ui.tabs.documents_tab",        "DocumentsTab"),
     "control_panel":     ("ui.tabs.admin_dashboard_tab",  "AdminDashboardTab"),
     "audit_trail":       ("ui.tabs.audit_trail_tab",      "AuditTrailTab"),
+    "offices":           ("ui.tabs.offices_tab",            "OfficesTab"),
 }
 
-_TABS_NEEDING_USER = {"users", "users_permissions"}
+_TABS_NEEDING_USER = {"users", "users_permissions", "offices"}
 
 
 class MainWindow(BaseWindow):
@@ -155,14 +156,32 @@ class MainWindow(BaseWindow):
     # ─── UI init ─────────────────────────────────────────────────────────────
 
     def _init_ui(self):
+        # ═══════════════════════════════════════════════════
+        # الهيكل:
+        #   HBox → [Sidebar كامل الارتفاع] + [VBox → TopBar + Stack]
+        # ═══════════════════════════════════════════════════
         main_widget = QWidget()
         main_widget.setObjectName("main-widget")
-        main_layout = QVBoxLayout(main_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
 
         lang = SettingsManager.get_instance().get("language", "ar")
         is_rtl = (lang == "ar")
+
+        # root layout أفقي — بدون setDirection (يسبب عكس الـ Sidebar)
+        root_layout = QHBoxLayout(main_widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        # ── العمود الرئيسي: TopBar + Content ──────────────
+        # نبنيه أولاً ثم نرتب الإضافة حسب الاتجاه
+        right_col = QWidget()
+        right_col.setObjectName("right-col")
+        right_col_layout = QVBoxLayout(right_col)
+        right_col_layout.setContentsMargins(0, 0, 0, 0)
+        right_col_layout.setSpacing(0)
+
+        # ── Sidebar — كامل الارتفاع ────────────────────────
+        self.sidebar = Sidebar()
+        self.sidebar.section_changed.connect(self.switch_section)
 
         # TopBar
         self.top_bar = TopBar()
@@ -177,34 +196,29 @@ class MainWindow(BaseWindow):
             self.top_bar.search_requested.connect(self._open_global_search)
         except Exception:
             pass
-        main_layout.addWidget(self.top_bar)
+        right_col_layout.addWidget(self.top_bar)
 
-        # Ctrl+F — Global Search shortcut
+        # Content Stack
+        self.stack = QStackedWidget()
+        self.stack.setObjectName("content-stack")
+        right_col_layout.addWidget(self.stack, 1)
+
+        # RTL: Sidebar على اليمين | LTR: Sidebar على اليسار
+        if is_rtl:
+            root_layout.addWidget(right_col, 1)   # المحتوى أولاً (يسار فيزيائياً)
+            root_layout.addWidget(self.sidebar)    # Sidebar ثانياً (يمين فيزيائياً)
+        else:
+            root_layout.addWidget(self.sidebar)    # Sidebar أولاً (يسار فيزيائياً)
+            root_layout.addWidget(right_col, 1)    # المحتوى ثانياً (يمين فيزيائياً)
+        # Ctrl+F
         self._search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._search_shortcut.activated.connect(self._open_global_search)
 
-        # Center
-        center_widget = QWidget()
-        center_widget.setObjectName("center-widget")
-        center_layout = QHBoxLayout(center_widget)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(0)
-        center_widget.setLayoutDirection(Qt.RightToLeft if is_rtl else Qt.LeftToRight)
-        self.center_widget = center_widget
-
-        self.sidebar = Sidebar()
-        self.sidebar.section_changed.connect(self.switch_section)
-        center_layout.addWidget(self.sidebar)
-
-        self.stack = QStackedWidget()
-        self.stack.setObjectName("content-stack")
-
-        # Dashboard — يُبنى فوراً
+        # بناء التبويبات
         dashboard = DashboardTab()
         self.tabs["dashboard"] = dashboard
         self.stack.addWidget(dashboard)
 
-        # باقي التبويبات — placeholder فارغ
         for tab_key in self.sidebar.btn_keys:
             if tab_key == "dashboard":
                 continue
@@ -214,8 +228,7 @@ class MainWindow(BaseWindow):
                 self._tab_placeholders[tab_key] = placeholder
                 self.stack.addWidget(placeholder)
 
-        center_layout.addWidget(self.stack, 1)
-        main_layout.addWidget(center_widget)
+        self.center_widget = right_col  # backward compat
         self.setCentralWidget(main_widget)
 
         if self.sidebar.btn_keys:
@@ -254,11 +267,17 @@ class MainWindow(BaseWindow):
 
             self.tabs[tab_key] = tab_instance
             logger.debug(f"Lazy loaded tab: {tab_key}")
-            # تطبيق الاتجاه الحالي فوراً على التبويبة المُنشأة حديثاً
+            # تطبيق الاتجاه الحالي على التبويبة المُنشأة حديثاً
             lang = SettingsManager.get_instance().get("language", "ar")
             direction = Qt.RightToLeft if lang == "ar" else Qt.LeftToRight
             tab_instance.setLayoutDirection(direction)
             self._apply_direction_recursive(tab_instance, direction)
+            # استدعاء retranslate_ui إذا كانت التبويبة تدعمه
+            if hasattr(tab_instance, "retranslate_ui"):
+                try:
+                    tab_instance.retranslate_ui()
+                except Exception:
+                    pass
             return tab_instance
 
         except Exception as e:
@@ -340,6 +359,13 @@ class MainWindow(BaseWindow):
         self._notif_svc.stop()
         SettingsManager.get_instance().set("user", None)
 
+        # مسح سياق المكتب
+        try:
+            from core.office_context import OfficeContext
+            OfficeContext.clear()
+        except Exception:
+            pass
+
         # أخفي النافذة مؤقتاً
         self.hide()
 
@@ -383,6 +409,7 @@ class MainWindow(BaseWindow):
 
         # 4) أعد بناء الـ UI (يعيد بناء sidebar + stack + dashboard)
         self._init_ui()
+        self.update_layout_direction()  # تأكد من موضع Sidebar باللغة الصحيحة
         self.retranslate_ui()
 
         # 5) أعد تشغيل الإشعارات
@@ -435,27 +462,30 @@ class MainWindow(BaseWindow):
         lang = SettingsManager.get_instance().get("language", "ar")
         direction = Qt.RightToLeft if lang == "ar" else Qt.LeftToRight
 
-        from PySide6.QtWidgets import QApplication
-        app = QApplication.instance()
-        if app:
-            app.setLayoutDirection(direction)
+        # ══════════════════════════════════════════════════════════════
+        # سبب عدم استخدام app.setLayoutDirection أو self.setLayoutDirection:
+        # ────────────────────────────────────────────────────────────────
+        # Qt عند ضبط setLayoutDirection(RTL) على أي widget يُعيد عكس
+        # ترتيب أبنائه في HBoxLayout تلقائياً.
+        # أي: app.setLayoutDirection(RTL) يعكس root HBox
+        #     → sidebar يرجع لليسار رغم أنه أُضيف يمين في _init_ui!
+        # لذا: نُطبّق فقط على المحتوى (center_widget, topbar, stack)
+        # وموضع الـ Sidebar يُتحكم به حصراً عبر _reposition_sidebar()
+        # ══════════════════════════════════════════════════════════════
 
-        # تطبيق على كل الـ widgets الحيوية في النافذة
+        # المحتوى فقط (بدون self, بدون app, بدون sidebar)
         for widget in [
-            self,
             getattr(self, "center_widget", None),
             getattr(self, "top_bar", None),
-            getattr(self, "sidebar", None),
             getattr(self, "stack", None),
         ]:
             if widget is not None:
                 widget.setLayoutDirection(direction)
 
-        # تطبيق على التبويبات المُنشأة (الجداول والمحتوى)
+        # التبويبات المبنية (الجداول والمحتوى)
         for tab in getattr(self, "tabs", {}).values():
             if tab is not None:
                 tab.setLayoutDirection(direction)
-                # الجداول داخل التبويبة
                 self._apply_direction_recursive(tab, direction)
 
         # البروفايل إن كان مفتوحاً
@@ -463,6 +493,51 @@ class MainWindow(BaseWindow):
         if profile:
             profile.setLayoutDirection(direction)
             self._apply_direction_recursive(profile, direction)
+
+        # إعادة ترتيب موضع Sidebar حسب اللغة
+        self._reposition_sidebar()
+
+    def _reposition_sidebar(self):
+        """
+        يُعيد ترتيب الـ Sidebar في root HBox حسب اللغة الحالية.
+        RTL → sidebar يمين (index=1)
+        LTR → sidebar يسار (index=0)
+        يعمل بشكل آمن حتى لو استُدعي أكثر من مرة.
+        """
+        sidebar = getattr(self, "sidebar", None)
+        center  = getattr(self, "center_widget", None)
+        if not sidebar or not center:
+            return
+
+        parent = sidebar.parentWidget()
+        if not parent:
+            return
+        layout = parent.layout()
+        if layout is None:
+            return
+
+        lang   = SettingsManager.get_instance().get("language", "ar")
+        is_rtl = (lang == "ar")
+
+        sb_idx = layout.indexOf(sidebar)
+        ct_idx = layout.indexOf(center)
+
+        # sb_idx > ct_idx → sidebar على اليمين (RTL صح)
+        # sb_idx < ct_idx → sidebar على اليسار (LTR صح)
+        already_correct = (is_rtl and sb_idx > ct_idx) or (not is_rtl and sb_idx < ct_idx)
+        if already_correct:
+            return
+
+        # أزل الاثنين ثم أعد الإضافة بالترتيب الصحيح مع الـ stretch factors
+        layout.removeWidget(sidebar)
+        layout.removeWidget(center)
+
+        if is_rtl:
+            layout.addWidget(center,  1)   # المحتوى يسار — stretch=1
+            layout.addWidget(sidebar, 0)   # Sidebar يمين — stretch=0 (Fixed width)
+        else:
+            layout.addWidget(sidebar, 0)   # Sidebar يسار — stretch=0 (Fixed width)
+            layout.addWidget(center,  1)   # المحتوى يمين — stretch=1
 
     @staticmethod
     def _apply_direction_recursive(widget, direction):

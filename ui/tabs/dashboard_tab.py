@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QGridLayout, QTableWidget,
     QTableWidgetItem, QHeaderView, QPushButton, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QThread, Signal as _Signal
 from PySide6.QtGui import QFont, QColor
 
 from core.translator import TranslationManager
@@ -144,6 +144,74 @@ class ActivityItem(QFrame):
 # ─────────────────────────────────────────────────────────────────────────────
 # DashboardTab
 # ─────────────────────────────────────────────────────────────────────────────
+
+class _DashboardWorker(QThread):
+    """Worker thread — ينفّذ DB queries في الخلفية دون تجميد الـ UI."""
+    stats_ready       = _Signal(dict)
+    activities_ready  = _Signal(list)
+    transactions_ready = _Signal(list)
+
+    def run(self):
+        try:
+            from database.models import get_session_local, Transaction, Client, Material, Document, AuditLog
+            from sqlalchemy import func
+
+            # ── Stats ──────────────────────────────────────────────────
+            s = {k: 0 for k in [
+                "total_transactions", "active_transactions", "total_value",
+                "total_clients", "total_materials",
+                "import_count", "import_value", "export_count", "export_value",
+                "transit_count", "transit_value", "total_documents",
+            ]}
+            try:
+                with get_session_local()() as session:
+                    s["total_transactions"]  = session.query(Transaction).count()
+                    s["active_transactions"] = session.query(Transaction).filter(Transaction.status == "active").count()
+                    v = session.query(func.sum(Transaction.totals_value)).scalar() or 0
+                    s["total_value"] = f"${float(v):,.0f}"
+                    for t in ("import", "export", "transit"):
+                        s[f"{t}_count"] = session.query(Transaction).filter(Transaction.transaction_type == t).count()
+                        s[f"{t}_value"] = float(session.query(func.sum(Transaction.totals_value)).filter(Transaction.transaction_type == t).scalar() or 0)
+                    s["total_clients"]   = session.query(Client).count()
+                    s["total_materials"] = session.query(Material).count()
+                    s["total_documents"] = session.query(Document).count()
+            except Exception as e:
+                pass
+            self.stats_ready.emit(s)
+
+            # ── Activities ─────────────────────────────────────────────
+            acts = []
+            try:
+                with get_session_local()() as session:
+                    rows = (session.query(AuditLog)
+                            .order_by(AuditLog.timestamp.desc())
+                            .limit(8).all())
+                    acts = [{"action": r.action, "table_name": r.table_name,
+                             "timestamp": r.timestamp} for r in rows]
+            except Exception:
+                pass
+            self.activities_ready.emit(acts)
+
+            # ── Recent Transactions ────────────────────────────────────
+            txs = []
+            try:
+                with get_session_local()() as session:
+                    rows = (session.query(Transaction)
+                            .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+                            .limit(8).all())
+                    txs = [{"transaction_no": r.transaction_no,
+                            "transaction_date": str(r.transaction_date or ""),
+                            "transaction_type": r.transaction_type,
+                            "totals_value": r.totals_value,
+                            "status": r.status,
+                            "client": r.client  # << تأكد من جلب العميل
+                            } for r in rows]
+            except Exception:
+                pass
+            self.transactions_ready.emit(txs)
+        except Exception:
+            pass
+
 
 class DashboardTab(QWidget):
 
@@ -356,7 +424,7 @@ class DashboardTab(QWidget):
         if sub_key == "transit_value_fmt": return f"${stats.get('transit_value', 0):,.0f}"
         return self._(sub_key)
 
-    def _load_activities(self):
+    def _load_activities(self, preloaded=None):
         # مسح العناصر القديمة
         while self._act_layout.count():
             item = self._act_layout.takeAt(0)
@@ -375,26 +443,39 @@ class DashboardTab(QWidget):
         }
 
         try:
-            from sqlalchemy.orm import joinedload as jl
-            with get_session_local()() as session:
-                rows = (session.query(AuditLog)
-                        .options(jl(AuditLog.user))
-                        .order_by(desc(AuditLog.id))
-                        .limit(12).all())
+            if preloaded is not None:
+                # بيانات جاهزة من الـ worker thread
+                rows = preloaded
+                for row in rows:
+                    action = (row.get("action") or "update").lower()
+                    tbl_name = row.get("table_name") or ""
+                    tbl    = self._(TABLE_KEYS[tbl_name]) if tbl_name in TABLE_KEYS else (tbl_name or "—")
+                    act    = self._(ACTION_KEYS[action]) if action in ACTION_KEYS else action
+                    msg = self._("activity_message").format(user="—", action=act, table=tbl)
+                    ts  = format_local_dt(row.get("timestamp"))
+                    item = ActivityItem(action, msg, ts)
+                    item.setObjectName("activity-item")
+                    self._act_layout.addWidget(item)
+            else:
+                from sqlalchemy.orm import joinedload as jl
+                with get_session_local()() as session:
+                    rows = (session.query(AuditLog)
+                            .options(jl(AuditLog.user))
+                            .order_by(desc(AuditLog.id))
+                            .limit(12).all())
 
-            for row in rows:
-                action = (row.action or "update").lower()
-                tbl    = self._(TABLE_KEYS[row.table_name]) if row.table_name in TABLE_KEYS else (row.table_name or "—")
-                act    = self._(ACTION_KEYS[action]) if action in ACTION_KEYS else action
-                uname  = ""
-                if row.user:
-                    uname = getattr(row.user, "full_name", None) or getattr(row.user, "username", None) or self._("system_user")
-                msg = self._("activity_message").format(user=uname, action=act, table=tbl)
-                ts  = format_local_dt(row.timestamp)
-
-                item = ActivityItem(action, msg, ts)
-                item.setObjectName("activity-item")
-                self._act_layout.addWidget(item)
+                for row in rows:
+                    action = (row.action or "update").lower()
+                    tbl    = self._(TABLE_KEYS[row.table_name]) if row.table_name in TABLE_KEYS else (row.table_name or "—")
+                    act    = self._(ACTION_KEYS[action]) if action in ACTION_KEYS else action
+                    uname  = ""
+                    if row.user:
+                        uname = getattr(row.user, "full_name", None) or getattr(row.user, "username", None) or self._("system_user")
+                    msg = self._("activity_message").format(user=uname, action=act, table=tbl)
+                    ts  = format_local_dt(row.timestamp)
+                    item = ActivityItem(action, msg, ts)
+                    item.setObjectName("activity-item")
+                    self._act_layout.addWidget(item)
 
         except Exception as e:
             err = QLabel(f"⚠️ {e}")
@@ -410,61 +491,91 @@ class DashboardTab(QWidget):
             self._("col_status"),
         ])
 
-    def _load_transactions(self):
-        self._trans_table.setRowCount(0)
+    def _load_transactions(self, preloaded=None):
         TYPE_MAP = {
-            "import":  self._("import_type"),
-            "export":  self._("export_type"),
+            "import": self._("import_type"),
+            "export": self._("export_type"),
             "transit": self._("transit_type"),
         }
         STATUS_COLORS = {
-            "active":   "#2ECC71",
-            "draft":    "#F39C12",
-            "closed":   "#95A5A6",
+            "active": "#2ECC71",
+            "draft": "#F39C12",
+            "closed": "#95A5A6",
             "archived": "#7F8C8D",
         }
+
+        def _cell(txt, right=False):
+            item = QTableWidgetItem(str(txt))
+            align = (Qt.AlignRight if right else Qt.AlignCenter) | Qt.AlignVCenter
+            item.setTextAlignment(align)
+            return item
+
         try:
-            from sqlalchemy.orm import joinedload as jl
-            with get_session_local()() as session:
-                rows = (session.query(Transaction)
-                        .options(jl(Transaction.client))
-                        .order_by(desc(Transaction.id))
-                        .limit(10).all())
+            # بيانات جاهزة أم استعلام من DB
+            if preloaded is not None:
+                rows = preloaded
+            else:
+                from sqlalchemy.orm import joinedload as jl
+                with get_session_local()() as session:
+                    rows_db = (session.query(Transaction)
+                               .options(jl(Transaction.client))
+                               .order_by(desc(Transaction.id))
+                               .limit(10).all())
+                    rows = [{
+                        "transaction_no": r.transaction_no,
+                        "transaction_date": str(r.transaction_date or ""),
+                        "transaction_type": r.transaction_type,
+                        "totals_value": r.totals_value,
+                        "status": r.status,
+                        "client": r.client  # << جلب العميل
+                    } for r in rows_db]
 
-            self._trans_table.setRowCount(len(rows))
-            for r, t in enumerate(rows):
-                def cell(txt, right=False):
-                    i = QTableWidgetItem(txt)
-                    i.setTextAlignment((Qt.AlignRight if right else Qt.AlignCenter) | Qt.AlignVCenter)
-                    return i
+            self._trans_table.setSortingEnabled(False)
+            self._trans_table.setUpdatesEnabled(False)
+            try:
+                self._trans_table.setRowCount(len(rows))
+                for r, t in enumerate(rows):
+                    # التاريخ
+                    date_str = str(t.get("transaction_date", "") or "—")[:10]
 
-                date_str = t.transaction_date.strftime("%Y-%m-%d") if t.transaction_date else "—"
-                status_txt = self._(f"status_{t.status}") if t.status else "—"
-                wt = f"{t.totals_net_kg:,.1f}" if t.totals_net_kg else "—"
-                vl = f"{t.totals_value:,.2f}"  if t.totals_value  else "—"
+                    # الحالة
+                    status = t.get("status") or ""
+                    status_txt = self._(f"status_{status}") if status else "—"
 
-                self._trans_table.setItem(r, 0, cell(t.transaction_no or "—"))
-                self._trans_table.setItem(r, 1, cell(date_str))
-                self._trans_table.setItem(r, 2, cell(TYPE_MAP.get(t.transaction_type, t.transaction_type or "—")))
-                # اختيار اسم العميل حسب اللغة الحالية
-                lang = TranslationManager.get_instance().get_current_language()
-                if t.client:
-                    if lang == "en":
-                        client_display = t.client.name_en or t.client.name_ar or "—"
-                    elif lang == "tr":
-                        client_display = t.client.name_tr or t.client.name_ar or "—"
-                    else:
-                        client_display = t.client.name_ar or "—"
-                else:
-                    client_display = "—"
-                self._trans_table.setItem(r, 3, cell(client_display))
-                self._trans_table.setItem(r, 4, cell(wt, right=True))
-                self._trans_table.setItem(r, 5, cell(vl, right=True))
+                    # القيمة
+                    vl = f"{t.get('totals_value', 0) or 0:,.2f}"
 
-                si = cell(status_txt)
-                color = STATUS_COLORS.get(t.status or "", "#95A5A6")
-                si.setForeground(QColor(color))
-                self._trans_table.setItem(r, 6, si)
+                    # نوع المعاملة
+                    trx_type = t.get("transaction_type") or ""
+                    trx_type_txt = TYPE_MAP.get(trx_type, trx_type or "—")
+
+                    # اسم العميل
+                    client_name = "—"
+                    client_obj = t.get("client")
+                    if client_obj:
+                        client_name = getattr(client_obj, "full_name", None) or getattr(client_obj, "username", "—")
+
+                    # عمود الوزن (افتراضي —)
+                    weight_txt = "—"
+                    if "totals_weight" in t and t["totals_weight"] is not None:
+                        weight_txt = f"{t['totals_weight']:,.2f}"
+
+                    # تعبئة الجدول بالترتيب الصحيح
+                    self._trans_table.setItem(r, 0, _cell(t.get("transaction_no") or "—"))
+                    self._trans_table.setItem(r, 1, _cell(date_str))
+                    self._trans_table.setItem(r, 2, _cell(trx_type_txt))
+                    self._trans_table.setItem(r, 3, _cell(client_name))
+                    self._trans_table.setItem(r, 4, _cell(weight_txt, right=True))
+                    self._trans_table.setItem(r, 5, _cell(vl, right=True))
+
+                    # عمود الحالة مع اللون
+                    si = _cell(status_txt)
+                    si.setForeground(QColor(STATUS_COLORS.get(status, "#95A5A6")))
+                    self._trans_table.setItem(r, 6, si)
+
+            finally:
+                self._trans_table.setUpdatesEnabled(True)
+                self._trans_table.setSortingEnabled(True)
 
         except Exception as e:
             print(f"Dashboard transactions error: {e}")
@@ -472,13 +583,23 @@ class DashboardTab(QWidget):
     # ── refresh ───────────────────────────────────────────────────────────────
 
     def refresh_all_data(self):
+        # منع تشغيل worker متعدد في نفس الوقت
+        if getattr(self, "_worker", None) and self._worker.isRunning():
+            return
+
         self._refresh_btn.setEnabled(False)
         self._refresh_btn.setText(self._("refreshing"))
         self._set_update_time()
 
-        stats = self._get_stats()
-        self._cached_stats.update(stats)
+        self._worker = _DashboardWorker(self)
+        self._worker.stats_ready.connect(self._on_stats_ready)
+        self._worker.activities_ready.connect(self._on_activities_ready)
+        self._worker.transactions_ready.connect(self._on_transactions_ready)
+        self._worker.finished.connect(self._on_worker_done)
+        self._worker.start()
 
+    def _on_stats_ready(self, stats: dict):
+        self._cached_stats.update(stats)
         for key, val in {
             "total_transactions": stats["total_transactions"],
             "total_value":        stats["total_value"],
@@ -491,16 +612,25 @@ class DashboardTab(QWidget):
         }.items():
             if card := self._stat_cards.get(key):
                 card.update_value(val)
-
         card = self._stat_cards.get("total_transactions")
         if card:
             card.update_subtitle(
                 self._("active_transactions").format(count=stats.get("active_transactions", 0))
             )
 
-        self._load_activities()
-        self._load_transactions()
+    def _on_activities_ready(self, acts: list):
+        try:
+            self._load_activities(preloaded=acts)
+        except Exception:
+            pass
 
+    def _on_transactions_ready(self, txs: list):
+        try:
+            self._load_transactions(preloaded=txs)
+        except Exception:
+            pass
+
+    def _on_worker_done(self):
         self._refresh_btn.setEnabled(True)
         self._refresh_btn.setText(self._("refresh"))
 

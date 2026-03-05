@@ -152,18 +152,6 @@ class TransportTabMixin:
             self.txt_attached_docs,
         )
 
-        # بلد التحميل/المنشأ (للمستندات — مستقل عن حقل المعاملة)
-        self.txt_origin_country = QLineEdit()
-        self.txt_origin_country.setObjectName("origin-country-input")
-        self.txt_origin_country.setPlaceholderText(_("origin_country_placeholder") if hasattr(self, "_") else "e.g. Turkey")
-        form.addRow(_("origin_country_doc") if hasattr(self, "_") else "Origin Country (Doc)", self.txt_origin_country)
-
-        # بلد التسليم/الوجهة (للمستندات — مستقل عن حقل المعاملة)
-        self.txt_dest_country = QLineEdit()
-        self.txt_dest_country.setObjectName("dest-country-input")
-        self.txt_dest_country.setPlaceholderText(_("dest_country_placeholder") if hasattr(self, "_") else "e.g. Iraq")
-        form.addRow(_("dest_country_doc") if hasattr(self, "_") else "Dest Country (Doc)", self.txt_dest_country)
-
         # تاريخ الشحن
         self.dt_shipment = QDateEdit()
         self.dt_shipment.setObjectName("shipment-date-input")
@@ -171,15 +159,12 @@ class TransportTabMixin:
         self.dt_shipment.setSpecialValueText(_("not_specified"))
         self.dt_shipment.setDate(QDate())          # فارغ
         self.dt_shipment.setMinimumDate(QDate(2000, 1, 1))
-        self._shipment_date_set = False
+        self._shipment_date_set = False             # flag: هل المستخدم حدّد تاريخاً؟
         self.dt_shipment.dateChanged.connect(self._on_shipment_date_changed)
         form.addRow(_("shipment_date"), self.dt_shipment)
 
     def _on_shipment_date_changed(self, qdate: QDate):
         self._shipment_date_set = qdate.isValid() and qdate != QDate()
-
-    def _on_certificate_date_changed(self, qdate: QDate):
-        self._certificate_date_set = qdate.isValid() and qdate != QDate()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Form A Fields
@@ -199,17 +184,6 @@ class TransportTabMixin:
         self.txt_issuing_authority.setObjectName("issuing-authority-input")
         self.txt_issuing_authority.setPlaceholderText(_("issuing_authority_placeholder"))
         form.addRow(_("issuing_authority"), self.txt_issuing_authority)
-
-        # تاريخ إصدار الشهادة (مستقل عن تاريخ الشحن)
-        self.dt_certificate = QDateEdit()
-        self.dt_certificate.setObjectName("certificate-date-input")
-        self.dt_certificate.setCalendarPopup(True)
-        self.dt_certificate.setSpecialValueText(_("not_specified") if hasattr(self, "_") else "—")
-        self.dt_certificate.setDate(QDate())
-        self.dt_certificate.setMinimumDate(QDate(2000, 1, 1))
-        self._certificate_date_set = False
-        self.dt_certificate.dateChanged.connect(self._on_certificate_date_changed)
-        form.addRow(_("certificate_date") if hasattr(self, "_") else "Certificate Date", self.dt_certificate)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Data loading
@@ -252,14 +226,6 @@ class TransportTabMixin:
                 from datetime import date as _date
                 shipment_date = _date(qd.year(), qd.month(), qd.day())
 
-        # تاريخ الشهادة
-        certificate_date = None
-        if getattr(self, "_certificate_date_set", False):
-            qd = self.dt_certificate.date()
-            if qd.isValid():
-                from datetime import date as _date
-                certificate_date = _date(qd.year(), qd.month(), qd.day())
-
         return {
             "transport": {
                 "carrier_company_id": self.cmb_carrier.currentData(),
@@ -267,13 +233,10 @@ class TransportTabMixin:
                 "driver_name":        self.txt_driver_name.text().strip() or None,
                 "loading_place":      self.txt_loading_place.text().strip() or None,
                 "delivery_place":     self.txt_delivery_place.text().strip() or None,
-                "origin_country":     self.txt_origin_country.text().strip() or None,
-                "dest_country":       self.txt_dest_country.text().strip() or None,
                 "shipment_date":      shipment_date,
                 "attached_documents": self.txt_attached_docs.text().strip() or None,
                 "certificate_no":     self.txt_certificate_no.text().strip() or None,
                 "issuing_authority":  self.txt_issuing_authority.text().strip() or None,
-                "certificate_date":   certificate_date,
             }
         }
 
@@ -319,8 +282,6 @@ class TransportTabMixin:
             ("driver_name",        self.txt_driver_name),
             ("loading_place",      self.txt_loading_place),
             ("delivery_place",     self.txt_delivery_place),
-            ("origin_country",     self.txt_origin_country),
-            ("dest_country",       self.txt_dest_country),
             ("attached_documents", self.txt_attached_docs),
             ("certificate_no",     self.txt_certificate_no),
             ("issuing_authority",  self.txt_issuing_authority),
@@ -337,16 +298,5 @@ class TransportTabMixin:
                     QDate(shipment_date.year, shipment_date.month, shipment_date.day)
                 )
                 self._shipment_date_set = True
-            except Exception:
-                pass
-
-        # تاريخ إصدار الشهادة
-        certificate_date = _g("certificate_date")
-        if certificate_date:
-            try:
-                self.dt_certificate.setDate(
-                    QDate(certificate_date.year, certificate_date.month, certificate_date.day)
-                )
-                self._certificate_date_set = True
             except Exception:
                 pass

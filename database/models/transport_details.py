@@ -53,16 +53,9 @@ class TransportDetails(Base):
     # ── CMR — Documents attached (Box 5) ─────────────────────────────────────
     attached_documents  = Column(String(512), nullable=True)  # الوثائق المرفقة — Box 5
 
-    # ── Document-specific country overrides ──────────────────────────────────
-    # مستقلة عن origin_country_id/dest_country_id في جدول transactions
-    # المستخدم يكتبها كما يريدها أن تظهر في CMR و Form A
-    origin_country = Column(String(255), nullable=True)   # بلد المنشأ للمستندات
-    dest_country   = Column(String(255), nullable=True)   # بلد الوجهة للمستندات
-
     # ── Form A / EUR.1 fields ─────────────────────────────────────────────────
-    certificate_no    = Column(String(64),  nullable=True)  # رقم شهادة المنشأ
-    issuing_authority = Column(String(255), nullable=True)  # الجهة المُصدِرة
-    certificate_date  = Column(Date,        nullable=True)  # تاريخ إصدار الشهادة (مستقل)
+    certificate_no      = Column(String(64),  nullable=True)  # رقم شهادة المنشأ
+    issuing_authority   = Column(String(255), nullable=True)  # الجهة المُصدِرة للشهادة
 
     # ── Audit ─────────────────────────────────────────────────────────────────
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -81,6 +74,5 @@ class TransportDetails(Base):
             self.carrier_company_id, self.truck_plate, self.driver_name,
             self.loading_place, self.delivery_place, self.shipment_date,
             self.attached_documents,
-            self.origin_country, self.dest_country,
-            self.certificate_no, self.issuing_authority, self.certificate_date,
+            self.certificate_no, self.issuing_authority,
         ])

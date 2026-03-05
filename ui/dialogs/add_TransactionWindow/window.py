@@ -15,7 +15,19 @@ except Exception:
 try:
     from core.translator import TranslationManager
 except Exception:
-    from core.translator import _DummyTranslator as TranslationManager  # type: ignore
+    class _DummyT:
+        @staticmethod
+        def get_instance():
+            return _DummyT()
+
+        def translate(self, x):
+            return x
+
+        def get_current_language(self):
+            return "ar"
+
+
+    TranslationManager = _DummyT
 
 try:
     from core.settings_manager import SettingsManager
@@ -32,10 +44,47 @@ except Exception:
     SettingsManager = _DummyS
 
 # ---- Mixins --------------------------------------------------------------
-from ui.dialogs.mixins.parties_geo_tab import PartiesGeoTabMixin
-from ui.dialogs.mixins.items_tab       import ItemsTabMixin
-from ui.dialogs.mixins.transport_tab   import TransportTabMixin
-from ui.dialogs.mixins.documents_tab   import DocumentsTabMixin
+try:
+    from ui.dialogs.mixins.parties_geo_tab import PartiesGeoTabMixin
+except Exception:
+    class PartiesGeoTabMixin:
+        def _build_parties_geo_tab(self): pass
+
+        def prefill_parties_geo(self, *_): pass
+
+        def get_parties_geo_data(self) -> dict: return {}
+
+try:
+    from ui.dialogs.mixins.items_tab import ItemsTabMixin
+except Exception:
+    class ItemsTabMixin:
+        def _build_items_tab(self): pass
+
+        def prefill_items(self, *_): pass
+
+        def get_items_data(self) -> list: return []
+
+try:
+    from ui.dialogs.mixins.transport_tab import TransportTabMixin
+except Exception:
+    class TransportTabMixin:
+        def _build_transport_tab(self): pass
+        def get_transport_data(self) -> dict: return {}
+        def prefill_transport(self, *_): pass
+
+try:
+    from ui.dialogs.mixins.documents_tab import DocumentsTabMixin
+except Exception:
+    class DocumentsTabMixin:
+        def _build_documents_tab(self): pass
+        def build_documents_panel(self):
+            from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+            w = QWidget(); lay = QVBoxLayout(w)
+            lay.addWidget(QLabel("⚠ docs panel unavailable"))
+            return w
+        def prefill_documents(self, *_): pass
+        def get_documents_data(self) -> list: return []
+        def get_documents_codes(self) -> list: return []
 
 
 
@@ -47,9 +96,6 @@ import re
 # ---- Window --------------------------------------------------------------
 class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, TransportTabMixin, BaseWindow):
     saved = Signal(int)
-
-    # مفتاح حفظ geometry في الإعدادات
-    _GEOMETRY_KEY = "window_geometry_AddTransactionWindow"
 
     def __init__(self, parent=None, current_user=None, transaction=None):
         super().__init__(parent)
@@ -68,54 +114,13 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.setObjectName("AddTransactionWindow")
         self.setWindowTitle(self._("edit_transaction") if self._is_edit else self._("add_transaction"))
 
+        # ✨ تحسين: حجم النافذة الافتراضي أكبر
+        self.resize(1400, 900)  # كان صغير جداً
         self.setMinimumSize(QSize(1200, 800))
-
-        # استرجاع آخر geometry للمستخدم، أو الحجم الافتراضي
-        self._restore_window_geometry()
 
         self._build_ui()
         self._setup_shortcuts()
         self._prefill_if_edit()
-
-    def _restore_window_geometry(self):
-        """استرجاع آخر حجم وموضع للنافذة."""
-        try:
-            from base64 import b64decode
-            settings = SettingsManager.get_instance()
-            encoded = settings.get(self._GEOMETRY_KEY)
-            if encoded:
-                from PySide6.QtCore import QByteArray
-                geometry = QByteArray.fromBase64(encoded.encode("utf-8"))
-                if self.restoreGeometry(geometry):
-                    return
-        except Exception:
-            pass
-        # قياس افتراضي إذا لم تكن هناك geometry محفوظة
-        self.resize(1400, 900)
-        # توسيط على الشاشة
-        from PySide6.QtWidgets import QApplication
-        screen = QApplication.primaryScreen()
-        if screen:
-            sg = screen.availableGeometry()
-            self.move(
-                sg.left() + (sg.width() - 1400) // 2,
-                sg.top() + (sg.height() - 900) // 2,
-            )
-
-    def _save_window_geometry(self):
-        """حفظ الحجم والموضع الحاليين."""
-        try:
-            from base64 import b64encode
-            settings = SettingsManager.get_instance()
-            geometry = self.saveGeometry()
-            encoded = b64encode(bytes(geometry)).decode("utf-8")
-            settings.set(self._GEOMETRY_KEY, encoded)
-        except Exception:
-            pass
-
-    def closeEvent(self, event):
-        self._save_window_geometry()
-        super().closeEvent(event)
 
     def _build_ui(self):
         root = QWidget(self)

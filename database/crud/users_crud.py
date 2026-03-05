@@ -77,6 +77,7 @@ class UsersCRUD(BaseCRUD):
         password: str,
         full_name: str,
         role_id: Optional[int] = None,
+        office_id: Optional[int] = None,
         is_active: bool = True,
         user_id: Optional[int] = None,
     ) -> User:
@@ -86,6 +87,7 @@ class UsersCRUD(BaseCRUD):
             password=password_hashed,
             full_name=full_name,
             role_id=role_id,
+            office_id=office_id,
             is_active=is_active,
         )
         # Stamp created_by/updated_by for schemas without *_id

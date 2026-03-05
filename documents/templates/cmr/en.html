@@ -80,7 +80,11 @@ table.goods td { border: 0.4pt solid #000; padding: 1pt 2pt; vertical-align: top
 </colgroup>
 <tbody>
 <tr class="r1">
-  <td colspan="8" class="vm"></td>
+  <td colspan="4" class="vm">
+    <span class="badge">1</span>
+    <span class="lbl" style="display:inline; font-size:7.5pt;">Copy for sender</span>
+  </td>
+  <td colspan="4" style="border-left:none;"></td>
 </tr>
 <tr class="r2">
   <td colspan="4"><span class="lbl">1. Sender (name, address, country)</span></td>
@@ -168,7 +172,7 @@ table.goods td { border: 0.4pt solid #000; padding: 1pt 2pt; vertical-align: top
       <tbody>
         {%- for it in ilist %}
         <tr>
-          <td></td>
+          <td>{{ it.code or '' }}</td>
           <td class="tc">{{ it.qty|int }}</td>
           <td>{{ it.packaging or '' }}</td>
           <td style="font-weight:700;" colspan="2">{{ it.description or '' }}</td>
@@ -184,6 +188,7 @@ table.goods td { border: 0.4pt solid #000; padding: 1pt 2pt; vertical-align: top
     </table>
   </td>
   <td rowspan="2" style="text-align:right; vertical-align:top;">
+    {%- for it in ilist %}<span style="display:block; font-size:7pt; padding:1pt;">{{ it.code or '' }}</span>{%- endfor %}
   </td>
   <td rowspan="2" style="text-align:right; vertical-align:top;">
     {%- for it in ilist %}<span style="display:block; font-size:7pt; padding:1pt;">{{ "%.3f"|format(it.gross|float) }}</span>{%- endfor %}

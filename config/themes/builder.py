@@ -282,14 +282,15 @@ class ThemeBuilder:
             margin-left: 0px;
         }}
         
-        /* Menus - Right aligned */
+        /* Menus - Right aligned (RTL) */
         QMenu::item {{
-            padding-right: 12px;
-            padding-left: 30px;
+            padding-right: 16px;
+            padding-left : 20px;
+            text-align   : right;
         }}
-        
+
         QMenu::indicator {{
-            left: auto;
+            left : auto;
             right: 8px;
         }}
         

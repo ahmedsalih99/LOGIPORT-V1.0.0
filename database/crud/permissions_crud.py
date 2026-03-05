@@ -265,6 +265,7 @@ TAB_PERMISSIONS: Dict[str, str] = {
     "users_permissions": "view_users_roles",
     "audit_trail":       "view_audit_trail",
     "control_panel":     "view_control_panel",
+    "offices":           "view_offices",
 }
 
 

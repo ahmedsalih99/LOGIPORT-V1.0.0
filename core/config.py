@@ -18,8 +18,9 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 
-# ConfigurationError مُوحَّدة من exceptions.py
-from exceptions import ConfigurationError  # noqa: F401 — re-exported for back-compat
+class ConfigurationError(Exception):
+    """Raised when configuration is invalid or missing"""
+    pass
 
 
 class Config(metaclass=SingletonMeta):

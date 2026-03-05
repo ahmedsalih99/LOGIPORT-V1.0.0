@@ -1,84 +1,232 @@
-# documents/builders/packing_list.py
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-from typing import Dict, Any, List
+"""
+packing_list.py
+================
+
+Packing List builder for LOGIPORT
+
+Features
+--------
+• يعتمد على helpers من _shared
+• حساب totals تلقائي
+• توليد النصوص بالحروف (tafqit)
+• دعم اللغات (AR / EN / TR)
+• دمج أنواع التغليف تلقائياً
+"""
+
+from typing import Dict, List, Any
 from sqlalchemy import text
 from database.models import get_session_local
+
 from documents.builders._shared import (
-    blankify, coalesce, dedup_preserve_order, join_with_and,
-    country_name   as _country_name,
-    company_obj    as _company_obj,
-    client_obj     as _client_obj,
-    get_bank_info,
-    tafqit_amount  as _tafqit_amount,
-    num_words      as _num_words,
-    unit_word      as _unit_word,
-    spell_non_monetary as _spell_non_monetary,
-    label_from_pricing_code,
-    compute_line_amount,
-    currency_info  as _currency_info,
+    blankify,
+    coalesce,
+    country_name,
+    company_obj,
+    client_obj,
+    spell_non_monetary,
+    pick_dest_col,
     delivery_method_name,
-    pick_dest_col  as _pick_dest_col,
+    join_with_and,
 )
-_blankify  = blankify
-_coalesce  = coalesce
-_dedup_preserve_order = dedup_preserve_order
 
-def build_ctx(*args, **kwargs) -> Dict:
-    """
-    build_ctx(doc_code, transaction_id, lang)  أو  build_ctx(doc_code=..., transaction_id=..., lang=...)
-    يدعم ثلاثة أنواع:
-      - packing_list.export.simple
-      - packing_list.export.with_dates
-      - packing_list.export.with_line_id
-    """
-    # تطبيع الاستدعاء
-    doc_code = kwargs.get("doc_code") or (args[0] if len(args) >= 1 else None)
-    transaction_id = kwargs.get("transaction_id") or kwargs.get("trx_id") or (args[1] if len(args) >= 2 else None)
-    lang = kwargs.get("lang") or (args[2] if len(args) >= 3 else "en")
-    if doc_code is None or transaction_id is None or lang is None:
-        raise ValueError("build_ctx requires doc_code, transaction_id, and lang")
+DEFAULT_WEIGHT_UNIT = "kg"
 
-    code = str(doc_code).strip()
-    with_dates   = (code == "packing_list.export.with_dates")
-    with_line_id = (code == "packing_list.export.with_line_id")
-    if code not in ("packing_list.export.simple", "packing_list.export.with_dates", "packing_list.export.with_line_id"):
-        raise ValueError(f"Unsupported packing list code: {doc_code}")
 
-    header = _fetch_header(int(transaction_id), str(lang))
-    items  = _fetch_items(int(transaction_id), str(lang))
-    totals = _compute_totals(items)
+# =========================================================
+# HEADER
+# =========================================================
 
-    # ===== تفقيط غير نقدي (كميّات/أوزان) =====
-    # وحدة الوزن للعرض (KG دائماً بقائمة التعبئة؛ لو أردتها TON استنتجها من البيانات)
-    weight_unit = "KG"
-    qty_in_words   = _spell_non_monetary(totals["quantity"], lang, "", kind="qty")
-    gross_in_words = _spell_non_monetary(totals["gross_kg"], lang, weight_unit, kind="weight")
-    net_in_words   = _spell_non_monetary(totals["net_kg"],   lang, weight_unit, kind="weight")
+def _fetch_header(transaction_id: int, lang: str) -> Dict[str, Any]:
 
-    ctx: Dict[str, Any] = {
-        "doc": {"code": code, "lang": str(lang), "with_dates": with_dates, "with_line_id": with_line_id},
-        "transaction": {"id": header["id"], "no": header["no"], "issue_date": header["issue_date"]},
-        "exporter": header["exporter"],
-        "importer": header["importer"],
-        "consignee": header["consignee"],
-        "incoterms": header["incoterms"],
-        "delivery_method": header["delivery_method"],
-        "country_of_origin": header["country_of_origin"],
-        "destination_country": header["destination_country"],
-        "port_of_loading": header["port_of_loading"],
-        "port_of_discharge": header["port_of_discharge"],
-        "transport": header["transport"],
-        "notes": header["notes"],
-        "rows": items,
-        "totals": totals,
-        # tafqit (للاستخدام في القوالب)
-        "tafqit_qty": qty_in_words,
-        "tafqit_gross": gross_in_words,
-        "tafqit_net": net_in_words,
+    s = get_session_local()
+    dest_col = pick_dest_col(s)
+
+    row = s.execute(text(f"""
+        SELECT
+            t.id,
+            t.transaction_no,
+            t.issue_date,
+
+            t.exporter_id,
+            t.importer_id,
+            t.consignee_id,
+
+            t.incoterm_id,
+            t.delivery_method_id,
+
+            t.country_of_origin_id,
+            t.{dest_col} AS destination_country_id,
+
+            t.port_of_loading,
+            t.port_of_discharge,
+            t.transport,
+            t.notes
+
+        FROM transactions t
+        WHERE t.id = :id
+    """), {"id": transaction_id}).mappings().first()
+
+    if not row:
+        raise ValueError("Transaction not found")
+
+    exporter = company_obj(s, row["exporter_id"], lang)
+    importer = client_obj(s, row["importer_id"], lang)
+    consignee = client_obj(s, row["consignee_id"], lang)
+
+    delivery = delivery_method_name(s, row.get("delivery_method_id"), lang)
+
+    return {
+        "id": row["id"],
+        "transaction_no": row["transaction_no"],
+        "issue_date": row["issue_date"],
+
+        "exporter": exporter,
+        "importer": importer,
+        "consignee": consignee,
+
+        "incoterms": row.get("incoterm_id") or "",
+        "delivery_method": delivery,
+
+        "country_of_origin": country_name(s, row.get("country_of_origin_id"), lang),
+        "destination_country": country_name(s, row.get("destination_country_id"), lang),
+
+        "port_of_loading": row.get("port_of_loading") or "",
+        "port_of_discharge": row.get("port_of_discharge") or "",
+        "transport": row.get("transport") or "",
+
+        "notes": row.get("notes") or "",
     }
 
-    if with_dates and (header.get("notes") or "").strip():
-        ctx["brands_note"] = header["notes"].strip()
 
-    return _blankify(ctx)
+# =========================================================
+# ITEMS
+# =========================================================
+
+def _fetch_items(transaction_id: int, lang: str) -> List[Dict[str, Any]]:
+
+    s = get_session_local()
+
+    rows = s.execute(text("""
+        SELECT
+            id,
+            product_name,
+            quantity,
+            net_weight,
+            gross_weight,
+            package_type,
+            package_count
+        FROM transaction_items
+        WHERE transaction_id = :id
+        ORDER BY id
+    """), {"id": transaction_id}).mappings().all()
+
+    items: List[Dict[str, Any]] = []
+
+    for i, r in enumerate(rows, 1):
+
+        items.append({
+            "line": i,
+            "description": r.get("product_name") or "",
+            "quantity": float(r.get("quantity") or 0),
+            "net_kg": float(r.get("net_weight") or 0),
+            "gross_kg": float(r.get("gross_weight") or 0),
+            "package_type": r.get("package_type") or "",
+            "package_count": int(r.get("package_count") or 0),
+        })
+
+    return items
+
+
+# =========================================================
+# TOTALS
+# =========================================================
+
+def _compute_totals(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    qty = 0
+    gross = 0
+    net = 0
+
+    packages = {}
+    total_packages = 0
+
+    for r in items:
+
+        qty += r["quantity"]
+        gross += r["gross_kg"]
+        net += r["net_kg"]
+
+        pkg_type = r.get("package_type")
+        pkg_count = r.get("package_count")
+
+        if pkg_type:
+            packages[pkg_type] = packages.get(pkg_type, 0) + pkg_count
+            total_packages += pkg_count
+
+    package_list = [
+        f"{v} {k}" for k, v in packages.items()
+    ]
+
+    return {
+        "quantity": qty,
+        "gross_kg": gross,
+        "net_kg": net,
+        "packages_total": total_packages,
+        "packages_summary": join_with_and(package_list, "en") if package_list else "",
+    }
+
+
+# =========================================================
+# BUILD CONTEXT
+# =========================================================
+
+def build_ctx(transaction_id: int, lang: str = "en") -> Dict[str, Any]:
+
+    header = _fetch_header(transaction_id, lang)
+    items = _fetch_items(transaction_id, lang)
+    totals = _compute_totals(items)
+
+    weight_unit = DEFAULT_WEIGHT_UNIT
+
+    qty_in_words = spell_non_monetary(
+        totals["quantity"],
+        lang,
+        "",
+        kind="qty"
+    )
+
+    gross_in_words = spell_non_monetary(
+        totals["gross_kg"],
+        lang,
+        weight_unit,
+        kind="weight"
+    )
+
+    net_in_words = spell_non_monetary(
+        totals["net_kg"],
+        lang,
+        weight_unit,
+        kind="weight"
+    )
+
+    ctx = {
+        "header": header,
+        "items": items,
+        "totals": totals,
+
+        "qty_in_words": qty_in_words,
+        "gross_in_words": gross_in_words,
+        "net_in_words": net_in_words,
+
+        "weight_unit": weight_unit,
+    }
+
+    return blankify(ctx)
+
+
+# =========================================================
+# EXPORT
+# =========================================================
+
+def build(transaction_id: int, lang: str = "en") -> Dict[str, Any]:
+    return build_ctx(transaction_id, lang)

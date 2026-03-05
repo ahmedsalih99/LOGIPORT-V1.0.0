@@ -75,4 +75,81 @@ def get_styles(theme):
     QScrollBar::sub-line:horizontal {{
         width: 0px;
     }}
+
+    /* ========== QMENU - CONTEXT MENU & DROPDOWNS ========== */
+
+    QMenu {{
+        background-color : {c["bg_card"]};
+        color            : {c["text_primary"]};
+        border           : 1px solid {c["border"]};
+        border-radius    : 10px;
+        padding          : 6px 4px;
+        font-size        : {s["base"]}px;
+        font-weight      : 500;
+    }}
+
+    QMenu::item {{
+        padding          : 9px 20px 9px 16px;
+        border-radius    : 7px;
+        margin           : 2px 4px;
+        min-width        : 160px;
+        color            : {c["text_primary"]};
+    }}
+
+    QMenu::item:selected {{
+        background-color : {c["bg_hover"]};
+        color            : {c["primary"]};
+    }}
+
+    QMenu::item:pressed {{
+        background-color : {c["bg_active"]};
+        color            : {c["primary_active"]};
+    }}
+
+    QMenu::item:disabled {{
+        color            : {c["text_disabled"]};
+        background-color : transparent;
+    }}
+
+    QMenu::separator {{
+        height           : 1px;
+        background       : {c["border_subtle"]};
+        margin           : 4px 12px;
+    }}
+
+    QMenu::indicator {{
+        width            : 16px;
+        height           : 16px;
+    }}
+
+    /* ========== QCOMBOBOX DROPDOWN - أوسع وأكثر راحة ========== */
+
+    QAbstractItemView {{
+        background-color : {c["bg_card"]};
+        color            : {c["text_primary"]};
+        border           : 1px solid {c["border"]};
+        border-radius    : 8px;
+        padding          : 4px;
+        outline          : none;
+        selection-background-color: {c["primary_light"]};
+        selection-color  : {c["primary"]};
+    }}
+
+    QAbstractItemView::item {{
+        padding          : 8px 12px;
+        border-radius    : 6px;
+        min-height       : 34px;
+        color            : {c["text_primary"]};
+    }}
+
+    QAbstractItemView::item:hover {{
+        background-color : {c["bg_hover"]};
+        color            : {c["primary"]};
+    }}
+
+    QAbstractItemView::item:selected {{
+        background-color : {c["primary_light"]};
+        color            : {c["primary"]};
+        font-weight      : 600;
+    }}
     """

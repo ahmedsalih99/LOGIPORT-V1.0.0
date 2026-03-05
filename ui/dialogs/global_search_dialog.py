@@ -158,45 +158,64 @@ class GlobalSearchDialog(QDialog):
     # ─── Style ───────────────────────────────────────────────────────────────
 
     def _apply_style(self):
-        self.setStyleSheet("""
-            QFrame#search-card {
-                background: palette(window);
-                border: 1px solid palette(mid);
-                border-radius: 12px;
-            }
-            QLineEdit#global-search-input {
-                background: transparent;
-                border: none;
-                color: palette(windowText);
-                font-size: 13px;
-                padding: 2px 0;
-            }
-            QListWidget#search-results-list {
-                background: transparent;
-                border: none;
-                outline: none;
-                padding: 4px 8px;
-                min-height: 200px;
-                max-height: 300px;
-            }
-            QListWidget#search-results-list::item {
+        try:
+            from config.themes import ThemeBuilder
+            theme_name = SettingsManager.get_instance().get("theme", "light")
+            theme = ThemeBuilder(theme_name)
+            c = theme.colors
+            bg = c.get("bg_card", "#FFFFFF")
+            border_c = c.get("border", "#E0E0E0")
+            text_c = c.get("text_primary", "#212529")
+            text_muted = c.get("text_muted", "#6C757D")
+            hover_bg = c.get("bg_hover", "#F0F7FF")
+        except Exception:
+            bg = "#FFFFFF"; border_c = "#E0E0E0"
+            text_c = "#212529"; text_muted = "#6C757D"; hover_bg = "#F0F7FF"
+
+        self.setStyleSheet(f"""
+            QFrame#search-card {{
+                background   : {bg};
+                border       : 1px solid {border_c};
+                border-radius: 14px;
+            }}
+            QLineEdit#global-search-input {{
+                background  : transparent;
+                border      : none;
+                color       : {text_c};
+                font-size   : 14px;
+                padding     : 2px 0;
+            }}
+            QListWidget#search-results-list {{
+                background  : transparent;
+                border      : none;
+                outline     : none;
+                padding     : 4px 8px;
+                min-height  : 200px;
+                max-height  : 320px;
+                color       : {text_c};
+            }}
+            QListWidget#search-results-list::item {{
                 border-radius: 8px;
-                padding: 0;
-                margin: 1px 0;
-            }
+                padding     : 0;
+                margin      : 1px 0;
+                color       : {text_c};
+            }}
             QListWidget#search-results-list::item:selected,
-            QListWidget#search-results-list::item:hover {
-                background: palette(highlight);
-                color: palette(highlightedText);
-            }
-            QLabel#kbd-hint {
-                color: palette(mid);
-                border: 1px solid palette(mid);
+            QListWidget#search-results-list::item:hover {{
+                background  : {hover_bg};
+                color       : {text_c};
+            }}
+            QLabel {{
+                color: {text_c};
+            }}
+            QLabel#kbd-hint {{
+                color        : {text_muted};
+                border       : 1px solid {border_c};
                 border-radius: 4px;
-                padding: 1px 5px;
-                font-size: 10px;
-                font-family: monospace;
-            }
+                padding      : 1px 5px;
+                font-size    : 10px;
+                font-family  : monospace;
+            }}
         """)
 
     # ─── Search logic ─────────────────────────────────────────────────────────

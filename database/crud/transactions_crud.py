@@ -313,6 +313,15 @@ class TransactionsCRUD(BaseCRUD):
                 trx_no = NumberingService.get_next_transaction_number(s)
 
             # 2) رأس المعاملة
+            # office_id: من data أو من OfficeContext تلقائياً
+            office_id = data.get("office_id")
+            if not office_id:
+                try:
+                    from core.office_context import OfficeContext
+                    office_id = OfficeContext.get_id()
+                except Exception:
+                    pass
+
             trx = Transaction(
                 transaction_no    = trx_no,
                 transaction_date  = data.get("transaction_date"),
@@ -330,6 +339,7 @@ class TransactionsCRUD(BaseCRUD):
                 transport_type    = data.get("transport_type"),
                 transport_ref     = data.get("transport_ref"),
                 notes             = data.get("notes"),
+                office_id         = office_id,
                 created_by_id     = user_id,
                 updated_by_id     = user_id,
             )
@@ -657,6 +667,7 @@ class TransactionsCRUD(BaseCRUD):
         status          : Optional[str] = None,
         transaction_type: Optional[str] = None,
         search          : Optional[str] = None,
+        office_id       : Optional[int] = None,
         limit           : int = 100,
         offset          : int = 0,
     ) -> List["Transaction"]:
@@ -664,6 +675,8 @@ class TransactionsCRUD(BaseCRUD):
             q = select(Transaction)
             if client_id:
                 q = q.where(Transaction.client_id == client_id)
+            if office_id:
+                q = q.where(Transaction.office_id == office_id)
             if status:
                 q = q.where(Transaction.status == status)
             if transaction_type:

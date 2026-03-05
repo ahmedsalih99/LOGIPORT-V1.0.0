@@ -622,49 +622,53 @@ class DocumentsTab(BaseTab):
     def _render_table(self, rows: List[Dict[str, Any]]):
         """Render documents table with action buttons"""
         from pathlib import Path
-        self.tbl.setRowCount(0)
+        self.tbl.setSortingEnabled(False)
+        self.tbl.setUpdatesEnabled(False)
+        try:
+            self.tbl.setRowCount(len(rows))
+            for r, rec in enumerate(rows):
+                file_missing = rec.get("_file_missing", False)
 
-        for r, rec in enumerate(rows):
-            self.tbl.insertRow(r)
-            file_missing = rec.get("_file_missing", False)
+                # Doc number
+                item_doc = QTableWidgetItem(_fmt(rec.get("doc_no")))
+                item_doc.setData(Qt.UserRole, rec)
+                item_doc.setTextAlignment(Qt.AlignCenter)
+                self.tbl.setItem(r, self.COL_DOCNO, item_doc)
 
-            # Doc number
-            item_doc = QTableWidgetItem(_fmt(rec.get("doc_no")))
-            item_doc.setData(Qt.UserRole, rec)
-            item_doc.setTextAlignment(Qt.AlignCenter)
-            self.tbl.setItem(r, self.COL_DOCNO, item_doc)
+                # Transaction number
+                item_tx = QTableWidgetItem(_fmt(rec.get("transaction_no")))
+                item_tx.setTextAlignment(Qt.AlignCenter)
+                self.tbl.setItem(r, self.COL_TRANSACTION, item_tx)
 
-            # Transaction number
-            item_tx = QTableWidgetItem(_fmt(rec.get("transaction_no")))
-            item_tx.setTextAlignment(Qt.AlignCenter)
-            self.tbl.setItem(r, self.COL_TRANSACTION, item_tx)
+                # Type
+                item_type = QTableWidgetItem(_fmt(rec.get("doc_type_label")))
+                item_type.setTextAlignment(Qt.AlignCenter)
+                self.tbl.setItem(r, self.COL_TYPE, item_type)
 
-            # Type
-            item_type = QTableWidgetItem(_fmt(rec.get("doc_type_label")))
-            item_type.setTextAlignment(Qt.AlignCenter)
-            self.tbl.setItem(r, self.COL_TYPE, item_type)
+                # Language
+                item_lang = QTableWidgetItem(_fmt(rec.get("lang")))
+                item_lang.setTextAlignment(Qt.AlignCenter)
+                self.tbl.setItem(r, self.COL_LANG, item_lang)
 
-            # Language
-            item_lang = QTableWidgetItem(_fmt(rec.get("lang")))
-            item_lang.setTextAlignment(Qt.AlignCenter)
-            self.tbl.setItem(r, self.COL_LANG, item_lang)
+                # File name — يظهر "مفقود" إذا الملف غير موجود
+                full_path = _fmt(rec.get("path"))
+                if file_missing:
+                    file_name = "⚠ " + _tr("file_missing")
+                    item_path = QTableWidgetItem(file_name)
+                    item_path.setForeground(__import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#EF4444"))
+                else:
+                    file_name = Path(full_path).name if full_path != "-" else "-"
+                    item_path = QTableWidgetItem(file_name)
+                item_path.setToolTip(full_path)
+                item_path.setTextAlignment(Qt.AlignCenter)
+                self.tbl.setItem(r, self.COL_PATH, item_path)
 
-            # File name — يظهر "مفقود" إذا الملف غير موجود
-            full_path = _fmt(rec.get("path"))
-            if file_missing:
-                file_name = "⚠ " + _tr("file_missing")
-                item_path = QTableWidgetItem(file_name)
-                item_path.setForeground(__import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#EF4444"))
-            else:
-                file_name = Path(full_path).name if full_path != "-" else "-"
-                item_path = QTableWidgetItem(file_name)
-            item_path.setToolTip(full_path)
-            item_path.setTextAlignment(Qt.AlignCenter)
-            self.tbl.setItem(r, self.COL_PATH, item_path)
-
-            # Actions
-            actions_widget = self._create_action_buttons(rec, file_missing=file_missing)
-            self.tbl.setCellWidget(r, self.COL_ACTIONS, actions_widget)
+                # Actions
+                actions_widget = self._create_action_buttons(rec, file_missing=file_missing)
+                self.tbl.setCellWidget(r, self.COL_ACTIONS, actions_widget)
+        finally:
+            self.tbl.setUpdatesEnabled(True)
+            self.tbl.setSortingEnabled(True)
 
     def _create_action_buttons(self, rec: Dict[str, Any], file_missing: bool = False) -> QWidget:
         """Create action buttons — open/folder disabled if file missing"""

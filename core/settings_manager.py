@@ -568,19 +568,17 @@ class SettingsManager(QObject, QObjectSingletonMixin):
 
     def _apply_direction(self, direction: str) -> None:
         """Apply layout direction change"""
+        # ══════════════════════════════════════════════════════════════
+        # تم إزالة app.setLayoutDirection عن قصد:
+        # استدعاؤه يُعيد عكس root HBox في MainWindow تلقائياً،
+        # مما يُعيد الـ Sidebar لموضعه الخاطئ رغم ترتيبه الصح في _init_ui.
+        # موضع الـ Sidebar يُتحكم به حصراً عبر _reposition_sidebar() في MainWindow.
+        # ══════════════════════════════════════════════════════════════
         try:
             if not direction or direction not in ("rtl", "ltr"):
                 logger.warning(f"_apply_direction: invalid value '{direction}', skipping")
                 return
-
-            app = QApplication.instance()
-            if app is None:
-                return
-
-            dir_value = Qt.RightToLeft if direction == "rtl" else Qt.LeftToRight
-            app.setLayoutDirection(dir_value)
-            logger.info(f"Direction changed to: {direction}")
-
+            logger.info(f"Direction setting stored: {direction}")
         except Exception as e:
             logger.warning(f"Failed to apply direction: {e}")
 

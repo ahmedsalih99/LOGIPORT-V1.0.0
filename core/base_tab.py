@@ -481,15 +481,22 @@ class BaseTab(QWidget):
             self.table.setRowCount(0)
             return
 
-        self.table.setRowCount(len(page_rows))
-        for i, row in enumerate(page_rows):
-            for j, col in enumerate(self.columns):
-                key   = col.get("key", "")
-                value = row.get(key, "")
-                item  = QTableWidgetItem(str(value) if value is not None else "")
-                item.setTextAlignment(col.get("align", Qt.AlignCenter))
-                item.setFont(_BOLD_ITEM_FONT)
-                self.table.setItem(i, j, item)
+        # ── تجميد الـ UI أثناء التحميل لمنع إعادة الرسم مع كل صف ────────
+        self.table.setSortingEnabled(False)
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(page_rows))
+            for i, row in enumerate(page_rows):
+                for j, col in enumerate(self.columns):
+                    key   = col.get("key", "")
+                    value = row.get(key, "")
+                    item  = QTableWidgetItem(str(value) if value is not None else "")
+                    item.setTextAlignment(col.get("align", Qt.AlignCenter))
+                    item.setFont(_BOLD_ITEM_FONT)
+                    self.table.setItem(i, j, item)
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.setSortingEnabled(True)
         self.stretch_all_columns()
 
     # ─────────────────────────────────────────────────────────────────────
@@ -532,46 +539,51 @@ class BaseTab(QWidget):
         self._show_empty_state(len(rows) == 0, searched=searched)
 
         # ── رسم الجدول ───────────────────────────────────────────────────
-        self.table.setRowCount(0)
-        for row_idx, row in enumerate(page_rows):
-            self.table.insertRow(row_idx)
-            for col_idx, col in enumerate(self.columns):
-                key = col.get("key", "")
-                if key == "actions":
-                    if not show_actions:
-                        continue
-                    obj = row.get("actions")
-                    if can_edit and can_delete:
-                        # زران: نضعهما في widget بسيط جداً
-                        w = QWidget()
-                        lay = QHBoxLayout(w)
-                        lay.setContentsMargins(2, 2, 2, 2)
-                        lay.setSpacing(3)
-                        btn_e = QPushButton(self._("edit"))
-                        btn_e.setObjectName("primary-btn")
-                        btn_e.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        btn_d = QPushButton(self._("delete"))
-                        btn_d.setObjectName("danger-btn")
-                        btn_d.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        lay.addWidget(btn_e)
-                        lay.addWidget(btn_d)
-                        self.table.setCellWidget(row_idx, col_idx, w)
-                    elif can_edit:
-                        btn = QPushButton(self._("edit"))
-                        btn.setObjectName("primary-btn")
-                        btn.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
-                        self.table.setCellWidget(row_idx, col_idx, btn)
-                    elif can_delete:
-                        btn = QPushButton(self._("delete"))
-                        btn.setObjectName("danger-btn")
-                        btn.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
-                        self.table.setCellWidget(row_idx, col_idx, btn)
-                else:
-                    val = row.get(key, "")
-                    item = QTableWidgetItem(str(val) if val is not None else "")
-                    item.setTextAlignment(col.get("align", Qt.AlignCenter))
-                    item.setFont(_BOLD_ITEM_FONT)
-                    self.table.setItem(row_idx, col_idx, item)
+        # تجميد الرسم أثناء التحميل — يمنع إعادة الرسم مع كل صف (أسرع بـ 5-10x)
+        self.table.setSortingEnabled(False)
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(page_rows))
+            for row_idx, row in enumerate(page_rows):
+                for col_idx, col in enumerate(self.columns):
+                    key = col.get("key", "")
+                    if key == "actions":
+                        if not show_actions:
+                            continue
+                        obj = row.get("actions")
+                        if can_edit and can_delete:
+                            w = QWidget()
+                            lay = QHBoxLayout(w)
+                            lay.setContentsMargins(2, 2, 2, 2)
+                            lay.setSpacing(3)
+                            btn_e = QPushButton(self._("edit"))
+                            btn_e.setObjectName("primary-btn")
+                            btn_e.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
+                            btn_d = QPushButton(self._("delete"))
+                            btn_d.setObjectName("danger-btn")
+                            btn_d.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
+                            lay.addWidget(btn_e)
+                            lay.addWidget(btn_d)
+                            self.table.setCellWidget(row_idx, col_idx, w)
+                        elif can_edit:
+                            btn = QPushButton(self._("edit"))
+                            btn.setObjectName("primary-btn")
+                            btn.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
+                            self.table.setCellWidget(row_idx, col_idx, btn)
+                        elif can_delete:
+                            btn = QPushButton(self._("delete"))
+                            btn.setObjectName("danger-btn")
+                            btn.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
+                            self.table.setCellWidget(row_idx, col_idx, btn)
+                    else:
+                        val = row.get(key, "")
+                        item = QTableWidgetItem(str(val) if val is not None else "")
+                        item.setTextAlignment(col.get("align", Qt.AlignCenter))
+                        item.setFont(_BOLD_ITEM_FONT)
+                        self.table.setItem(row_idx, col_idx, item)
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.setSortingEnabled(True)
 
         # ── إخفاء عمود actions إذا لا صلاحية ───────────────────────────
         try:
@@ -603,19 +615,56 @@ class BaseTab(QWidget):
     # Context menu
     # -----------------------------
     def show_context_menu(self, pos):
-        menu = QMenu(self)
-        edit_action = menu.addAction(self._("edit"))
-        delete_action = menu.addAction(self._("delete"))
-        view_action = menu.addAction(self._("view"))
-        extra_actions = self.get_extra_context_actions(menu)
-        action = menu.exec(self.table.mapToGlobal(pos))
         selected_rows = self.get_selected_rows()
-        if action == edit_action and selected_rows:
+        count = len(selected_rows)
+
+        menu = QMenu(self)
+
+        # ── عنوان يُظهر عدد الصفوف المحددة ──────────────────────────────
+        if count > 1:
+            title = menu.addAction(f"✓  {count}  {self._('selected_rows_count') if hasattr(self, '_') else 'rows selected'}")
+            title.setEnabled(False)
+            menu.addSeparator()
+
+        # ── إجراءات الصف الواحد ──────────────────────────────────────────
+        view_action   = menu.addAction(self._("view"))
+        edit_action   = menu.addAction(self._("edit"))
+
+        # edit و view: متاحان فقط بصف واحد
+        view_action.setEnabled(count == 1)
+        edit_action.setEnabled(count == 1)
+
+        menu.addSeparator()
+
+        # ── نسخ ─────────────────────────────────────────────────────────
+        copy_action = menu.addAction(self._("copy") if "copy" in (self._.__doc__ or "") or True else "Copy")
+        copy_action.setEnabled(count >= 1)
+
+        menu.addSeparator()
+
+        # ── حذف (يعمل مع تعدد) ──────────────────────────────────────────
+        if count > 1:
+            delete_action = menu.addAction(f"🗑  {self._('delete')}  ({count})")
+        else:
+            delete_action = menu.addAction(self._("delete"))
+        delete_action.setEnabled(count >= 1)
+
+        # ── إجراءات إضافية من التاب الفرعي ─────────────────────────────
+        extra_actions = self.get_extra_context_actions(menu)
+
+        # ── تنفيذ ────────────────────────────────────────────────────────
+        action = menu.exec(self.table.mapToGlobal(pos))
+        if action is None:
+            return
+
+        if action == view_action and selected_rows:
+            self.request_view.emit(selected_rows[0])
+        elif action == edit_action and selected_rows:
             self.request_edit.emit(selected_rows[0])
+        elif action == copy_action and selected_rows:
+            self.copy_selected()
         elif action == delete_action and selected_rows:
             self.request_delete.emit(selected_rows)
-        elif action == view_action and selected_rows:
-            self.request_view.emit(selected_rows[0])
         elif extra_actions:
             for act, callback in extra_actions:
                 if action == act:

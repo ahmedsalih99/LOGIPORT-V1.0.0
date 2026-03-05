@@ -378,26 +378,31 @@ class AuditTrailTab(QWidget):
         self._count_lbl.setText(self._("total_records").format(count=self._total))
 
     def _render(self, rows):
-        self._tbl.setRowCount(0)
-        for ri, row in enumerate(rows):
-            self._tbl.insertRow(ri)
-            action = (row.action or "").lower()
-            icon   = ACTION_ICONS.get(action, "•")
-            color  = ACTION_COLORS.get(action, "#3498DB")
-            uname = ""
-            if row.user:
-                uname = getattr(row.user, "full_name", None) or getattr(row.user, "username", None) or "—"
-            self._cell(ri, 0, uname)
-            self._cell(ri, 1, f"{icon} {row.action or '—'}", color)
-            tbl_key = row.table_name or ""
-            tbl_trans_key = TABLE_TRANSLATION_KEYS.get(tbl_key)
-            tbl_name = self._(tbl_trans_key) if tbl_trans_key else (tbl_key or "—")
-            self._cell(ri, 2, tbl_name)
-            self._cell(ri, 3, str(row.record_id or "—"))
-            details = str(getattr(row, "details", "") or "")[:80]
-            self._cell(ri, 4, details)
-            ts = format_local_dt(row.timestamp, "%Y-%m-%d  %H:%M:%S")
-            self._cell(ri, 5, ts)
+        self._tbl.setSortingEnabled(False)
+        self._tbl.setUpdatesEnabled(False)
+        try:
+            self._tbl.setRowCount(len(rows))
+            for ri, row in enumerate(rows):
+                action = (row.action or "").lower()
+                icon   = ACTION_ICONS.get(action, "•")
+                color  = ACTION_COLORS.get(action, "#3498DB")
+                uname = ""
+                if row.user:
+                    uname = getattr(row.user, "full_name", None) or getattr(row.user, "username", None) or "—"
+                self._cell(ri, 0, uname)
+                self._cell(ri, 1, f"{icon} {row.action or '—'}", color)
+                tbl_key = row.table_name or ""
+                tbl_trans_key = TABLE_TRANSLATION_KEYS.get(tbl_key)
+                tbl_name = self._(tbl_trans_key) if tbl_trans_key else (tbl_key or "—")
+                self._cell(ri, 2, tbl_name)
+                self._cell(ri, 3, str(row.record_id or "—"))
+                details = str(getattr(row, "details", "") or "")[:80]
+                self._cell(ri, 4, details)
+                ts = format_local_dt(row.timestamp, "%Y-%m-%d  %H:%M:%S")
+                self._cell(ri, 5, ts)
+        finally:
+            self._tbl.setUpdatesEnabled(True)
+            self._tbl.setSortingEnabled(True)
 
     def _cell(self, row, col, text, color=None):
         item = QTableWidgetItem(str(text))

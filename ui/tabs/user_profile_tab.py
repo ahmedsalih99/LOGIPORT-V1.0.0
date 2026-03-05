@@ -297,6 +297,10 @@ class UserProfileTab(QWidget):
         # نسخ الملف مع اسم مميز
         ext = os.path.splitext(file_path)[1].lower()
         dest = os.path.join(avatars_dir, f"user_{user.id}{ext}")
+        # حرر lock على الصورة الحالية قبل الكتابة (Windows PermissionError)
+        if hasattr(self, "_avatar_lbl"):
+            from PySide6.QtGui import QPixmap as _QPixmap
+            self._avatar_lbl.setPixmap(_QPixmap())
         shutil.copy2(file_path, dest)
 
         # تحديث قاعدة البيانات
@@ -309,6 +313,9 @@ class UserProfileTab(QWidget):
 
             # تحديث كائن المستخدم في الإعدادات
             user.avatar_path = dest
+            # حفظ في SettingsManager حتى يراه TopBar فوراً
+            from core.settings_manager import SettingsManager as _SM
+            _SM.get_instance().set("user", user)
 
             self._refresh_avatar()
             QMessageBox.information(self, self._("success"), self._("avatar_updated"))

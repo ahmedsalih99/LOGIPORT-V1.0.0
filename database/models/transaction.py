@@ -73,6 +73,9 @@ class Transaction(Base):
     totals_net_kg = Column(Float, nullable=True)
     totals_value = Column(Numeric(12, 4), nullable=True)
 
+    # Office
+    office_id = Column(Integer, ForeignKey("offices.id", ondelete="RESTRICT"), nullable=True)
+
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -89,9 +92,10 @@ class Transaction(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    office = relationship("Office", back_populates="transactions", foreign_keys=[office_id])
 
     def __repr__(self):
-        return f"<Transaction(id={self.id}, transaction_no ={self.transaction_no!r})>"
+        return f"<Transaction(id={self.id}, transaction_no={self.transaction_no!r})>"
 
 class TransactionEntry(Base):
     __tablename__ = "transaction_entries"

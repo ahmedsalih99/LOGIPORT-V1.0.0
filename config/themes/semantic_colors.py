@@ -20,11 +20,11 @@ class SemanticColors:
 
         return {
             # ========== Primary (Blue) - Professional ==========
-            "primary": "#4A7EC8",              # Professional blue - matches sidebar
-            "primary_hover": "#5B8ED8",        # Lighter on hover
-            "primary_active": "#3A6EB8",       # Darker on press
-            "primary_light": "rgba(74, 126, 200, 0.1)",
-            "primary_lighter": "rgba(74, 126, 200, 0.05)",
+            "primary": "#2563EB",              # Blue primary
+            "primary_hover": "#3B82F6",        # Lighter on hover
+            "primary_active": "#1D4ED8",       # Darker on press
+            "primary_light": "rgba(37, 99, 235, 0.1)",
+            "primary_lighter": "rgba(37, 99, 235, 0.05)",
 
             # ========== Success (Green) ==========
             "success": "#2ECC71",
@@ -62,7 +62,7 @@ class SemanticColors:
             "bg_main_gradient_start": "#FFFFFF",
             "bg_main_gradient_end": "#F8F9FA",
             "bg_elevated": "#FFFFFF",
-            "bg_sidebar": "#4A7EC8",           # Blue sidebar - lighter professional
+            "bg_sidebar": "#1B2A4A",           # Navy dark sidebar - Hypernode style
             "bg_topbar": "#FFFFFF",            # White topbar
             "bg_input": "#FFFFFF",
 
@@ -87,8 +87,8 @@ class SemanticColors:
             # ========== Borders ==========
             "border": "#E0E0E0",               # Clear gray border
             "border_subtle": "#F0F0F0",        # Subtle
-            "border_hover": "#4A7EC8",         # Blue on hover - matches sidebar
-            "border_focus": "#4A7EC8",         # Blue when focused - matches sidebar
+            "border_hover": "#2563EB",         # Blue on hover
+            "border_focus": "#2563EB",         # Blue when focused
             "border_error": "#E74C3C",         # Red for errors
 
             # ========== Shadows ==========
@@ -109,10 +109,10 @@ class SemanticColors:
             "bg_surface": "#FFFFFF",
 
             # ========== Accent System ==========
-            "accent": "#4A7EC8",
-            "accent_hover": "#5B8ED8",
-            "accent_active": "#3A6EB8",
-            "accent_soft": "rgba(74, 126, 200, 0.15)",
+            "accent": "#2563EB",
+            "accent_hover": "#3B82F6",
+            "accent_active": "#1D4ED8",
+            "accent_soft": "rgba(37, 99, 235, 0.15)",
 
             # ========== Inputs ==========
             "input_bg": "#FFFFFF",

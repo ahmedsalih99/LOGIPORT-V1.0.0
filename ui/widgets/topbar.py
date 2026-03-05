@@ -1,196 +1,293 @@
 """
-TopBar - LOGIPORT v3.1
-=========================
-
-محدّث:
-- NotificationBell مع badge حقيقي
-- زر المستخدم يفتح صفحة البروفايل
-- زر تسجيل خروج سريع
-- ساعة + لغة + ثيم + إعدادات
+TopBar - LOGIPORT
+==================
+الهيكل:
+  [أدوات + لغة]  [← spacer →]  [🔍 بحث]  [← spacer →]  [⏰]  [🔔]  [👤 اسم]  [⬡ logout]
 """
 
+import datetime
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QPushButton, QSpacerItem,
-    QSizePolicy, QLabel, QApplication
+    QSizePolicy, QLabel, QFrame
 )
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QTimer, Signal, QSize, QRect
+from PySide6.QtGui import QFont, QPixmap, QPainter, QColor, QPainterPath
+
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
-from ui.settings_window import SettingsWindow
 from ui.widgets.notification_bell import NotificationBell
-from ui.utils.svg_icons import set_icon, refresh_icons
-import datetime
+from ui.utils.svg_icons import set_icon
 
+
+# ─── Avatar دائرة ملوّنة ────────────────────────────────────────────────────
+
+class _AvatarLabel(QLabel):
+    SIZE = 28
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(self.SIZE, self.SIZE)
+        self._letter  = "U"
+        self._color   = "#2563EB"
+        self._img     = None
+
+    def set_user(self, name: str, avatar_path: str | None = None):
+        self._letter = (name[0].upper() if name else "U")
+        palette = ["#2563EB", "#7C3AED", "#059669", "#DC2626", "#D97706", "#0891B2"]
+        self._color = palette[ord(self._letter) % len(palette)]
+
+        self._img = None
+        if avatar_path:
+            try:
+                pm = QPixmap(avatar_path)
+                if not pm.isNull():
+                    self._img = pm.scaled(
+                        self.SIZE, self.SIZE,
+                        Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation
+                    )
+            except Exception:
+                pass
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        r = self.SIZE
+        path.addEllipse(0, 0, r, r)
+        p.setClipPath(path)
+        if self._img:
+            p.drawPixmap(0, 0, self._img)
+        else:
+            p.fillRect(0, 0, r, r, QColor(self._color))
+            p.setPen(QColor("#FFFFFF"))
+            p.setFont(QFont("Tajawal", 11, QFont.Bold))
+            p.drawText(QRect(0, 0, r, r), Qt.AlignCenter, self._letter)
+        p.end()
+
+
+# ─── User Widget: QFrame قابل للضغط ─────────────────────────────────────────
+
+class _UserChip(QFrame):
+    """QFrame يحمل avatar + اسم، ويصدر clicked عند الضغط."""
+
+    clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("topbar-user-chip")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(36)
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(8, 0, 12, 0)
+        lay.setSpacing(8)
+
+        self.avatar = _AvatarLabel()
+        lay.addWidget(self.avatar)
+
+        self.name_lbl = QLabel()
+        self.name_lbl.setObjectName("topbar-username-lbl")
+        lay.addWidget(self.name_lbl)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+    def set_user(self, name: str, avatar_path: str | None = None):
+        display = name or "User"
+        self.avatar.set_user(display, avatar_path)
+        self.name_lbl.setText(display)
+        self.name_lbl.setFont(QFont("Tajawal", 10, QFont.DemiBold))
+
+
+# ─── TopBar ──────────────────────────────────────────────────────────────────
 
 class TopBar(QWidget):
-    """Responsive top bar with notifications and user menu."""
 
-    # ── signals ──────────────────────────────────────────────────────────────
-    profile_requested = Signal()   # فتح صفحة البروفايل
-    logout_requested  = Signal()   # تسجيل الخروج
-    about_requested   = Signal()   # نافذة عن التطبيق
-    search_requested  = Signal()   # فتح البحث العام
+    profile_requested = Signal()
+    logout_requested  = Signal()
+    about_requested   = Signal()
+    search_requested  = Signal()
 
     def __init__(self):
         super().__init__()
         self.setObjectName("TopBar")
-        self._  = TranslationManager.get_instance().translate
+        self._       = TranslationManager.get_instance().translate
         self.settings = SettingsManager.get_instance()
+        self.setFixedHeight(52)
+        self._build()
 
-        self._set_responsive_height()
-        self._init_ui()
+    # ── بناء الواجهة ─────────────────────────────────────────────────────────
 
-    def _set_responsive_height(self):
-        screen = QApplication.primaryScreen()
-        screen_height = screen.availableGeometry().height()
+    def _build(self):
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(4)
 
-        if screen_height < 768:
-            height = max(48, int(screen_height * 0.06))
-        elif screen_height < 1080:
-            height = 54
-        else:
-            height = max(56, int(screen_height * 0.05))
+        # ══ LEFT: أدوات ══════════════════════════════════════════════════════
+        self.settings_btn = self._icon_btn("settings", self.open_settings)
+        self.theme_btn    = self._icon_btn("theme",    self.toggle_theme)
+        self.about_btn    = self._icon_btn("info",     self.about_requested.emit)
+        lay.addWidget(self.settings_btn)
+        lay.addWidget(self.theme_btn)
+        lay.addWidget(self.about_btn)
 
-        self.setMinimumHeight(height)
-        self.setMaximumHeight(height)
-        self.topbar_height = height
-
-    def _init_ui(self):
-        layout = QHBoxLayout(self)
-        margin_h = max(16, int(self.topbar_height * 0.4))
-        layout.setContentsMargins(margin_h, 0, margin_h, 0)
-        layout.setSpacing(max(8, int(self.topbar_height * 0.2)))
-
-        # ─── LEFT: Settings / Language / Theme ───────────────────────────────
-        self.settings_btn = QPushButton(f"{self._('settings')}")
-        self.settings_btn.setObjectName("topbar-btn")
-        self.settings_btn.setCursor(Qt.PointingHandCursor)
-        self.settings_btn.clicked.connect(self.open_settings)
-        layout.addWidget(self.settings_btn)
-
-        self.lang_btn = QPushButton(f"{self._('language')}")
-        self.lang_btn.setObjectName("topbar-btn")
+        # زر اللغة — نص فقط
+        self.lang_btn = QPushButton()
+        self.lang_btn.setObjectName("topbar-lang-btn")
+        self.lang_btn.setFixedHeight(28)
         self.lang_btn.setCursor(Qt.PointingHandCursor)
         self.lang_btn.clicked.connect(self.toggle_language)
-        layout.addWidget(self.lang_btn)
+        self._refresh_lang_btn()
+        lay.addWidget(self.lang_btn)
 
-        self.theme_btn = QPushButton(f"{self._('theme')}")
-        self.theme_btn.setObjectName("topbar-btn")
-        self.theme_btn.setCursor(Qt.PointingHandCursor)
-        self.theme_btn.clicked.connect(self.toggle_theme)
-        layout.addWidget(self.theme_btn)
+        # ══ CENTER: بحث ══════════════════════════════════════════════════════
+        lay.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        self.about_btn = QPushButton()
-        self.about_btn.setObjectName("topbar-btn-icon")
-        self.about_btn.setFixedSize(36, 36)
-        self.about_btn.setCursor(Qt.PointingHandCursor)
-        self.about_btn.setToolTip(self._("about_app"))
-        self.about_btn.clicked.connect(self.about_requested.emit)
-        layout.addWidget(self.about_btn)
-
-        # Search button
         self.search_btn = QPushButton()
-        self.search_btn.setObjectName("topbar-btn-icon")
-        self.search_btn.setFixedSize(36, 36)
+        self.search_btn.setObjectName("topbar-search-bar")
+        self.search_btn.setFixedHeight(34)
+        self.search_btn.setMinimumWidth(260)
+        self.search_btn.setMaximumWidth(400)
         self.search_btn.setCursor(Qt.PointingHandCursor)
-        self.search_btn.setToolTip(self._("search") + "  (Ctrl+F)")
+        self.search_btn.setLayoutDirection(Qt.RightToLeft)
         self.search_btn.clicked.connect(self.search_requested.emit)
-        layout.addWidget(self.search_btn)
+        set_icon(self.search_btn, "search", 15)
+        self._refresh_search_text()
+        lay.addWidget(self.search_btn)
 
-        # ─── CENTER: Clock ────────────────────────────────────────────────────
-        layout.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        lay.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
+        # ══ RIGHT: ساعة ══════════════════════════════════════════════════════
         self.time_label = QLabel(datetime.datetime.now().strftime("%H:%M"))
         self.time_label.setObjectName("topbar-clock")
         self.time_label.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
-        layout.addWidget(self.time_label)
+        lay.addWidget(self.time_label)
 
-        layout.addItem(QSpacerItem(20, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        lay.addWidget(self._vline())
 
-        # ─── RIGHT: Notification Bell ─────────────────────────────────────────
+        # ══ RIGHT: جرس إشعارات ════════════════════════════════════════════════
         self.notif_bell = NotificationBell()
-        layout.addWidget(self.notif_bell)
+        lay.addWidget(self.notif_bell)
 
-        # ─── RIGHT: User button (opens profile) ───────────────────────────────
-        self.user_btn = QPushButton()
-        self.user_btn.setObjectName("topbar-btn")
-        self.user_btn.setCursor(Qt.PointingHandCursor)
-        self.user_btn.setToolTip(self._("profile"))
-        self.user_btn.clicked.connect(self.profile_requested.emit)
-        self._refresh_user_btn()
-        layout.addWidget(self.user_btn)
+        lay.addWidget(self._vline())
 
-        # ─── RIGHT: Logout ────────────────────────────────────────────────────
-        self.logout_btn = QPushButton()
-        self.logout_btn.setObjectName("topbar-btn-icon")
-        self.logout_btn.setFixedSize(36, 36)
-        self.logout_btn.setCursor(Qt.PointingHandCursor)
-        self.logout_btn.setToolTip(self._("logout"))
-        self.logout_btn.clicked.connect(self.logout_requested.emit)
-        layout.addWidget(self.logout_btn)
+        # ══ RIGHT: User chip (avatar + اسم) ══════════════════════════════════
+        self.user_chip = _UserChip()
+        self.user_chip.clicked.connect(self.profile_requested.emit)
+        self.user_chip.setToolTip(self._("profile"))
+        lay.addWidget(self.user_chip)
 
-        # ─── Icons ───────────────────────────────────────────────────────────
-        refresh_icons(self)
+        # ══ RIGHT: logout ═════════════════════════════════════════════════════
+        self.logout_btn = self._icon_btn("logout", self.logout_requested.emit)
+        lay.addWidget(self.logout_btn)
 
-        # ─── Clock timer ──────────────────────────────────────────────────────
+        # ── تحديث بيانات المستخدم ─────────────────────────────────────────────
+        self._refresh_user()
+
+        # ── Timer الساعة ──────────────────────────────────────────────────────
         timer = QTimer(self)
-        timer.timeout.connect(self.update_time)
-        timer.start(60000)
+        timer.timeout.connect(lambda: self.time_label.setText(
+            datetime.datetime.now().strftime("%H:%M")
+        ))
+        timer.start(1000)
 
-        # ─── Theme change → أعد رسم الأيقونات ────────────────────────────────
+        # ── إعادة رسم الأيقونات عند تغيير الثيم ──────────────────────────────
         try:
             from core.theme_manager import ThemeManager
-            ThemeManager.get_instance().theme_changed.connect(
-                lambda _: refresh_icons(self)
-            )
+            ThemeManager.get_instance().theme_changed.connect(self._on_theme_changed)
         except Exception:
             pass
 
-    def _refresh_user_btn(self):
-        user = self.settings.get("user")
-        name = "◉"
+        # تحديث الصورة فوراً عند تغيير user في الـ settings
+        self.settings.setting_changed.connect(self._on_setting_changed)
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _icon_btn(self, icon_name: str, slot) -> QPushButton:
+        btn = QPushButton()
+        btn.setObjectName("topbar-tool-btn")
+        btn.setFixedSize(32, 32)
+        btn.setCursor(Qt.PointingHandCursor)
+        set_icon(btn, icon_name, 17)
+        btn.clicked.connect(slot)
+        return btn
+
+    def _vline(self) -> QFrame:
+        f = QFrame()
+        f.setFrameShape(QFrame.VLine)
+        f.setObjectName("topbar-sep")
+        return f
+
+    def _refresh_lang_btn(self):
+        lang   = self.settings.get("language") or "ar"
+        labels = {"ar": "ع", "en": "EN", "tr": "TR"}
+        self.lang_btn.setText(labels.get(lang, lang.upper()))
+
+    def _refresh_search_text(self):
+        self.search_btn.setText(f"  {self._('search')}...        Ctrl+F")
+
+    def _refresh_user(self):
+        user        = self.settings.get("user")
+        name        = ""
+        avatar_path = None
         if user:
-            display = (getattr(user, "full_name", None) or
-                       getattr(user, "username", None) or "")
-            if display:
-                name = display
-        self.user_btn.setText(name)
-        self.user_btn.setFont(QFont("Tajawal", 10))
+            name        = getattr(user, "full_name", None) or getattr(user, "username", None) or ""
+            avatar_path = getattr(user, "avatar_path", None)
+        self.user_chip.set_user(name, avatar_path)
+
+    # ── slots ─────────────────────────────────────────────────────────────────
+
+    def _on_setting_changed(self, key, value):
+        if key == "user":
+            self._refresh_user()
+
+    def _on_theme_changed(self, _=None):
+        set_icon(self.settings_btn, "settings", 17)
+        set_icon(self.theme_btn,    "theme",    17)
+        set_icon(self.about_btn,    "info",     17)
+        set_icon(self.logout_btn,   "logout",   17)
+        set_icon(self.search_btn,   "search",   15)
+
+    def toggle_language(self):
+        lang     = self.settings.get("language")
+        new_lang = "en" if lang == "ar" else ("tr" if lang == "en" else "ar")
+        self.settings.set_language(new_lang)
+        self._refresh_lang_btn()
+
+    def toggle_theme(self):
+        theme     = self.settings.get("theme")
+        new_theme = "dark" if theme == "light" else "light"
+        self.settings.set("theme", new_theme)
+
+    def open_settings(self):
+        from ui.settings_window import SettingsWindow
+        SettingsWindow(self).exec_()
+
+    # ── public API ────────────────────────────────────────────────────────────
 
     def update_time(self):
         self.time_label.setText(datetime.datetime.now().strftime("%H:%M"))
 
-    def toggle_language(self):
-        lang = self.settings.get("language")
-        new_lang = "en" if lang == "ar" else ("tr" if lang == "en" else "ar")
-        self.settings.set_language(new_lang)
-        self.lang_btn.setText(self._('language'))
-        self.settings_btn.setText(self._('settings'))
-        self.theme_btn.setText(self._('theme'))
-
-    def toggle_theme(self):
-        theme = self.settings.get("theme")
-        new_theme = "dark" if theme == "light" else "light"
-        self.settings.set("theme", new_theme)
-        self.theme_btn.setText(self._('theme'))
-
-
-    def open_settings(self):
-        dlg = SettingsWindow(self)
-        dlg.exec_()
-
     def retranslate_ui(self):
-        self._ = TranslationManager.get_instance().translate
-        self.lang_btn.setText(self._('language'))
-        self.theme_btn.setText(self._('theme'))
-        self.settings_btn.setText(self._('settings'))
-        self.lang_btn.setToolTip(self._("language"))
-        self.theme_btn.setToolTip(self._("theme"))
+        self._       = TranslationManager.get_instance().translate
+        self._refresh_lang_btn()
+        self._refresh_search_text()
+        self._refresh_user()
         self.settings_btn.setToolTip(self._("settings"))
+        self.theme_btn.setToolTip(self._("theme"))
         self.about_btn.setToolTip(self._("about_app"))
-        if hasattr(self, "search_btn"):
-            self.search_btn.setToolTip(self._("search") + "  (Ctrl+F)")
-        self.user_btn.setToolTip(self._("profile"))
         self.logout_btn.setToolTip(self._("logout"))
-        self._refresh_user_btn()
+        self.user_chip.setToolTip(self._("profile"))
+
+    # backward compat — بعض الأماكن تستدعي هذه الأسماء
+    @property
+    def user_btn(self):
+        return self.user_chip
+
+    @property
+    def user_widget(self):
+        return self.user_chip
