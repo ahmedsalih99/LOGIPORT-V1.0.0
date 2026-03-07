@@ -266,6 +266,16 @@ class FormDialog(BaseDialog):
         يُستدعى من BaseDialog._retranslate_ui() عند تغيير اللغة.
         الـ subclass يمكنه تجاوزه لكن يجب استدعاء super().retranslate_ui() أولاً.
         """
+        # ── ضبط محاذاة الـ label حسب اللغة RTL/LTR ─────────────────────
+        try:
+            lang = self.translator.get_current_language()
+            if lang.startswith("ar"):
+                self._form_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            else:
+                self._form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        except Exception:
+            pass
+
         # ── العنوان ──────────────────────────────────────────────────────
         if self._title_key_form:
             text = self._(self._title_key_form)

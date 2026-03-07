@@ -211,9 +211,11 @@ class DocumentsTab(BaseTab):
     # ---------------- UI -----------------
     def _build_ui(self):
         """Build complete UI from scratch"""
-        # Clear any existing layout
-        if self.layout() is not None:
-            QWidget().setLayout(self.layout())  # Reparent to clear
+        # Clear any existing layout (bypass property, call Qt C++ method directly)
+        from PySide6.QtWidgets import QWidget as _QW
+        _existing = _QW.layout(self)
+        if _existing is not None:
+            _QW().setLayout(_existing)  # Reparent to clear
 
         # Create fresh layout
         root = QVBoxLayout()
@@ -311,66 +313,15 @@ class DocumentsTab(BaseTab):
         layout.setSpacing(12)
 
         # === Filters Bar ===
-        from PySide6.QtWidgets import QDateEdit, QFrame as _QFrame2
-        from PySide6.QtCore import QDate
-        from PySide6.QtGui import QFont as _QFont2
+        from core.base_tab import DateRangeBar
+        self._date_bar = DateRangeBar(self, default_months=3)
+        self._date_bar.changed.connect(lambda: self._reload_docs(reset_page=True))
 
-        filters_bar = QHBoxLayout()
-        filters_bar.setSpacing(8)
-
-        # ── Date From / To ──
-        lbl_df = QLabel("\U0001f4c5 " + _tr("date_from") + ":")
-        lbl_df.setFont(_QFont2("Tajawal", 9))
-        filters_bar.addWidget(lbl_df)
-
-        self.doc_date_from = QDateEdit()
-        self.doc_date_from.setObjectName("form-input")
-        self.doc_date_from.setCalendarPopup(True)
-        self.doc_date_from.setDisplayFormat("yyyy-MM-dd")
-        self.doc_date_from.setDate(QDate.currentDate().addMonths(-3))
-        self.doc_date_from.setMinimumWidth(108)
-        filters_bar.addWidget(self.doc_date_from)
-
-        lbl_dt = QLabel("→ " + _tr("date_to") + ":")
-        lbl_dt.setFont(_QFont2("Tajawal", 9))
-        filters_bar.addWidget(lbl_dt)
-
-        self.doc_date_to = QDateEdit()
-        self.doc_date_to.setObjectName("form-input")
-        self.doc_date_to.setCalendarPopup(True)
-        self.doc_date_to.setDisplayFormat("yyyy-MM-dd")
-        self.doc_date_to.setDate(QDate.currentDate())
-        self.doc_date_to.setMinimumWidth(108)
-        filters_bar.addWidget(self.doc_date_to)
-
-        for _lbl2, _slot2 in (
-            ("\U0001f4c5 " + _tr("today"),      "_doc_preset_today"),
-            ("\U0001f4c5 " + _tr("this_month"), "_doc_preset_month"),
-        ):
-            _btn2 = QPushButton(_lbl2)
-            _btn2.setObjectName("topbar-btn")
-            _btn2.setMinimumHeight(28)
-            _btn2.setFont(_QFont2("Tajawal", 9))
-            _btn2.setCursor(Qt.PointingHandCursor)
-            _btn2.clicked.connect(lambda _=False, s=_slot2: getattr(self, s)())
-            filters_bar.addWidget(_btn2)
-
-        _clr2 = QPushButton("\u2716")
-        _clr2.setObjectName("topbar-btn")
-        _clr2.setMinimumHeight(28)
-        _clr2.setToolTip(_tr("clear"))
-        _clr2.setCursor(Qt.PointingHandCursor)
-        _clr2.clicked.connect(self._doc_preset_clear)
-        filters_bar.addWidget(_clr2)
-
-        _sep2 = _QFrame2()
-        _sep2.setFrameShape(_QFrame2.VLine)
-        _sep2.setFixedWidth(1); _sep2.setFixedHeight(22)
-        filters_bar.addWidget(_sep2)
+        # alias للتوافق مع _reload_docs
+        self.doc_date_from = self._date_bar._date_from
+        self.doc_date_to   = self._date_bar._date_to
 
         # Type filter
-        lbl_type = QLabel(_tr("document_type") + ":")
-        lbl_type.setFont(_QFont2("Tajawal", 9))
         self.cmb_type = QComboBox()
         self.cmb_type.setObjectName("filter-combo")
         self.cmb_type.addItem(_tr("all_types"), None)
@@ -378,25 +329,18 @@ class DocumentsTab(BaseTab):
         self.cmb_type.addItem(_tr("document_packing_list"), "packing")
         self.cmb_type.addItem("CMR", "cmr")
         self.cmb_type.addItem(_tr("form_a_certificate"), "form_a")
+        self._date_bar.add_widget(self.cmb_type)
 
         # Language filter
-        lbl_lang = QLabel(_tr("language") + ":")
-        lbl_lang.setFont(_QFont2("Tajawal", 9))
         self.cmb_lang = QComboBox()
         self.cmb_lang.setObjectName("filter-combo")
         self.cmb_lang.addItem(_tr("all_languages"), None)
         self.cmb_lang.addItem(self._("arabic"), "ar")
         self.cmb_lang.addItem(self._("english"), "en")
         self.cmb_lang.addItem(self._("turkish"), "tr")
+        self._date_bar.add_widget(self.cmb_lang)
 
-        filters_bar.addWidget(lbl_type)
-        filters_bar.addWidget(self.cmb_type)
-        filters_bar.addSpacing(12)
-        filters_bar.addWidget(lbl_lang)
-        filters_bar.addWidget(self.cmb_lang)
-        filters_bar.addStretch()
-
-        layout.addLayout(filters_bar)
+        layout.addWidget(self._date_bar)
 
         # === Table ===
         self.tbl = QTableWidget(0, 6)
@@ -478,8 +422,7 @@ class DocumentsTab(BaseTab):
         # Filters
         self.cmb_type.currentIndexChanged.connect(lambda: self._reload_docs(reset_page=True))
         self.cmb_lang.currentIndexChanged.connect(lambda: self._reload_docs(reset_page=True))
-        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
-        self.doc_date_to.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
+        # doc_date_from/to مرتبطان بـ DateRangeBar.changed
 
         # Transaction picker
         self.cmb_transaction.currentIndexChanged.connect(self._on_transaction_changed)
@@ -523,26 +466,6 @@ class DocumentsTab(BaseTab):
         self._reload_docs(reset_page=True)
 
     # ── Date presets for documents tab ──────────────────────────────────────
-    def _doc_preset_today(self):
-        today = QDate.currentDate()
-        # فصل الإشارة لمنع reload مزدوج
-        self.doc_date_from.dateChanged.disconnect()
-        self.doc_date_from.setDate(today)
-        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
-        self.doc_date_to.setDate(today)
-
-    def _doc_preset_month(self):
-        today = QDate.currentDate()
-        self.doc_date_from.dateChanged.disconnect()
-        self.doc_date_from.setDate(QDate(today.year(), today.month(), 1))
-        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
-        self.doc_date_to.setDate(today)
-
-    def _doc_preset_clear(self):
-        self.doc_date_from.dateChanged.disconnect()
-        self.doc_date_from.setDate(QDate.currentDate().addMonths(-3))
-        self.doc_date_from.dateChanged.connect(lambda: self._reload_docs(reset_page=True))
-        self.doc_date_to.setDate(QDate.currentDate())
 
     def _refresh_transactions_seed(self):
         """Load recent transactions"""

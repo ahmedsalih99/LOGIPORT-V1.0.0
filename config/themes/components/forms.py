@@ -220,6 +220,101 @@ def get_styles(theme):
     }}
 
     /* =======================================================================
+       QCalendarWidget
+    ======================================================================= */
+
+    /* شريط التنقل: الشهر والسنة والأسهم */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {{
+        background   : {c["primary"]};
+        min-height   : 40px;
+        padding      : 2px 6px;
+    }}
+
+    /* أزرار التنقل (اسم الشهر / السنة / الأسهم) */
+    QCalendarWidget QToolButton {{
+        background   : transparent;
+        color        : #FFFFFF;
+        font-size    : 13px;
+        font-weight  : 700;
+        border       : none;
+        border-radius: 4px;
+        padding      : 4px 10px;
+        margin       : 1px 2px;
+        min-width    : 28px;
+        min-height   : 28px;
+    }}
+    QCalendarWidget QToolButton:hover {{
+        background : rgba(255,255,255,0.20);
+    }}
+    QCalendarWidget QToolButton:pressed {{
+        background : rgba(255,255,255,0.35);
+    }}
+    QCalendarWidget QToolButton::menu-indicator {{
+        image : none;
+        width : 0px;
+    }}
+
+    /* SpinBox السنة داخل شريط التنقل */
+    QCalendarWidget QSpinBox {{
+        background   : rgba(255,255,255,0.15);
+        color        : #FFFFFF;
+        border       : 1px solid rgba(255,255,255,0.35);
+        border-radius: 4px;
+        padding      : 2px 4px;
+        font-size    : 13px;
+        font-weight  : 700;
+        min-width    : 52px;
+        selection-background-color : {c["primary_active"]};
+        selection-color            : #FFFFFF;
+    }}
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {{
+        background : transparent;
+        border     : none;
+        width      : 14px;
+        height     : 10px;
+    }}
+    QCalendarWidget QSpinBox::up-arrow {{
+        border-left  : 3px solid transparent;
+        border-right : 3px solid transparent;
+        border-bottom: 4px solid #FFFFFF;
+        width  : 0px;
+        height : 0px;
+    }}
+    QCalendarWidget QSpinBox::down-arrow {{
+        border-left  : 3px solid transparent;
+        border-right : 3px solid transparent;
+        border-top   : 4px solid #FFFFFF;
+        width  : 0px;
+        height : 0px;
+    }}
+
+    /* صف رؤوس الأيام (Sun Mon ...) */
+    QCalendarWidget QHeaderView {{
+        background : {c["bg_hover"]};
+    }}
+    QCalendarWidget QHeaderView::section {{
+        background : {c["bg_hover"]};
+        color      : {c["text_muted"]};
+        font-size  : 11px;
+        font-weight: 600;
+        border     : none;
+        padding    : 4px 0;
+    }}
+
+    /* خلايا الأيام */
+    QCalendarWidget QAbstractItemView {{
+        background                 : {c["bg_card"]};
+        color                      : {c["text_primary"]};
+        selection-background-color : {c["primary"]};
+        selection-color            : #FFFFFF;
+        gridline-color             : {c["border_subtle"]};
+        outline                    : none;
+        border                     : none;
+        font-size                  : 13px;
+    }}
+
+    /* =======================================================================
        QSpinBox & QDoubleSpinBox
     ======================================================================= */
 

@@ -173,34 +173,63 @@ class OfficesTab(BaseTab):
         if reply != QMessageBox.Yes:
             return
         user_id = getattr(self.current_user, "id", None)
+        deleted = 0
         for row in rows:
             office_dict = self.data[row]["actions"]
             try:
                 self.crud.delete(office_dict["id"], user_id=user_id)
+                deleted += 1
+            except ValueError as exc:
+                msg = str(exc)
+                if msg.startswith("office_has_users:"):
+                    n = msg.split(":")[1]
+                    QMessageBox.warning(
+                        self, self._("cannot_delete"),
+                        self._("office_has_users_warning").format(
+                            name=office_dict.get("name_ar", ""), n=n
+                        )
+                    )
+                elif msg.startswith("office_has_transactions:"):
+                    n = msg.split(":")[1]
+                    QMessageBox.warning(
+                        self, self._("cannot_delete"),
+                        self._("office_has_transactions_warning").format(
+                            name=office_dict.get("name_ar", ""), n=n
+                        )
+                    )
+                else:
+                    QMessageBox.warning(self, self._("error"), msg)
             except Exception as exc:
                 QMessageBox.warning(self, self._("error"), str(exc))
-        QMessageBox.information(self, self._("deleted"), self._("office_deleted_success"))
+        if deleted:
+            QMessageBox.information(self, self._("deleted"), self._("office_deleted_success"))
         self.reload_data()
 
     # ── دابل كليك → تفعيل / تعطيل ────────────────────────────────────────────
 
     def on_row_double_clicked(self, row_index):
+        """دابل كليك → يفتح نافذة تفاصيل المكتب."""
         try:
             row = int(row_index)
         except Exception:
             row = getattr(row_index, "row", lambda: -1)()
         if not (0 <= row < len(self.data)):
             return
-
         office_dict = self.data[row]["actions"]
+        self._open_view_dialog(office_dict)
+
+    def _open_view_dialog(self, office_dict: dict):
+        from ui.dialogs.view_details.view_office_dialog import ViewOfficeDialog
+        dlg = ViewOfficeDialog(office_dict, current_user=self.current_user, parent=self)
+        dlg.exec()
+
+    def _toggle_active(self, office_dict: dict):
+        """تفعيل / تعطيل مكتب — يُستدعى من edit dialog أو context menu."""
         is_active = office_dict.get("is_active", True)
         action = self._("deactivate") if is_active else self._("activate")
-        name = office_dict.get("name_ar", "")
-
-        reply = QMessageBox.question(
-            self,
-            action,
-            f"{action} — {name}؟",
+        name   = office_dict.get("name_ar", "")
+        reply  = QMessageBox.question(
+            self, action, f"{action} — {name}؟",
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:

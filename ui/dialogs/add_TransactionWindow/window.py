@@ -114,8 +114,15 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.setObjectName("AddTransactionWindow")
         self.setWindowTitle(self._("edit_transaction") if self._is_edit else self._("add_transaction"))
 
-        # ✨ تحسين: حجم النافذة الافتراضي أكبر
-        self.resize(1400, 900)  # كان صغير جداً
+        # حجم يراعي الشاشة — يأخذ 92% من المساحة المتاحة بحد أدنى ثابت
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen().availableGeometry()
+            w = max(1200, int(screen.width()  * 0.92))
+            h = max(800,  int(screen.height() * 0.92))
+            self.resize(w, h)
+        except Exception:
+            self.resize(1400, 900)
         self.setMinimumSize(QSize(1200, 800))
 
         self._build_ui()
@@ -292,6 +299,11 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.btn_cancel.clicked.connect(self.close)
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_generate_docs.clicked.connect(self._open_generate_docs)
+
+    def showEvent(self, event):
+        """استعادة حجم النافذة بعد اكتمال بناء الـ UI"""
+        super().showEvent(event)
+        self._restore_geometry()
 
     def _setup_shortcuts(self):
         save_shortcut = QShortcut(QKeySequence.Save, self)

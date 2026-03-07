@@ -59,8 +59,9 @@ class BaseDialog(QDialog):
         # Apply settings
         if QApplication.instance():
             self._apply_settings()
-            self._restore_geometry()
 
+        # ضبط اتجاه RTL/LTR فوراً عند الإنشاء
+        self._apply_layout_direction()
 
         # Setup keyboard shortcuts
         self._setup_shortcuts()
@@ -447,6 +448,9 @@ class BaseDialog(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
+
+        # استعادة الحجم والموقع بعد اكتمال بناء الـ UI
+        self._restore_geometry()
 
         if getattr(self, "_auto_center", False):
             self.center_on_parent()

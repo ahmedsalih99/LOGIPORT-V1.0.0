@@ -103,6 +103,34 @@ class _UserChip(QFrame):
         self.name_lbl.setFont(QFont("Tajawal", 10, QFont.DemiBold))
 
 
+# ─── OfficeBadge ─────────────────────────────────────────────────────────────
+
+class _OfficeBadge(QFrame):
+    """Badge صغير يعرض اسم المكتب الحالي في TopBar."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("topbar-office-badge")
+        self.setFixedHeight(28)
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(8, 0, 8, 0)
+        lay.setSpacing(4)
+
+        icon = QLabel("🏢")
+        icon.setFixedWidth(16)
+        icon.setAlignment(Qt.AlignCenter)
+        lay.addWidget(icon)
+
+        self._lbl = QLabel()
+        self._lbl.setObjectName("topbar-office-lbl")
+        lay.addWidget(self._lbl)
+
+    def set_office(self, name: str):
+        """يحدّث اسم المكتب — يُخفي الـ badge إذا لم يكن هناك مكتب."""
+        self._lbl.setText(name)
+        self.setVisible(bool(name))
+
+
 # ─── TopBar ──────────────────────────────────────────────────────────────────
 
 class TopBar(QWidget):
@@ -175,6 +203,10 @@ class TopBar(QWidget):
 
         lay.addWidget(self._vline())
 
+        # ══ RIGHT: badge المكتب ════════════════════════════════════════════════
+        self.office_badge = _OfficeBadge()
+        lay.addWidget(self.office_badge)
+
         # ══ RIGHT: User chip (avatar + اسم) ══════════════════════════════════
         self.user_chip = _UserChip()
         self.user_chip.clicked.connect(self.profile_requested.emit)
@@ -238,12 +270,25 @@ class TopBar(QWidget):
             name        = getattr(user, "full_name", None) or getattr(user, "username", None) or ""
             avatar_path = getattr(user, "avatar_path", None)
         self.user_chip.set_user(name, avatar_path)
+        self._refresh_office()
+
+    def _refresh_office(self):
+        """يحدّث badge المكتب من OfficeContext."""
+        try:
+            from core.office_context import OfficeContext
+            lang = self.settings.get("language") or "ar"
+            office_name = OfficeContext.get_name(lang)
+            self.office_badge.set_office(office_name)
+        except Exception:
+            self.office_badge.set_office("")
 
     # ── slots ─────────────────────────────────────────────────────────────────
 
     def _on_setting_changed(self, key, value):
         if key == "user":
             self._refresh_user()
+        elif key == "language":
+            self._refresh_office()
 
     def _on_theme_changed(self, _=None):
         set_icon(self.settings_btn, "settings", 17)
@@ -276,7 +321,7 @@ class TopBar(QWidget):
         self._       = TranslationManager.get_instance().translate
         self._refresh_lang_btn()
         self._refresh_search_text()
-        self._refresh_user()
+        self._refresh_user()  # يستدعي _refresh_office داخلياً
         self.settings_btn.setToolTip(self._("settings"))
         self.theme_btn.setToolTip(self._("theme"))
         self.about_btn.setToolTip(self._("about_app"))

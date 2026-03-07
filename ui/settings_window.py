@@ -59,7 +59,7 @@ class SettingsWindow(BaseDialog):
             width = 680
             height = 750  # ⭐ زدت الارتفاع
 
-        self.setFixedSize(width, height)
+        self.setMinimumSize(width, height)
 
         # Center on screen
         self.move(

@@ -152,4 +152,74 @@ def get_styles(theme):
         color            : {c["primary"]};
         font-weight      : 600;
     }}
+
+    /* ========== FILTER BAR - شريط الفلترة المشترك ========== */
+
+    QWidget#filter-bar {{
+        background  : {c["bg_card"]};
+        border      : 1px solid {c["border_subtle"]};
+        border-radius: 10px;
+        padding     : 2px 0;
+    }}
+
+    QWidget#filter-group {{
+        background  : {c["bg_main"]};
+        border      : 1px solid {c["border"]};
+        border-radius: 8px;
+    }}
+
+    /* أزرار الـ preset (اليوم / الأسبوع / الشهر) */
+    QPushButton#filter-preset-btn {{
+        background   : transparent;
+        border       : 1.5px solid {c["border"]};
+        border-radius: 7px;
+        padding      : 0 10px;
+        font-size    : {s["sm"]}px;
+        color        : {c["text_secondary"]};
+        min-height   : 30px;
+    }}
+    QPushButton#filter-preset-btn:hover {{
+        background   : {c["primary_light"]};
+        border-color : {c["primary"]};
+        color        : {c["primary"]};
+    }}
+    QPushButton#filter-preset-btn:checked {{
+        background   : {c["primary"]};
+        border-color : {c["primary"]};
+        color        : #FFFFFF;
+        font-weight  : 600;
+    }}
+
+    /* زر المسح (✖) */
+    QPushButton#filter-clear-btn {{
+        background   : transparent;
+        border       : 1.5px solid {c["danger"]}50;
+        border-radius : 6px;
+        font-size    : 11px;
+        color        : {c["danger"]};
+        min-width    : 28px;
+        max-width    : 28px;
+        min-height   : 28px;
+        max-height   : 28px;
+        padding      : 0;
+    }}
+    QPushButton#filter-clear-btn:hover {{
+        background   : {c["danger"]}12;
+        border-color : {c["danger"]};
+    }}
+
+    /* فاصل عمودي داخل filter-bar */
+    QFrame#filter-sep {{
+        color        : {c["border"]};
+        max-width    : 1px;
+        min-width    : 1px;
+    }}
+
+    /* label عدد النتائج */
+    QLabel#filter-count-lbl {{
+        color        : {c["text_muted"]};
+        font-size    : {s["sm"]}px;
+        padding      : 0 4px;
+    }}
+    
     """

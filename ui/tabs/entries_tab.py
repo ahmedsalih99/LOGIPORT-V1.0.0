@@ -116,121 +116,16 @@ class EntriesTab(BaseTab):
     # ── Filter bar ──────────────────────────────────────────────────────────
 
     def _build_filter_bar(self):
-        _ = self._
-        filter_bar = QWidget()
-        filter_bar.setObjectName("filter-bar")
-        lay = QHBoxLayout(filter_bar)
-        lay.setContentsMargins(0, 4, 0, 4)
-        lay.setSpacing(8)
-
-        # حفظ المراجع للترجمة الفورية
-        self._lbl_from = QLabel()
-        self._lbl_from.setFont(QFont("Tajawal", 9))
-        lay.addWidget(self._lbl_from)
-
-        self._date_from = QDateEdit()
-        self._date_from.setObjectName("form-input")
-        self._date_from.setCalendarPopup(True)
-        self._date_from.setDisplayFormat("yyyy-MM-dd")
-        self._date_from.setDate(QDate.currentDate().addMonths(-3))
-        self._date_from.setMinimumWidth(110)
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        lay.addWidget(self._date_from)
-
-        self._lbl_to = QLabel()
-        self._lbl_to.setFont(QFont("Tajawal", 9))
-        lay.addWidget(self._lbl_to)
-
-        self._date_to = QDateEdit()
-        self._date_to.setObjectName("form-input")
-        self._date_to.setCalendarPopup(True)
-        self._date_to.setDisplayFormat("yyyy-MM-dd")
-        self._date_to.setDate(QDate.currentDate())
-        self._date_to.setMinimumWidth(110)
-        self._date_to.dateChanged.connect(self._on_filter_changed)
-        lay.addWidget(self._date_to)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
-        sep.setFixedWidth(1);
-        sep.setFixedHeight(24)
-        lay.addWidget(sep)
-
-        # أزرار اليوم / الأسبوع / الشهر / مسح
-        self._btn_today = QPushButton()
-        self._btn_today.setObjectName("topbar-btn")
-        self._btn_today.setMinimumHeight(30)
-        self._btn_today.setFont(QFont("Tajawal", 9))
-        self._btn_today.setCursor(Qt.PointingHandCursor)
-        self._btn_today.clicked.connect(self._preset_today)
-        lay.addWidget(self._btn_today)
-
-        self._btn_week = QPushButton()
-        self._btn_week.setObjectName("topbar-btn")
-        self._btn_week.setMinimumHeight(30)
-        self._btn_week.setFont(QFont("Tajawal", 9))
-        self._btn_week.setCursor(Qt.PointingHandCursor)
-        self._btn_week.clicked.connect(self._preset_week)
-        lay.addWidget(self._btn_week)
-
-        self._btn_month = QPushButton()
-        self._btn_month.setObjectName("topbar-btn")
-        self._btn_month.setMinimumHeight(30)
-        self._btn_month.setFont(QFont("Tajawal", 9))
-        self._btn_month.setCursor(Qt.PointingHandCursor)
-        self._btn_month.clicked.connect(self._preset_month)
-        lay.addWidget(self._btn_month)
-
-        self._btn_clear = QPushButton()
-        self._btn_clear.setObjectName("topbar-btn")
-        self._btn_clear.setMinimumHeight(30)
-        self._btn_clear.setFont(QFont("Tajawal", 9))
-        self._btn_clear.setCursor(Qt.PointingHandCursor)
-        self._btn_clear.clicked.connect(self._preset_clear)
-        lay.addWidget(self._btn_clear)
-
-        self._count_lbl = QLabel()
-        self._count_lbl.setFont(QFont("Tajawal", 9))
-        self._count_lbl.setObjectName("text-muted")
-        lay.addWidget(self._count_lbl)
-
-        lay.addStretch()
-
+        from core.base_tab import DateRangeBar
+        self._date_bar = DateRangeBar(self, default_months=3)
+        self._date_bar.changed.connect(self._on_filter_changed)
+        # alias للتوافق مع reload_data
+        self._date_from = self._date_bar._date_from
+        self._date_to   = self._date_bar._date_to
         try:
-            self.layout.insertWidget(1, filter_bar)
+            self.layout.insertWidget(1, self._date_bar)
         except Exception:
-            self.layout.addWidget(filter_bar)
-
-        # الترجمة الفورية لأول مرة
-        self._update_filter_bar_texts()
-
-    def _update_filter_bar_texts(self):
-        _ = self._
-        self._lbl_from.setText("📅 " + _("date_from") + ":")
-        self._lbl_to.setText("→ " + _("date_to") + ":")
-        self._btn_today.setText("📅 " + _("today"))
-        self._btn_week.setText("📅 " + _("this_week"))
-        self._btn_month.setText("📅 " + _("this_month"))
-        self._btn_clear.setText("✖ " + _("clear"))
-
-    def _preset_today(self):
-        today = QDate.currentDate()
-        self._date_from.setDate(today); self._date_to.setDate(today)
-
-    def _preset_week(self):
-        today = QDate.currentDate()
-        self._date_from.setDate(today.addDays(-today.dayOfWeek() + 1))
-        self._date_to.setDate(today)
-
-    def _preset_month(self):
-        today = QDate.currentDate()
-        self._date_from.setDate(QDate(today.year(), today.month(), 1))
-        self._date_to.setDate(today)
-
-    def _preset_clear(self):
-        self._date_from.setDate(QDate.currentDate().addMonths(-3))
-        self._date_to.setDate(QDate.currentDate())
-        if hasattr(self, "search_bar"): self.search_bar.clear()
+            self.layout.addWidget(self._date_bar)
 
     def _on_filter_changed(self, *_):
         self.reload_data()
@@ -413,10 +308,7 @@ class EntriesTab(BaseTab):
         except Exception:
             pass
 
-        # ترجمة الفلاتر وأزرارهم
-        self._update_filter_bar_texts()
-
-        # إعادة تحميل البيانات حسب اللغة الجديدة
+        if hasattr(self, "_date_bar"): self._date_bar.retranslate()
         self.reload_data()
 
     def _apply_admin_columns(self):

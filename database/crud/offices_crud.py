@@ -82,6 +82,25 @@ class OfficesCRUD(BaseCRUD):
             office = session.query(Office).filter(Office.id == office_id).first()
             if not office:
                 return False
+
+            # ── حماية: تحقق من وجود مستخدمين أو معاملات مرتبطة ─────────────
+            from database.models.user import User
+            from database.models.transaction import Transaction
+            users_count = session.query(User).filter(
+                User.office_id == office_id
+            ).count()
+            if users_count > 0:
+                raise ValueError(
+                    f"office_has_users:{users_count}"
+                )
+            trx_count = session.query(Transaction).filter(
+                Transaction.office_id == office_id
+            ).count()
+            if trx_count > 0:
+                raise ValueError(
+                    f"office_has_transactions:{trx_count}"
+                )
+
             before = self._snap(office)
             session.delete(office)
             self._log(session, "delete", office_id, before, None, user_id)

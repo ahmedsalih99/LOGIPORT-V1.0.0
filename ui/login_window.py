@@ -335,13 +335,17 @@ class LoginWindow(BaseDialog):
             try:
                 from core.office_context import OfficeContext
                 office_id = getattr(user, "office_id", None)
+                # office محمّل الآن بـ joinedload في authenticate()
                 office    = getattr(user, "office", None)
-                # إذا كان office lazy-loaded، نحمّله الآن
+                # fallback: إذا لم يُحمَّل لأي سبب، نجلبه يدوياً
                 if office_id and office is None:
                     from database.crud.offices_crud import OfficesCRUD
-                    raw = OfficesCRUD().get_by_id(office_id)
-                    office = raw
+                    office = OfficesCRUD().get_by_id(office_id)
                 OfficeContext.set(office_id, office)
+                import logging
+                logging.getLogger(__name__).debug(
+                    f"OfficeContext set: id={office_id}, name={office.get_name() if office else None}"
+                )
             except Exception as _oc_err:
                 import logging
                 logging.getLogger(__name__).warning(f"OfficeContext load failed: {_oc_err}")

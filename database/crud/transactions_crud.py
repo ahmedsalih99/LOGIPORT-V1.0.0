@@ -5,7 +5,6 @@ CRUD للمعاملات مع منطق صارم ولا افتراضات.
 
 التغييرات عن النسخة السابقة:
   - حذف _SessionLocal() المخصص → استبدال بـ get_session() من BaseCRUD
-  - استيراد مباشر من base_crud بدل base_crud_v5 (deprecated)
   - استخراج _f() و _calc_line_total() كدوال module-level مشتركة
     بدل تعريفهم 4 مرات داخل كل method
 """

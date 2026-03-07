@@ -3,13 +3,13 @@
 
 #define AppName      "LOGIPORT"
 #define AppVersion   "1.0.0"
-#define AppPublisher "Ahmedsalih99"
-#define AppURL = "https://github.com/ahmedsalih99/LOGIPORT-V1.0.0"
+#define AppPublisher "LOGIPORT"
+#define AppURL       "https://github.com/ahmedsalih99/LOGIPORT-V1.0.0"
 #define AppExeName   "LOGIPORT.exe"
 #define SourceDir    "dist\LOGIPORT"
 
 [Setup]
-AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+AppId={{D7F057AA-B8F8-4B55-AAAE-A59D95268B23}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
@@ -21,7 +21,7 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
 OutputBaseFilename=LOGIPORT_Setup_{#AppVersion}
-; SetupIconFile removed - add .ico file later
+SetupIconFile=icons\logo.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
@@ -69,7 +69,7 @@ var
   ResultCode: Integer;
 begin
   Result := True;
-  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}_is1',
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{D7F057AA-B8F8-4B55-AAAE-A59D95268B23}_is1',
     'UninstallString', UninstallString) then
   begin
     Exec(RemoveQuotes(UninstallString), '/SILENT /NORESTART', '', SW_HIDE,

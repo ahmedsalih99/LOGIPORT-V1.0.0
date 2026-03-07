@@ -10,6 +10,7 @@ Features:
 - Lifecycle management
 """
 import logging
+from base64 import b64encode, b64decode
 from typing import Optional, Any, List, Tuple
 from PySide6.QtWidgets import QMainWindow, QApplication, QWidget
 from PySide6.QtGui import QAction
@@ -347,7 +348,32 @@ class BaseWindow(QMainWindow):
         self.log_event("Window opened", level="debug")
         super().showEvent(event)
 
+    # ==============================
+    # GEOMETRY — حفظ واستعادة حجم النافذة
+    # ==============================
+
+    def _geometry_key(self) -> str:
+        return f"window_geometry_{self.__class__.__name__}"
+
+    def _restore_geometry(self):
+        try:
+            encoded = self.settings.get(self._geometry_key())
+            if encoded:
+                geometry = b64decode(encoded.encode("utf-8"))
+                self.restoreGeometry(geometry)
+        except Exception as e:
+            logger.warning(f"Failed restoring window geometry: {e}")
+
+    def _save_geometry(self):
+        try:
+            geometry = self.saveGeometry()
+            encoded = b64encode(bytes(geometry)).decode("utf-8")
+            self.settings.set(self._geometry_key(), encoded)
+        except Exception as e:
+            logger.warning(f"Failed saving window geometry: {e}")
+
     def closeEvent(self, event) -> None:
         """Handle window close event"""
+        self._save_geometry()
         self.log_event("Window closed", level="debug")
         super().closeEvent(event)

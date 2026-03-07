@@ -233,6 +233,21 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: office_id (users) migration skipped: %s", _e)
 
+    # Migration: تعيين مكتب HQ للسوبرأدمن إذا كان office_id=NULL
+    try:
+        hq = conn.execute(
+            "SELECT id FROM offices WHERE is_active=1 ORDER BY sort_order, id LIMIT 1"
+        ).fetchone()
+        if hq:
+            conn.execute(
+                "UPDATE users SET office_id=? WHERE role_id=1 AND (office_id IS NULL OR office_id=0)",
+                (hq[0],)
+            )
+            conn.commit()
+            logger.info("Bootstrap: assigned HQ office to superadmin users")
+    except Exception as _e:
+        logger.warning("Bootstrap: superadmin office assignment skipped: %s", _e)
+
     # Migration: office_id column for transactions
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()]
@@ -296,12 +311,23 @@ def create_superadmin(username: str, password: str, full_name: str) -> bool:
             logger.warning(f"Bootstrap: المستخدم '{username}' موجود مسبقاً")
             return True
 
+        # جلب أول مكتب نشط لتعيينه للسوبرأدمن
+        hq_office_id = None
+        try:
+            from database.crud.offices_crud import OfficesCRUD
+            offices = OfficesCRUD().get_all(active_only=True)
+            if offices:
+                hq_office_id = offices[0]["id"]
+        except Exception:
+            pass
+
         user = crud.add_user(
             username=username,
             password=password,
             full_name=full_name,
             role_id=1,
             is_active=True,
+            office_id=hq_office_id,
             user_id=None,  # لا يوجد مستخدم حالي لأنه أول مستخدم
         )
 

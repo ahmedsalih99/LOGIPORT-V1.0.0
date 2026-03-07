@@ -83,7 +83,16 @@ class ViewTransactionDialog(BaseDialog):
         self._rel = self._load_related_data()
 
         self.setWindowTitle(self._("transaction_view"))
-        self.resize(980, 680)
+
+        # حجم يراعي الشاشة (لا يتجاوز 90%) مع حد أدنى مناسب
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen().availableGeometry()
+            w = min(980, int(screen.width() * 0.85))
+            h = min(680, int(screen.height() * 0.85))
+            self.resize(w, h)
+        except Exception:
+            self.resize(980, 680)
 
         self._build_ui()
         self._fill_all()

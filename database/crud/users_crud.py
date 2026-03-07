@@ -33,14 +33,14 @@ class UsersCRUD(BaseCRUD):
     def get_all(self, language: Optional[str] = None) -> List[Dict[str, Any]]:
         lang = language or TranslationManager.get_instance().get_current_language()
         with self.get_session() as session:
-            users = session.query(User).options(joinedload(User.role)).all()
+            users = session.query(User).options(joinedload(User.role), joinedload(User.office)).all()
             return [self.as_dict(u, lang) for u in users]
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         with self.get_session() as session:
             return (
                 session.query(User)
-                .options(joinedload(User.role))
+                .options(joinedload(User.role), joinedload(User.office))
                 .filter(User.id == user_id)
                 .first()
             )
@@ -49,7 +49,7 @@ class UsersCRUD(BaseCRUD):
         with self.get_session() as session:
             return (
                 session.query(User)
-                .options(joinedload(User.role))
+                .options(joinedload(User.role), joinedload(User.office))
                 .filter(User.username == username)
                 .first()
             )
@@ -58,7 +58,7 @@ class UsersCRUD(BaseCRUD):
         with self.get_session() as session:
             user = (
                 session.query(User)
-                .options(joinedload(User.role))
+                .options(joinedload(User.role), joinedload(User.office))
                 .filter(User.username == username)
                 .first()
             )

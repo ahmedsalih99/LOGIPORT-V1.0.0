@@ -127,75 +127,27 @@ class AuditTrailTab(QWidget):
         return w
 
     def _build_filter_bar(self) -> QWidget:
-        w = QWidget()
-        w.setObjectName("card")
+        """شريط الفلترة — DateRangeBar مع combos المستخدم/العملية/الجدول."""
+        from core.base_tab import DateRangeBar
 
-        # صفّان بدل صف واحد — يمنع توسّع النافذة أكثر من 1920px
-        outer = QVBoxLayout(w)
-        outer.setContentsMargins(14, 8, 14, 8)
-        outer.setSpacing(6)
+        self._date_bar = DateRangeBar(self, default_months=0)
+        # audit_trail الافتراضي: 30 يوم أخير
+        from PySide6.QtCore import QDate
+        self._date_bar._date_from.setDate(QDate.currentDate().addDays(-30))
+        self._date_bar.changed.connect(self._on_filter_changed)
 
-        # ── الصف الأول: تصفية التاريخ + أزرار الفترة السريعة ────────────────
-        row1 = QHBoxLayout()
-        row1.setSpacing(8)
+        # alias للتوافق مع _reload
+        self._date_from = self._date_bar._date_from
+        self._date_to   = self._date_bar._date_to
 
-        self._lbl_from = self._lbl(self._("date_from"))
-        row1.addWidget(self._lbl_from)
-        self._date_from = QDateEdit()
-        self._date_from.setObjectName("form-input")
-        self._date_from.setCalendarPopup(True)
-        self._date_from.setDisplayFormat("yyyy-MM-dd")
-        self._date_from.setDate(QDate.currentDate().addDays(-30))
-        self._date_from.setFixedWidth(108)
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        row1.addWidget(self._date_from)
-
-        self._lbl_to = self._lbl(self._("date_to"))
-        row1.addWidget(self._lbl_to)
-        self._date_to = QDateEdit()
-        self._date_to.setObjectName("form-input")
-        self._date_to.setCalendarPopup(True)
-        self._date_to.setDisplayFormat("yyyy-MM-dd")
-        self._date_to.setDate(QDate.currentDate())
-        self._date_to.setFixedWidth(108)
-        self._date_to.dateChanged.connect(self._on_filter_changed)
-        row1.addWidget(self._date_to)
-
-        sep0 = QFrame(); sep0.setFrameShape(QFrame.VLine)
-        sep0.setFixedWidth(1); sep0.setFixedHeight(22)
-        row1.addWidget(sep0)
-
-        self._btn_today = QPushButton(self._("filter_today"))
-        self._btn_today.setObjectName("topbar-btn"); self._btn_today.setMinimumHeight(28)
-        self._btn_today.setFont(QFont("Tajawal", 9)); self._btn_today.setCursor(Qt.PointingHandCursor)
-        self._btn_today.clicked.connect(self._pre_today); row1.addWidget(self._btn_today)
-        self._btn_week = QPushButton(self._("filter_week"))
-        self._btn_week.setObjectName("topbar-btn"); self._btn_week.setMinimumHeight(28)
-        self._btn_week.setFont(QFont("Tajawal", 9)); self._btn_week.setCursor(Qt.PointingHandCursor)
-        self._btn_week.clicked.connect(self._pre_week); row1.addWidget(self._btn_week)
-        self._btn_month = QPushButton(self._("filter_month"))
-        self._btn_month.setObjectName("topbar-btn"); self._btn_month.setMinimumHeight(28)
-        self._btn_month.setFont(QFont("Tajawal", 9)); self._btn_month.setCursor(Qt.PointingHandCursor)
-        self._btn_month.clicked.connect(self._pre_month); row1.addWidget(self._btn_month)
-
-        row1.addStretch()
-        outer.addLayout(row1)
-
-        # ── الصف الثاني: فلاتر المستخدم / العملية / الجدول + بحث ───────────
-        row2 = QHBoxLayout()
-        row2.setSpacing(8)
-
-        self._lbl_user = self._lbl(self._("filter_user"))
-        row2.addWidget(self._lbl_user)
+        # ── Combos إضافية ─────────────────────────────────────────────
         self._user_combo = QComboBox()
         self._user_combo.setObjectName("form-input")
         self._user_combo.setFixedWidth(130)
         self._user_combo.addItem(self._("all"), None)
         self._user_combo.currentIndexChanged.connect(self._on_filter_changed)
-        row2.addWidget(self._user_combo)
+        self._date_bar.add_widget(self._user_combo)
 
-        self._lbl_action = self._lbl(self._("filter_action"))
-        row2.addWidget(self._lbl_action)
         self._action_combo = QComboBox()
         self._action_combo.setObjectName("form-input")
         self._action_combo.setFixedWidth(120)
@@ -203,10 +155,8 @@ class AuditTrailTab(QWidget):
         for act, icon in ACTION_ICONS.items():
             self._action_combo.addItem(f"{icon} {act}", act)
         self._action_combo.currentIndexChanged.connect(self._on_filter_changed)
-        row2.addWidget(self._action_combo)
+        self._date_bar.add_widget(self._action_combo)
 
-        self._lbl_table = self._lbl(self._("filter_table"))
-        row2.addWidget(self._lbl_table)
         self._table_combo = QComboBox()
         self._table_combo.setObjectName("form-input")
         self._table_combo.setFixedWidth(130)
@@ -214,44 +164,31 @@ class AuditTrailTab(QWidget):
         for tbl_key, tbl_trans_key in TABLE_TRANSLATION_KEYS.items():
             self._table_combo.addItem(self._(tbl_trans_key), tbl_key)
         self._table_combo.currentIndexChanged.connect(self._on_filter_changed)
-        row2.addWidget(self._table_combo)
-
-        sep2 = QFrame(); sep2.setFrameShape(QFrame.VLine)
-        sep2.setFixedWidth(1); sep2.setFixedHeight(22)
-        row2.addWidget(sep2)
+        self._date_bar.add_widget(self._table_combo)
 
         self._search = QLineEdit()
         self._search.setObjectName("form-input")
         self._search.setPlaceholderText(self._("search_details_placeholder"))
         self._search.setMinimumWidth(120)
-        self._search.setSizePolicy(
-            self._search.sizePolicy().horizontalPolicy(),
-            self._search.sizePolicy().verticalPolicy()
-        )
-        from PySide6.QtWidgets import QSizePolicy as QSP
-        self._search.setSizePolicy(QSP.Expanding, QSP.Fixed)
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(400)
-        self._search_timer.timeout.connect(lambda: self._reload())
-        self._search.textChanged.connect(lambda: self._search_timer.start())
-        row2.addWidget(self._search, 1)
+        self._search.textChanged.connect(self._on_filter_changed)
+        self._date_bar.add_widget(self._search)
 
-        self._clr_btn = QPushButton("✖")
-        self._clr_btn.setObjectName("topbar-btn"); self._clr_btn.setMinimumHeight(28)
-        self._clr_btn.setToolTip(self._("clear_filters_tooltip"))
+        # زر مسح الفلاتر
+        self._clr_btn = QPushButton("🗑")
+        self._clr_btn.setObjectName("filter-clear-btn")
+        self._clr_btn.setFixedSize(28, 28)
         self._clr_btn.setCursor(Qt.PointingHandCursor)
+        self._clr_btn.setToolTip(self._("clear_filters_tooltip"))
         self._clr_btn.clicked.connect(self._clear_filters)
-        row2.addWidget(self._clr_btn)
+        self._date_bar.add_widget(self._clr_btn)
 
+        # label عدد النتائج — يُحدَّث من _reload
         self._count_lbl = QLabel()
-        self._count_lbl.setObjectName("text-muted")
-        row2.addWidget(self._count_lbl)
+        self._count_lbl.setObjectName("filter-count-lbl")
+        self._date_bar.add_widget(self._count_lbl)
 
-        outer.addLayout(row2)
+        return self._date_bar
 
-        self._count_lbl.setFont(QFont("Tajawal", 9))
-        return w
 
     def _build_pagination(self) -> QHBoxLayout:
         lay = QHBoxLayout()
@@ -288,21 +225,8 @@ class AuditTrailTab(QWidget):
         lbl.setFont(QFont("Tajawal", 9))
         return lbl
 
-    def _pre_today(self):
-        t = QDate.currentDate()
-        self._date_from.setDate(t); self._date_to.setDate(t)
-
-    def _pre_week(self):
-        t = QDate.currentDate()
-        self._date_from.setDate(t.addDays(-t.dayOfWeek() + 1)); self._date_to.setDate(t)
-
-    def _pre_month(self):
-        t = QDate.currentDate()
-        self._date_from.setDate(QDate(t.year(), t.month(), 1)); self._date_to.setDate(t)
-
     def _clear_filters(self):
-        self._date_from.setDate(QDate.currentDate().addDays(-30))
-        self._date_to.setDate(QDate.currentDate())
+        if hasattr(self, "_date_bar"): self._date_bar._set_clear()
         self._user_combo.setCurrentIndex(0)
         self._action_combo.setCurrentIndex(0)
         self._table_combo.setCurrentIndex(0)
@@ -472,14 +396,7 @@ class AuditTrailTab(QWidget):
             self._("col_user"), self._("col_action"), self._("col_table"),
             self._("col_record_no"), self._("col_details"), self._("col_datetime")
         ])
-        self._lbl_from.setText(self._("date_from"))
-        self._lbl_to.setText(self._("date_to"))
-        self._btn_today.setText(self._("filter_today"))
-        self._btn_week.setText(self._("filter_week"))
-        self._btn_month.setText(self._("filter_month"))
-        self._lbl_user.setText(self._("filter_user"))
-        self._lbl_action.setText(self._("filter_action"))
-        self._lbl_table.setText(self._("filter_table"))
+        if hasattr(self, "_date_bar"): self._date_bar.retranslate()
         self._user_combo.setItemText(0, self._("all"))
         self._action_combo.setItemText(0, self._("all"))
         current_table_data = self._table_combo.currentData()

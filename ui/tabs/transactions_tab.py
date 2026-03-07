@@ -126,193 +126,42 @@ class TransactionsTab(BaseTab):
     # ── Filter bar ────────────────────────────────────────────────────────
 
     def _build_filter_bar(self):
-        """شريط فلترة احترافي مع تجميع منطقي للعناصر."""
-        from PySide6.QtWidgets import QGroupBox
+        """شريط الفلترة — يستخدم DateRangeBar من البيس."""
+        from core.base_tab import DateRangeBar
 
-        filter_bar = QWidget()
-        filter_bar.setObjectName("filter-bar")
-        outer = QHBoxLayout(filter_bar)
-        outer.setContentsMargins(0, 4, 0, 4)
-        outer.setSpacing(10)
+        self._date_bar = DateRangeBar(self, default_months=3)
+        self._date_bar.changed.connect(self._on_filter_changed)
 
-        # ── مجموعة 1: نطاق التاريخ ──────────────────────────────────────
-        date_group = QWidget()
-        date_group.setObjectName("filter-group")
-        date_lay = QHBoxLayout(date_group)
-        date_lay.setContentsMargins(10, 4, 10, 4)
-        date_lay.setSpacing(6)
-
-        lbl_from = QLabel("📅")
-        lbl_from.setFixedWidth(18)
-        date_lay.addWidget(lbl_from)
-
-        self._date_from = QDateEdit()
-        self._date_from.setObjectName("form-input")
-        self._date_from.setCalendarPopup(True)
-        self._date_from.setDisplayFormat("yyyy-MM-dd")
-        self._date_from.setDate(QDate.currentDate().addMonths(-3))
-        self._date_from.setFixedWidth(106)
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        date_lay.addWidget(self._date_from)
-
-        arr = QLabel("→")
-        arr.setStyleSheet("color: #6b7280; font-weight: 600;")
-        date_lay.addWidget(arr)
-
-        self._date_to = QDateEdit()
-        self._date_to.setObjectName("form-input")
-        self._date_to.setCalendarPopup(True)
-        self._date_to.setDisplayFormat("yyyy-MM-dd")
-        self._date_to.setDate(QDate.currentDate())
-        self._date_to.setFixedWidth(106)
-        self._date_to.dateChanged.connect(self._on_filter_changed)
-        date_lay.addWidget(self._date_to)
-
-        outer.addWidget(date_group)
-
-        # ── أزرار Preset مدمجة ──────────────────────────────────────────
-        preset_group = QWidget()
-        preset_lay = QHBoxLayout(preset_group)
-        preset_lay.setContentsMargins(0, 0, 0, 0)
-        preset_lay.setSpacing(4)
-
-        presets = [
-            (self._("today"),      self._preset_today,  "📅"),
-            (self._("this_week"),  self._preset_week,   "📆"),
-            (self._("this_month"), self._preset_month,  "🗓"),
-        ]
-        for label, slot, icon in presets:
-            btn = QPushButton(f"{icon} {label}")
-            btn.setObjectName("filter-preset-btn")
-            btn.setFixedHeight(32)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet("""
-                QPushButton#filter-preset-btn {
-                    background: transparent;
-                    border: 1.5px solid #D1D5DB;
-                    border-radius: 8px;
-                    padding: 0 10px;
-                    font-size: 11px;
-                    color: #374151;
-                }
-                QPushButton#filter-preset-btn:hover {
-                    background: #EFF6FF;
-                    border-color: #3B82F6;
-                    color: #1D4ED8;
-                }
-            """)
-            btn.clicked.connect(slot)
-            preset_lay.addWidget(btn)
-
-        clr = QPushButton("✖")
-        clr.setObjectName("filter-preset-btn")
-        clr.setFixedSize(32, 32)
-        clr.setCursor(Qt.PointingHandCursor)
-        clr.setToolTip(self._("clear"))
-        clr.setStyleSheet("""
-            QPushButton#filter-preset-btn {
-                background: transparent;
-                border: 1.5px solid #FCA5A5;
-                border-radius: 8px;
-                font-size: 12px; color: #DC2626;
-            }
-            QPushButton#filter-preset-btn:hover {
-                background: #FEF2F2; border-color: #DC2626;
-            }
-        """)
-        clr.clicked.connect(self._preset_clear)
-        preset_lay.addWidget(clr)
-
-        outer.addWidget(preset_group)
-
-        # ── فاصل ───────────────────────────────────────────────────────
-        vsep = QFrame()
-        vsep.setFrameShape(QFrame.VLine)
-        vsep.setObjectName("separator")
-        vsep.setFixedHeight(28)
-        outer.addWidget(vsep)
-
-        # ── نوع المعاملة — Pill buttons ─────────────────────────────────
-        type_group = QWidget()
-        type_lay = QHBoxLayout(type_group)
-        type_lay.setContentsMargins(0, 0, 0, 0)
-        type_lay.setSpacing(4)
-
-        self._type_btns = {}
-        # تُعرَّف كـ lambda حتى يمكن إعادة استخدامها في retranslate_ui
+        # ── أزرار نوع المعاملة (Pill) ─────────────────────────────────
+        self._type_btns   = {}
+        self._selected_type = ""
         self._type_defs = lambda: [
             ("",        "🔍 " + self._("all_types")),
             ("export",  "📤 " + self._("export")),
             ("import",  "📥 " + self._("import")),
             ("transit", "🔄 " + self._("transit")),
         ]
-        type_defs = self._type_defs()
-
-        def _style_type_btn(btn, active):
-            if active:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background: #3B82F6; color: white;
-                        border: 1.5px solid #3B82F6;
-                        border-radius: 14px; padding: 0 12px;
-                        font-size: 11px; font-weight: 600;
-                    }
-                """)
-            else:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background: transparent; color: #374151;
-                        border: 1.5px solid #D1D5DB;
-                        border-radius: 14px; padding: 0 12px;
-                        font-size: 11px;
-                    }
-                    QPushButton:hover {
-                        border-color: #3B82F6; color: #1D4ED8;
-                        background: #EFF6FF;
-                    }
-                """)
-
-        first_btn = None
-        for val, label in type_defs:
+        for val, label in self._type_defs():
             btn = QPushButton(label)
+            btn.setObjectName("filter-preset-btn")
             btn.setFixedHeight(30)
+            btn.setCheckable(True)
+            btn.setChecked(val == "")
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setProperty("type_val", val)
             self._type_btns[val] = btn
-            if first_btn is None:
-                first_btn = btn
-                _style_type_btn(btn, True)
-            else:
-                _style_type_btn(btn, False)
-
-            def _on_type_click(checked=False, v=val):
+            def _on_type(checked=False, v=val):
                 for vv, b in self._type_btns.items():
-                    _style_type_btn(b, vv == v)
+                    b.setChecked(vv == v)
                 self._selected_type = v
                 self._on_filter_changed()
-            btn.clicked.connect(_on_type_click)
-            type_lay.addWidget(btn)
+            btn.clicked.connect(_on_type)
+            self._date_bar.add_widget(btn)
 
-        self._selected_type = ""
-        outer.addWidget(type_group)
-
-        # للتوافق مع الكود القديم
+        # backward-compat
         self._type_combo = QComboBox()
         self._type_combo.setVisible(False)
-        self._type_combo.addItem("", "")
-        self._type_combo.addItem(self._("export"), "export")
-        self._type_combo.addItem(self._("import"), "import")
-        self._type_combo.addItem(self._("transit"), "transit")
 
-        outer.addStretch(1)
-
-        # ── عداد النتائج ────────────────────────────────────────────────
-        self._count_lbl = QLabel()
-        self._count_lbl.setObjectName("text-muted")
-        self._count_lbl.setStyleSheet("font-size: 11px; color: #6B7280; padding: 0 4px;")
-        outer.addWidget(self._count_lbl)
-
-        # ── فلتر المكتب ─────────────────────────────────────────────────
+        # ── فلتر المكتب ───────────────────────────────────────────────
         try:
             from core.office_context import OfficeContext
             _has_office = OfficeContext.get_id() is not None
@@ -320,73 +169,66 @@ class TransactionsTab(BaseTab):
             _has_office = False
 
         if _has_office:
-            vsep2 = QFrame()
-            vsep2.setFrameShape(QFrame.VLine)
-            vsep2.setObjectName("separator")
-            vsep2.setFixedHeight(28)
-            outer.addWidget(vsep2)
-
             self._my_office_btn = QPushButton()
+            self._my_office_btn.setObjectName("filter-preset-btn")
             self._my_office_btn.setFixedHeight(30)
-            self._my_office_btn.setCursor(Qt.PointingHandCursor)
             self._my_office_btn.setCheckable(True)
-            # افتراضي: مكتبي فقط — ما عدا Admin يرى الكل دائماً
+            self._my_office_btn.setCursor(Qt.PointingHandCursor)
             _default_my_office = not is_admin(self.current_user)
             self._office_filter_active = _default_my_office
             self._my_office_btn.setChecked(_default_my_office)
             self._refresh_office_btn_text()
             self._my_office_btn.toggled.connect(self._on_office_filter_toggled)
-            outer.addWidget(self._my_office_btn)
+            self._date_bar.add_widget(self._my_office_btn)
         else:
             self._my_office_btn = None
             self._office_filter_active = False
 
-        # ── تصدير Excel ─────────────────────────────────────────────────
+        # ── تصدير Excel ───────────────────────────────────────────────
         btn_rich = QPushButton("📊  " + self._("export_to_excel_rich"))
         btn_rich.setObjectName("secondary-btn")
-        btn_rich.setFixedHeight(32)
+        btn_rich.setFixedHeight(30)
         btn_rich.setToolTip(self._("export_transactions_tip"))
         btn_rich.clicked.connect(self._rich_export)
-        outer.addWidget(btn_rich)
+        self._date_bar.add_widget(btn_rich)
+
+        # alias للتوافق مع _get_filter_values
+        self._date_from = self._date_bar._date_from
+        self._date_to   = self._date_bar._date_to
 
         try:
-            self.layout.insertWidget(1, filter_bar)
+            self.layout.insertWidget(1, self._date_bar)
         except Exception:
-            self.layout.addWidget(filter_bar)
+            self.layout.addWidget(self._date_bar)
+
 
     # ── Preset slots ─────────────────────────────────────────────────────────
 
-    def _preset_today(self):
-        today = QDate.currentDate()
-        self._date_from.dateChanged.disconnect(self._on_filter_changed)
-        self._date_from.setDate(today)
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        self._date_to.setDate(today)  # هذا وحده يطلق reload_data
-
-    def _preset_week(self):
-        today = QDate.currentDate()
-        self._date_from.dateChanged.disconnect(self._on_filter_changed)
-        self._date_from.setDate(today.addDays(-today.dayOfWeek() + 1))
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        self._date_to.setDate(today)
-
-    def _preset_month(self):
-        today = QDate.currentDate()
-        self._date_from.dateChanged.disconnect(self._on_filter_changed)
-        self._date_from.setDate(QDate(today.year(), today.month(), 1))
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        self._date_to.setDate(today)
-
-    def _preset_clear(self):
-        self._date_from.dateChanged.disconnect(self._on_filter_changed)
-        self._date_from.setDate(QDate.currentDate().addMonths(-3))
-        self._date_from.dateChanged.connect(self._on_filter_changed)
-        self._date_to.setDate(QDate.currentDate())
-        self._type_combo.setCurrentIndex(0)
-        if hasattr(self, "search_bar"):
-            self.search_bar.clear()
-
     def _on_filter_changed(self, *_):
+        self.reload_data()
+
+    # ── office filter helpers ─────────────────────────────────────────────────
+
+    def _refresh_office_btn_text(self):
+        """يحدّث نص زر المكتب حسب الحالة الحالية."""
+        if not getattr(self, "_my_office_btn", None):
+            return
+        try:
+            from core.office_context import OfficeContext
+            office_name = OfficeContext.get_name(
+                self.settings.get("language") or "ar"
+            ) if hasattr(self, "settings") else ""
+        except Exception:
+            office_name = ""
+        active = getattr(self, "_office_filter_active", False)
+        label = office_name or self._("my_office")
+        icon  = "🏢 " if active else "🌐 "
+        self._my_office_btn.setText(icon + label)
+
+    def _on_office_filter_toggled(self, checked: bool):
+        """يُفعَّل عند الضغط على زر المكتب."""
+        self._office_filter_active = checked
+        self._refresh_office_btn_text()
         self.reload_data()
 
     # ── helpers ──────────────────────────────────────────────────────────────

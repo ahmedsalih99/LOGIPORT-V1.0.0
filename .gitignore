@@ -37,6 +37,10 @@ env/
 logs/*.log
 *.log
 
+# مخرجات المستندات المولّدة (PDF/HTML — بيانات العملاء، لا تُرفع)
+documents/output/
+!documents/output/.gitkeep
+
 # ملفات IDE
 .vscode/
 .idea/
@@ -69,3 +73,6 @@ secrets.py
 .pytest_cache/
 .coverage
 htmlcov/
+
+# نسخ احتياطية (تُنشأ بواسطة backup_service)
+backups/
