@@ -66,7 +66,7 @@ class _BankCard(QFrame):
         if self._bank.beneficiary_name: parts.append(f"📋 {self._bank.beneficiary_name}")
         if parts:
             info = QLabel("   ".join(parts))
-            info.setStyleSheet("color: #64748B; font-size: 11px;")
+            info.setObjectName("text-muted")
             outer.addWidget(info)
 
         # Edit form (hidden)
@@ -271,7 +271,7 @@ class CompanyBanksDialog(QDialog):
         if not banks:
             lbl = QLabel(self._("no_bank_accounts"))
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("color: #94A3B8; padding: 20px;")
+            lbl.setObjectName("empty-label")
             self._cards_layout.addWidget(lbl)
         else:
             for bank in banks:

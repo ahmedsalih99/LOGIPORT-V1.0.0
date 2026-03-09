@@ -221,5 +221,38 @@ def get_styles(theme):
         font-size    : {s["sm"]}px;
         padding      : 0 4px;
     }}
+
+    /* ========== SEMANTIC LABELS ========== */
+    QLabel#text-muted, QLabel#empty-label, QLabel#form-hint {{
+        color        : {c["text_muted"]};
+        background   : transparent;
+    }}
+    QLabel#text-secondary {{
+        color        : {c["text_secondary"]};
+        background   : transparent;
+    }}
+    QLabel#text-danger, QLabel#form-error {{
+        color        : {c["danger"]};
+        background   : transparent;
+    }}
+    QLabel#text-warning {{
+        color        : {c["warning"]};
+        background   : transparent;
+    }}
+    QLabel#text-success {{
+        color        : {c["success"]};
+        background   : transparent;
+    }}
+    QLabel#text-primary {{
+        color        : {c["primary"]};
+        background   : transparent;
+    }}
+    QLabel#preview-label {{
+        background   : {c["bg_secondary"]};
+        color        : {c["text_muted"]};
+        border       : 1px solid {c["border"]};
+        border-radius: 4px;
+        padding      : 4px 8px;
+    }}
     
     """

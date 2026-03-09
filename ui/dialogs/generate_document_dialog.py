@@ -141,8 +141,7 @@ class _ResultsDialog(QDialog):
         if html_only:
             warn = QLabel("⚠  " + _("pdf_runtime_missing_html_only"))
             warn.setWordWrap(True)
-            warn.setStyleSheet("color: #F39C12; background: rgba(243,156,18,0.1); "
-                               "padding: 8px 12px; border-radius: 8px;")
+            warn.setObjectName("text-warning")
             v.addWidget(warn)
 
         self.listw = QListWidget()
@@ -227,9 +226,6 @@ class _DocCard(QFrame):
         self._icon_lbl = QLabel(icon)
         self._icon_lbl.setFixedSize(36, 36)
         self._icon_lbl.setAlignment(Qt.AlignCenter)
-        self._icon_lbl.setStyleSheet(
-            "background: rgba(74,126,200,0.12); border-radius: 18px; font-size: 17px;"
-        )
         hdr.addWidget(self._icon_lbl)
 
         text_col = QVBoxLayout()
@@ -269,7 +265,7 @@ class _DocCard(QFrame):
         if len(self._choices) == 1:
             # خيار واحد: label ثابت بدون checkbox
             lbl = QLabel(self._choices[0][0])
-            lbl.setStyleSheet("color: #555; font-size: 11px;")
+            lbl.setObjectName("text-secondary")
             body_lay.addWidget(lbl)
             # checkbox داخلي غير مرئي نحتاجه لـ selected_codes
             cb = QCheckBox()
@@ -291,7 +287,7 @@ class _DocCard(QFrame):
         # تنبيه English-only
         if self._english_only:
             note = QLabel("🌐  English only — CMR is an international document")
-            note.setStyleSheet("color: #3498DB; font-size: 11px;")
+            note.setObjectName("text-primary")
             body_lay.addWidget(note)
 
         root.addWidget(self._body)
@@ -311,28 +307,36 @@ class _DocCard(QFrame):
             p = p.parent()
 
     def _update_style(self):
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+            pri   = c.get("primary", "#2563EB")
+            bdr   = c.get("border",  "#E0E0E0")
+        except Exception:
+            pri, bdr = "#2563EB", "#E0E0E0"
+
         if self._enabled:
-            self.setStyleSheet("""
-                QFrame#doc-card {
-                    border: 2px solid #4A7EC8;
+            self.setStyleSheet(f"""
+                QFrame#doc-card {{
+                    border: 2px solid {pri};
                     border-radius: 12px;
-                    background: rgba(74,126,200,0.06);
-                }
+                    background: {pri}0F;
+                }}
             """)
             self._icon_lbl.setStyleSheet(
-                "background: rgba(74,126,200,0.25); border-radius: 18px; font-size: 17px;"
+                f"background: {pri}40; border-radius: 18px; font-size: 17px;"
             )
         else:
-            self.setStyleSheet("""
-                QFrame#doc-card {
-                    border: 1px solid #E0E0E0;
+            self.setStyleSheet(f"""
+                QFrame#doc-card {{
+                    border: 1px solid {bdr};
                     border-radius: 12px;
                     background: transparent;
-                }
-                QFrame#doc-card:hover { border-color: #4A7EC8; }
+                }}
+                QFrame#doc-card:hover {{ border-color: {pri}; }}
             """)
             self._icon_lbl.setStyleSheet(
-                "background: rgba(74,126,200,0.08); border-radius: 18px; font-size: 17px;"
+                f"background: {pri}14; border-radius: 18px; font-size: 17px;"
             )
 
     @property
@@ -378,22 +382,33 @@ class _LangPill(QPushButton):
         self.toggled.connect(lambda _: self._update_style())
 
     def _update_style(self):
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+            pri      = c.get("primary",        "#2563EB")
+            pri_h    = c.get("primary_hover",  "#1D4ED8")
+            txt_sec  = c.get("text_secondary", "#495057")
+            bdr      = c.get("border",         "#CED4DA")
+            txt_w    = c.get("text_white",     "white")
+        except Exception:
+            pri, pri_h, txt_sec, bdr, txt_w = "#2563EB","#1D4ED8","#495057","#CED4DA","white"
+
         if self.isChecked():
-            self.setStyleSheet("""
-                QPushButton {
-                    background: #4A7EC8; color: white; border: 2px solid #4A7EC8;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background: {pri}; color: {txt_w}; border: 2px solid {pri};
                     border-radius: 17px; font-weight: 700; font-size: 12px; padding: 0 16px;
-                }
-                QPushButton:hover { background: #5B8ED8; border-color: #5B8ED8; }
+                }}
+                QPushButton:hover {{ background: {pri_h}; border-color: {pri_h}; }}
             """)
         else:
-            self.setStyleSheet("""
-                QPushButton {
-                    background: transparent; color: #495057;
-                    border: 1.5px solid #CED4DA; border-radius: 17px;
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent; color: {txt_sec};
+                    border: 1.5px solid {bdr}; border-radius: 17px;
                     font-weight: 500; font-size: 12px; padding: 0 16px;
-                }
-                QPushButton:hover { border-color: #4A7EC8; color: #4A7EC8; }
+                }}
+                QPushButton:hover {{ border-color: {pri}; color: {pri}; }}
             """)
 
 

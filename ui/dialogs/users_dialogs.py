@@ -137,10 +137,10 @@ class UserDialog(BaseDialog):
             return
         if pw == text:
             self.lbl_match.setText("  ✓ " + self._("passwords_match"))
-            self.lbl_match.setStyleSheet("color: #10B981; font-size: 11px; font-weight: bold;")
+            self.lbl_match.setObjectName("text-success")
         else:
             self.lbl_match.setText("  ✗ " + self._("passwords_no_match"))
-            self.lbl_match.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: bold;")
+            self.lbl_match.setObjectName("text-danger")
 
     def load_roles(self):
         lang = TranslationManager.get_instance().get_current_language()

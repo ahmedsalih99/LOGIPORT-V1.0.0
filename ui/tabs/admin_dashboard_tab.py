@@ -92,7 +92,7 @@ class AdminDashboardTab(QWidget):
         user = _current_user()
         if not _is_admin(user):
             warn = QLabel(self._("admin_only_warning"))
-            warn.setStyleSheet("color: #F39C12; font-size: 11px; background: transparent;")
+            warn.setObjectName("text-warning")
             warn.setFont(QFont("Tajawal", 10))
             main.addWidget(warn)
 
@@ -481,7 +481,7 @@ class AdminDashboardTab(QWidget):
 
             lbl = QLabel(name)
             lbl.setFont(QFont("Tajawal", 9))
-            lbl.setStyleSheet(f"color: {'#2ECC71' if ok else '#E74C3C'}; background:transparent;")
+            lbl.setObjectName("text-success" if ok else "text-danger")
             rlay.addWidget(lbl, 1)
 
             self._health_layout.addWidget(row)

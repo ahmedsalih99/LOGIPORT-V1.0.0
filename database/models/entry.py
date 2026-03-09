@@ -11,7 +11,7 @@ class Entry(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entry_no = Column(String(50), nullable=True, unique=True)
-    entry_date = Column(Date, nullable=False)
+    entry_date = Column(Date, nullable=False, index=True)
 
     transport_unit_type = Column(String(16), nullable=True)
     transport_ref = Column(String(64), nullable=True)

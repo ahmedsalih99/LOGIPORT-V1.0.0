@@ -436,6 +436,30 @@ class EntriesCRUD:
             return out
 
     @staticmethod
+    def count_with_totals(
+            self,
+            date_from=None,
+            date_to=None,
+    ) -> int:
+        """إرجاع عدد الإدخالات بنفس فلاتر list_with_totals — للـ pagination."""
+        SessionLocal = get_session_local()
+        with SessionLocal() as s:
+            q = select(func.count()).select_from(Entry)
+            if date_from:
+                try:
+                    from datetime import date as _d
+                    q = q.where(Entry.entry_date >= _d.fromisoformat(str(date_from)))
+                except Exception:
+                    pass
+            if date_to:
+                try:
+                    from datetime import date as _d
+                    q = q.where(Entry.entry_date <= _d.fromisoformat(str(date_to)))
+                except Exception:
+                    pass
+            return s.execute(q).scalar_one()
+
+
     def get_all(limit: int = 500) -> List[Entry]:
         """جلب جميع الإدخالات"""
         return EntriesCRUD.list(limit=limit, offset=0)

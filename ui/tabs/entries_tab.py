@@ -142,11 +142,24 @@ class EntriesTab(BaseTab):
         d_to = self._date_to.date().toString("yyyy-MM-dd") if hasattr(self, "_date_to") else None
         search = self.search_bar.text().strip().lower() if hasattr(self, "search_bar") else ""
 
+        # pagination server-side
+        try:
+            self.total_rows = self.crud.count_with_totals(date_from=d_from, date_to=d_to)
+        except Exception:
+            self.total_rows = 0
+        self.total_pages  = max(1, -(-self.total_rows // self.rows_per_page))
+        self.current_page = min(self.current_page, self.total_pages)
+
         # جلب البيانات من CRUD
         try:
-            rows = self.crud.list_with_totals(limit=1000, date_from=d_from, date_to=d_to)
+            rows = self.crud.list_with_totals(
+                limit  = self.rows_per_page,
+                offset = (self.current_page - 1) * self.rows_per_page,
+                date_from=d_from,
+                date_to=d_to,
+            )
         except TypeError:
-            rows = self.crud.list_with_totals(limit=1000)
+            rows = self.crud.list_with_totals(limit=self.rows_per_page)
 
         self.data = []
 

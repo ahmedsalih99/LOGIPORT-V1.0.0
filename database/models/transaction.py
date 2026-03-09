@@ -20,12 +20,12 @@ class Transaction(Base):
 
     # Header / identity
     transaction_no = Column(String(32), unique=True, nullable=False, index=True)
-    transaction_date = Column(Date, nullable=False)
-    transaction_type = Column(String(16), nullable=False, default="export")
+    transaction_date = Column(Date, nullable=False, index=True)
+    transaction_type = Column(String(16), nullable=False, default="export", index=True)
     status = Column(String(16), nullable=False, default="active")  # بقيت لأجل التوافق مع الـ DB
 
     # Parties
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="RESTRICT"), nullable=False)
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="RESTRICT"), nullable=False, index=True)
     exporter_company_id = Column(Integer, ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False)
     importer_company_id = Column(Integer, ForeignKey("companies.id", ondelete="RESTRICT"), nullable=False)
 
@@ -74,7 +74,7 @@ class Transaction(Base):
     totals_value = Column(Numeric(12, 4), nullable=True)
 
     # Office
-    office_id = Column(Integer, ForeignKey("offices.id", ondelete="RESTRICT"), nullable=True)
+    office_id = Column(Integer, ForeignKey("offices.id", ondelete="RESTRICT"), nullable=True, index=True)
 
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)

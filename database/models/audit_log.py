@@ -5,14 +5,14 @@ from .base import Base
 class AuditLog(Base):
     __tablename__ = "audit_log"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     action = Column(String(50), nullable=False)  # create | update | delete | import | export | print
-    table_name = Column(String(50), nullable=False)
+    table_name = Column(String(50), nullable=False, index=True)
     record_id = Column(Integer, nullable=True)
     details = Column(Text, nullable=True)
     before_data = Column(Text, nullable=True)   # JSON string (optional)
     after_data = Column(Text, nullable=True)    # JSON string (optional)
-    timestamp = Column(DateTime, server_default=func.now())
+    timestamp = Column(DateTime, server_default=func.now(), index=True)
 
     user = relationship("User", back_populates="audit_logs")
 

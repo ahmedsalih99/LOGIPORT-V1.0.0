@@ -268,7 +268,7 @@ class SettingsWindow(BaseDialog):
         self.preview_value = QLineEdit()
         self.preview_value.setObjectName("settings-input")
         self.preview_value.setReadOnly(True)
-        self.preview_value.setStyleSheet("background-color: #f5f5f5; color: #666;")
+        self.preview_value.setObjectName("preview-label")
         row.addWidget(self.preview_label, 0)
         row.addWidget(self.preview_value, 1)
         card_layout.addLayout(row)

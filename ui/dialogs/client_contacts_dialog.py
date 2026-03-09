@@ -68,7 +68,7 @@ class _ContactCard(QFrame):
         if self._contact.email: info_parts.append(f"📧 {self._contact.email}")
         if info_parts:
             info = QLabel("   ".join(info_parts))
-            info.setStyleSheet("color: #64748B; font-size: 11px;")
+            info.setObjectName("text-muted")
             outer.addWidget(info)
 
         # ── edit form (hidden by default) ──
@@ -297,7 +297,7 @@ class ClientContactsDialog(QDialog):
         if not contacts:
             lbl = QLabel(self._("no_contacts_yet"))
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("color: #94A3B8; padding: 20px;")
+            lbl.setObjectName("empty-label")
             self._cards_layout.addWidget(lbl)
         else:
             for contact in contacts:

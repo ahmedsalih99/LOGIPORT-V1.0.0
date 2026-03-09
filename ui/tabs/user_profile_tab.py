@@ -149,16 +149,23 @@ class UserProfileTab(QWidget):
     def _build_hero(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("profile-hero")
-        frame.setStyleSheet("""
-            QFrame#profile-hero {
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+            pri   = c.get("primary",        "#2563EB")
+            pri_a = c.get("primary_active", "#2C5AA0")
+        except Exception:
+            pri, pri_a = "#2563EB", "#2C5AA0"
+        frame.setStyleSheet(f"""
+            QFrame#profile-hero {{
                 background: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #4A7EC8, stop:1 #2C5AA0
+                    stop:0 {pri}, stop:1 {pri_a}
                 );
                 border-radius: 16px;
                 min-height: 120px;
-            }
-            QLabel { background: transparent; color: white; }
+            }}
+            QLabel {{ background: transparent; color: white; }}
         """)
         lay = QHBoxLayout(frame)
         lay.setContentsMargins(28, 20, 28, 20)
@@ -464,7 +471,7 @@ class UserProfileTab(QWidget):
             if not rows:
                 empty = QLabel(self._("no_activity_yet"))
                 empty.setAlignment(Qt.AlignCenter)
-                empty.setStyleSheet("color: #9CA3AF; padding: 12px;")
+                empty.setObjectName("empty-label")
                 self._act_sec.content_layout.addWidget(empty)
                 return
 
@@ -499,14 +506,14 @@ class UserProfileTab(QWidget):
 
                 ts_lbl = QLabel(ts)
                 ts_lbl.setFont(QFont("Tajawal", 8))
-                ts_lbl.setStyleSheet("color: #9CA3AF;")
+                ts_lbl.setObjectName("text-muted")
                 row_lay.addWidget(ts_lbl)
 
                 self._act_sec.content_layout.addWidget(item)
 
         except Exception as e:
             err = QLabel(f"⚠️ {e}")
-            err.setStyleSheet("color: #E74C3C;")
+            err.setObjectName("text-danger")
             self._act_sec.content_layout.addWidget(err)
 
     def _build_actions(self) -> QFrame:

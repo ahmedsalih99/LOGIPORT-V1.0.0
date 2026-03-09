@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QProgressBar, QTextEdit, QWidget
 )
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, Q_ARG
 from PySide6.QtGui import QFont
 import logging
 
@@ -100,29 +100,50 @@ class UpdateDialog(QDialog):
         layout.addLayout(btn_row)
 
     def _apply_style(self):
-        self.setStyleSheet("""
-            QDialog { background: #1e2130; color: #e0e6f0; }
-            QLabel  { color: #e0e6f0; }
-            QTextEdit {
-                background: #252840; border: 1px solid #3a4060;
-                border-radius: 6px; color: #c0c8e0; padding: 6px;
-            }
-            QProgressBar {
-                background: #252840; border: 1px solid #3a4060;
-                border-radius: 6px; height: 20px; color: white; text-align: center;
-            }
-            QProgressBar::chunk { background: #4a7cf0; border-radius: 5px; }
-            QPushButton {
-                background: #2e3450; border: 1px solid #3a4060;
-                border-radius: 8px; color: #e0e6f0; padding: 8px 20px;
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+            bg     = c.get("bg_primary",     "#1e2130")
+            bg2    = c.get("bg_secondary",   "#252840")
+            bg3    = c.get("bg_card",        "#2e3450")
+            bdr    = c.get("border",         "#3a4060")
+            txt_p  = c.get("text_primary",   "#e0e6f0")
+            txt_s  = c.get("text_secondary", "#c0c8e0")
+            txt_d  = c.get("text_disabled",  "#606880")
+            txt_w  = c.get("text_white",     "white")
+            pri    = c.get("primary",        "#4a7cf0")
+            pri_h  = c.get("primary_hover",  "#5a8cf8")
+            bg_h   = c.get("bg_hover",       "#3a4470")
+        except Exception:
+            bg, bg2, bg3     = "#1e2130", "#252840", "#2e3450"
+            bdr               = "#3a4060"
+            txt_p, txt_s      = "#e0e6f0", "#c0c8e0"
+            txt_d, txt_w      = "#606880", "white"
+            pri, pri_h, bg_h  = "#4a7cf0", "#5a8cf8", "#3a4470"
+
+        self.setStyleSheet(f"""
+            QDialog {{ background: {bg}; color: {txt_p}; }}
+            QLabel  {{ color: {txt_p}; }}
+            QTextEdit {{
+                background: {bg2}; border: 1px solid {bdr};
+                border-radius: 6px; color: {txt_s}; padding: 6px;
+            }}
+            QProgressBar {{
+                background: {bg2}; border: 1px solid {bdr};
+                border-radius: 6px; height: 20px; color: {txt_w}; text-align: center;
+            }}
+            QProgressBar::chunk {{ background: {pri}; border-radius: 5px; }}
+            QPushButton {{
+                background: {bg3}; border: 1px solid {bdr};
+                border-radius: 8px; color: {txt_p}; padding: 8px 20px;
                 font-family: Tajawal; font-size: 10pt;
-            }
-            QPushButton:hover   { background: #3a4470; }
-            QPushButton[default="true"] {
-                background: #4a7cf0; border-color: #5a8cf8;
-            }
-            QPushButton[default="true"]:hover { background: #5a8cf8; }
-            QPushButton:disabled { background: #252840; color: #606880; }
+            }}
+            QPushButton:hover   {{ background: {bg_h}; }}
+            QPushButton[default="true"] {{
+                background: {pri}; border-color: {pri_h};
+            }}
+            QPushButton[default="true"]:hover {{ background: {pri_h}; }}
+            QPushButton:disabled {{ background: {bg2}; color: {txt_d}; }}
         """)
 
     def _start_download(self):

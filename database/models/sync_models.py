@@ -30,10 +30,10 @@ class OpLog(Base):
     __tablename__ = "op_log"
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    entity_name  = Column(String(64), nullable=False)
+    entity_name  = Column(String(64), nullable=False, index=True)
     entity_id    = Column(Integer,    nullable=True)
     op           = Column(String(16), nullable=False)   # create | update | delete
     payload_json = Column(Text,       nullable=True)
     version      = Column(Integer,    nullable=True)
-    status       = Column(String(16), default="pending")  # pending | sent | failed
+    status       = Column(String(16), default="pending", index=True)  # pending | sent | failed
     created_at   = Column(DateTime,   server_default=func.now())

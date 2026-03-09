@@ -269,7 +269,7 @@ class CompanyPartnersDialog(QDialog):
         if not partners:
             lbl = QLabel(self._("no_partners"))
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("color: #94A3B8; padding: 20px;")
+            lbl.setObjectName("empty-label")
             self._cards_layout.addWidget(lbl)
         else:
             for p in partners:

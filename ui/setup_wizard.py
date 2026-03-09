@@ -248,7 +248,7 @@ class SetupWizard(QDialog):
         """يعرض رسالة النجاح ثم يُغلق النافذة."""
         self.progress.hide()
         self.create_btn.setText("✅  تم! جارٍ فتح التطبيق…")
-        self.create_btn.setStyleSheet("background:#27ae60; color:white;")
+        self.create_btn.setObjectName("success-btn")
 
         # اخفِ خانات الإدخال
         for attr in ("full_name_edit", "username_edit", "password_edit", "confirm_edit"):
@@ -290,116 +290,146 @@ class SetupWizard(QDialog):
     # ──────────────────────────────────────────────
 
     def _apply_style(self):
-        self.setStyleSheet("""
-        /* ─── الخلفية العامة ─── */
-        SetupWizard {
-            background: #f5f7fa;
-            font-family: 'Tajawal', 'Segoe UI', sans-serif;
-        }
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+            bg       = c.get("bg_primary",     "#f5f7fa")
+            bg_sec   = c.get("bg_secondary",   "#eceff1")
+            pri      = c.get("primary",        "#2563EB")
+            pri_h    = c.get("primary_hover",  "#1D4ED8")
+            pri_a    = c.get("primary_active", "#1e40af")
+            pri_l    = c.get("primary_light",  "#EFF6FF")
+            txt_p    = c.get("text_primary",   "#263238")
+            txt_s    = c.get("text_secondary", "#546e7a")
+            txt_m    = c.get("text_muted",     "#90a4ae")
+            txt_w    = c.get("text_white",     "white")
+            bdr      = c.get("border",         "#cfd8dc")
+            danger   = c.get("danger",         "#c62828")
+            danger_l = c.get("danger_light",   "#ffebee")
+            success  = c.get("success",        "#1b5e20")
+            success_l= c.get("success_light",  "#e8f5e9")
+            dis_bg   = c.get("bg_disabled",    "#90a4ae")
+        except Exception:
+            bg=bg_sec=pri=pri_h=pri_a=pri_l=txt_p=txt_s=txt_m=txt_w=bdr=None
+            bg,bg_sec       = "#f5f7fa","#eceff1"
+            pri,pri_h,pri_a = "#2563EB","#1D4ED8","#1e40af"
+            pri_l           = "#EFF6FF"
+            txt_p,txt_s,txt_m,txt_w = "#263238","#546e7a","#90a4ae","white"
+            bdr             = "#cfd8dc"
+            danger,danger_l = "#c62828","#ffebee"
+            success,success_l="#1b5e20","#e8f5e9"
+            dis_bg          = "#90a4ae"
 
-        /* ─── الهيدر ─── */
-        #WizardHeader {
+        self.setStyleSheet(f"""
+        /* general background */
+        SetupWizard {{
+            background: {bg};
+            font-family: 'Tajawal', 'Segoe UI', sans-serif;
+        }}
+
+        /* header */
+        #WizardHeader {{
             background: qlineargradient(
                 x1:0, y1:0, x2:1, y2:1,
-                stop:0 #1a237e, stop:1 #1565c0
+                stop:0 {pri_a}, stop:1 {pri}
             );
             border-radius: 0px;
-        }
-        #WizardTitle {
-            color: white;
+        }}
+        #WizardTitle {{
+            color: {txt_w};
             font-size: 20px;
             font-weight: bold;
-        }
-        #WizardSubtitle {
+        }}
+        #WizardSubtitle {{
             color: rgba(255,255,255,0.85);
             font-size: 13px;
-        }
+        }}
 
-        /* ─── Body ─── */
-        #WizardBody {
-            background: #f5f7fa;
-        }
-        #WizardDesc {
-            color: #546e7a;
+        /* body */
+        #WizardBody {{
+            background: {bg};
+        }}
+        #WizardDesc {{
+            color: {txt_s};
             font-size: 13px;
             line-height: 1.6;
-        }
+        }}
 
-        /* ─── حقول الإدخال ─── */
-        #WizardFieldLabel {
-            color: #37474f;
+        /* input fields */
+        #WizardFieldLabel {{
+            color: {txt_p};
             font-size: 13px;
             font-weight: 600;
-        }
-        #WizardFieldEdit {
-            border: 1.5px solid #cfd8dc;
+        }}
+        #WizardFieldEdit {{
+            border: 1.5px solid {bdr};
             border-radius: 8px;
             padding: 6px 12px;
             font-size: 13px;
-            background: white;
-            color: #263238;
-        }
-        #WizardFieldEdit:focus {
-            border-color: #1565c0;
-            background: #e8f0fe;
-        }
+            background: {bg};
+            color: {txt_p};
+        }}
+        #WizardFieldEdit:focus {{
+            border-color: {pri};
+            background: {pri_l};
+        }}
 
-        /* ─── رسائل ─── */
-        #WizardError {
-            color: #c62828;
+        /* messages */
+        #WizardError {{
+            color: {danger};
             font-size: 13px;
-            background: #ffebee;
-            border: 1px solid #ef9a9a;
+            background: {danger_l};
+            border: 1px solid {danger}80;
             border-radius: 6px;
             padding: 8px;
-        }
-        #WizardSuccess {
-            color: #1b5e20;
+        }}
+        #WizardSuccess {{
+            color: {success};
             font-size: 13px;
-            background: #e8f5e9;
-            border: 1px solid #a5d6a7;
+            background: {success_l};
+            border: 1px solid {success}80;
             border-radius: 6px;
             padding: 10px;
-        }
+        }}
 
-        /* ─── زر الإنشاء ─── */
-        #WizardCreateBtn {
+        /* create button */
+        #WizardCreateBtn {{
             background: qlineargradient(
                 x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1976d2, stop:1 #1565c0
+                stop:0 {pri}, stop:1 {pri_a}
             );
-            color: white;
+            color: {txt_w};
             border: none;
             border-radius: 10px;
             font-size: 15px;
             font-weight: bold;
-        }
-        #WizardCreateBtn:hover {
+        }}
+        #WizardCreateBtn:hover {{
             background: qlineargradient(
                 x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1e88e5, stop:1 #1976d2
+                stop:0 {pri_h}, stop:1 {pri}
             );
-        }
-        #WizardCreateBtn:disabled {
-            background: #90a4ae;
-            color: white;
-        }
+        }}
+        #WizardCreateBtn:disabled {{
+            background: {dis_bg};
+            color: {txt_w};
+        }}
 
-        /* ─── Progress Bar ─── */
-        #WizardProgress {
-            background: #e3f2fd;
+        /* progress bar */
+        #WizardProgress {{
+            background: {pri_l};
             border-radius: 3px;
-        }
-        #WizardProgress::chunk {
-            background: #1976d2;
+        }}
+        #WizardProgress::chunk {{
+            background: {pri};
             border-radius: 3px;
-        }
+        }}
 
-        /* ─── Footer ─── */
-        #WizardFooter {
-            color: #90a4ae;
+        /* footer */
+        #WizardFooter {{
+            color: {txt_m};
             font-size: 11px;
-            background: #eceff1;
-            border-top: 1px solid #cfd8dc;
-        }
+            background: {bg_sec};
+            border-top: 1px solid {bdr};
+        }}
         """)

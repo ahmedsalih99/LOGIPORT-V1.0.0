@@ -258,19 +258,30 @@ class TransactionsTab(BaseTab):
         d_from, d_to, t_type, search, status, office_id = self._get_filter_values()
         admin = is_admin(self.current_user)
 
-        # كل الفلاتر server-side الآن
+        # pagination server-side
+        filters = dict(
+            date_from        = d_from,
+            date_to          = d_to,
+            transaction_type = t_type or None,
+            search           = search or None,
+            status           = status or None,
+            office_id        = office_id,
+        )
+        try:
+            self.total_rows  = self.trx_crud.count_transactions(**filters)
+        except Exception:
+            self.total_rows  = 0
+        self.total_pages = max(1, -(-self.total_rows // self.rows_per_page))  # ceiling div
+        self.current_page = min(self.current_page, self.total_pages)
+
         try:
             items = self.trx_crud.list_transactions(
-                limit=1000,
-                date_from=d_from,
-                date_to=d_to,
-                transaction_type=t_type or None,
-                search=search or None,
-                status=status or None,
-                office_id=office_id,
+                limit  = self.rows_per_page,
+                offset = (self.current_page - 1) * self.rows_per_page,
+                **filters,
             ) or []
         except TypeError:
-            items = self.trx_crud.list_transactions(limit=1000) or []
+            items = self.trx_crud.list_transactions(limit=self.rows_per_page) or []
 
         client_ids, company_ids, currency_ids, office_ids = set(), set(), set(), set()
         created_ids, updated_ids = set(), set()

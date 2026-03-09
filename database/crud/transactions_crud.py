@@ -692,6 +692,36 @@ class TransactionsCRUD(BaseCRUD):
             ).limit(limit).offset(offset)
             return list(s.execute(q).scalars().all())
 
+    def count_transactions(
+        self,
+        *,
+        client_id       : Optional[int] = None,
+        date_from       : Optional[str] = None,
+        date_to         : Optional[str] = None,
+        status          : Optional[str] = None,
+        transaction_type: Optional[str] = None,
+        search          : Optional[str] = None,
+        office_id       : Optional[int] = None,
+    ) -> int:
+        """إرجاع عدد المعاملات بنفس فلاتر list_transactions — للـ pagination."""
+        with self.get_session() as s:
+            q = select(func.count()).select_from(Transaction)
+            if client_id:
+                q = q.where(Transaction.client_id == client_id)
+            if office_id:
+                q = q.where(Transaction.office_id == office_id)
+            if status:
+                q = q.where(Transaction.status == status)
+            if transaction_type:
+                q = q.where(Transaction.transaction_type == transaction_type)
+            if date_from:
+                q = q.where(Transaction.transaction_date >= date_from)
+            if date_to:
+                q = q.where(Transaction.transaction_date <= date_to)
+            if search:
+                q = q.where(Transaction.transaction_no.ilike(f"%{search}%"))
+            return s.execute(q).scalar_one()
+
     def get_with_items(
         self, trx_id: int
     ) -> Optional[Tuple["Transaction", List["TransactionItem"]]]:

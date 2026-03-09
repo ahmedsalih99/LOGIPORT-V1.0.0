@@ -274,6 +274,35 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: transport_details migration skipped: %s", _e)
 
+
+    # Migration: performance indexes (safe — CREATE INDEX IF NOT EXISTS)
+    _indexes = [
+        # transactions
+        ("idx_trx_date",       "CREATE INDEX IF NOT EXISTS idx_trx_date       ON transactions(transaction_date)"),
+        ("idx_trx_client",     "CREATE INDEX IF NOT EXISTS idx_trx_client     ON transactions(client_id)"),
+        ("idx_trx_office",     "CREATE INDEX IF NOT EXISTS idx_trx_office     ON transactions(office_id)"),
+        ("idx_trx_type",       "CREATE INDEX IF NOT EXISTS idx_trx_type       ON transactions(transaction_type)"),
+        # transaction_items
+        ("idx_trxitem_trx",    "CREATE INDEX IF NOT EXISTS idx_trxitem_trx    ON transaction_items(transaction_id)"),
+        ("idx_trxitem_mat",    "CREATE INDEX IF NOT EXISTS idx_trxitem_mat    ON transaction_items(material_id)"),
+        # entries
+        ("idx_entry_date",     "CREATE INDEX IF NOT EXISTS idx_entry_date     ON entries(entry_date)"),
+        # audit_log
+        ("idx_audit_user",     "CREATE INDEX IF NOT EXISTS idx_audit_user     ON audit_log(user_id)"),
+        ("idx_audit_table",    "CREATE INDEX IF NOT EXISTS idx_audit_table    ON audit_log(table_name)"),
+        ("idx_audit_ts",       "CREATE INDEX IF NOT EXISTS idx_audit_ts       ON audit_log(timestamp)"),
+        # op_log (sync)
+        ("idx_oplog_status",   "CREATE INDEX IF NOT EXISTS idx_oplog_status   ON op_log(status)"),
+        ("idx_oplog_entity",   "CREATE INDEX IF NOT EXISTS idx_oplog_entity   ON op_log(entity_name)"),
+    ]
+    for idx_name, idx_sql in _indexes:
+        try:
+            conn.execute(idx_sql)
+        except Exception as _ie:
+            logger.warning("Bootstrap: index %s skipped: %s", idx_name, _ie)
+    conn.commit()
+    logger.info("Bootstrap: performance indexes checked/created")
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

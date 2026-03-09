@@ -16,14 +16,14 @@ class TransactionItem(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Ownership
-    transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False)
+    transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Optional links to source entry/item
     entry_id = Column(Integer, ForeignKey("entries.id", ondelete="SET NULL"), nullable=True)
     entry_item_id = Column(Integer, ForeignKey("entry_items.id", ondelete="SET NULL"), nullable=True)
 
     # Product / packaging
-    material_id = Column(Integer, ForeignKey("materials.id", ondelete="RESTRICT"), nullable=False)
+    material_id = Column(Integer, ForeignKey("materials.id", ondelete="RESTRICT"), nullable=False, index=True)
     packaging_type_id = Column(Integer, ForeignKey("packaging_types.id", ondelete="RESTRICT"), nullable=True)
 
     # Quantities & weights
