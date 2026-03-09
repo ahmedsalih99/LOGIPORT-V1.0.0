@@ -16,8 +16,62 @@ from .persist_generated_doc import persist_document, allocate_group_doc_no
 from .builder_router import get_builder
 from .pdf_renderer import render_html_to_pdf, detect_engines
 
-from documents import OUTPUT_DIR
+from documents import OUTPUT_DIR, DOC_DIR
 from pathlib import Path as _Path
+
+
+def _inject_arabic_fonts(html: str) -> str:
+    """
+    يحقن @font-face بمسار مطلق للخطوط العربية داخل HTML قبل الطباعة.
+    يُطبَّق فقط على صفحات dir="rtl" (العربية).
+    QtWebEngine لا يرى الخطوط المحلية بدون file:/// مطلق.
+    """
+    if 'dir="rtl"' not in html and "dir='rtl'" not in html:
+        return html
+
+    fonts_dir = (DOC_DIR / "static" / "fonts").resolve()
+    if not fonts_dir.exists():
+        return html
+
+    # بناء مسارات file:///
+    def furl(name: str) -> str:
+        return (fonts_dir / name).as_uri()
+
+    noto_reg = furl("NotoNaskhArabic-Regular.ttf")
+    noto_bold = furl("NotoNaskhArabic-Bold.ttf")
+    amiri_reg = furl("Amiri-Regular.ttf")
+    amiri_bold = furl("Amiri-Bold.ttf")
+
+    face_block = f"""
+<style id="_logiport_fonts">
+@font-face {{
+  font-family: 'Noto Naskh Arabic';
+  font-weight: 400;
+  src: url('{noto_reg}') format('truetype');
+}}
+@font-face {{
+  font-family: 'Noto Naskh Arabic';
+  font-weight: 700;
+  src: url('{noto_bold}') format('truetype');
+}}
+@font-face {{
+  font-family: 'Amiri';
+  font-weight: 400;
+  src: url('{amiri_reg}') format('truetype');
+}}
+@font-face {{
+  font-family: 'Amiri';
+  font-weight: 700;
+  src: url('{amiri_bold}') format('truetype');
+}}
+</style>"""
+
+    # حقن قبل </head> أو بعد <head>
+    if "</head>" in html:
+        return html.replace("</head>", face_block + "\n</head>", 1)
+    if "<head>" in html:
+        return html.replace("<head>", "<head>" + face_block, 1)
+    return face_block + html
 
 from database.models import get_session_local
 from sqlalchemy import text
@@ -217,6 +271,9 @@ def render_document(
     # Output paths
     out_html, out_pdf = _output_paths(_doc_prefix, transaction_no, lang)
     out_html.parent.mkdir(parents=True, exist_ok=True)
+
+    # حقن الخطوط العربية بمسارات مطلقة (للصفحات RTL فقط)
+    html_str = _inject_arabic_fonts(html_str)
 
     out_html.write_text(html_str, encoding="utf-8")
     logger.info("HTML written | path=%s", out_html)
