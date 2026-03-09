@@ -1,23 +1,22 @@
-from typing import Optional, Dict, Any, List
-from sqlalchemy import Column, Integer, String, Text, DateTime, func
-from sqlalchemy.orm import Session
-from database.models.base import Base
+"""
+services/sync_service.py — LOGIPORT
+=====================================
+خدمة المزامنة مع الخادم المركزي (مخصص لإصدارات مستقبلية).
 
-class SyncState(Base):
-    __tablename__ = "sync_state"
-    entity_name = Column(String(64), primary_key=True)
-    last_pulled_version = Column(Integer, default=0)
+الجداول المطلوبة (sync_state, op_log) مُعرَّفة في:
+  database/models/sync_models.py
+وتُنشأ تلقائياً عبر Bootstrap عند بدء التطبيق.
 
-class OpLog(Base):
-    __tablename__ = "op_log"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_name = Column(String(64), nullable=False)
-    entity_id = Column(Integer, nullable=True)
-    op = Column(String(16), nullable=False)  # create | update | delete
-    payload_json = Column(Text, nullable=True)
-    version = Column(Integer, nullable=True)
-    status = Column(String(16), default="pending")  # pending | sent | failed
-    created_at = Column(DateTime, server_default=func.now())
+ملاحظة: هذه الخدمة غير مفعّلة حتى تكتمل البنية التحتية للـ API.
+"""
+from __future__ import annotations
+from typing import Optional, List
+import logging
+
+from database.models.sync_models import OpLog
+
+logger = logging.getLogger(__name__)
+
 
 class SyncService:
     def __init__(self, session_factory, settings, logger):

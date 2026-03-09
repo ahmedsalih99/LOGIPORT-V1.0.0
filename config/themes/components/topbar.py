@@ -85,7 +85,7 @@ def get_styles(theme):
         background: {c["bg_hover"]};
     }}
 
-    /* اسم المستخدم داخل الـ chip */
+    /* username inside chip */
     QLabel#topbar-username-lbl {{
         background : transparent;
         color      : {c["topbar_text"]};

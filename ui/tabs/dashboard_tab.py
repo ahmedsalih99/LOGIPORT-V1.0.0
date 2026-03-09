@@ -522,12 +522,14 @@ class DashboardTab(QWidget):
                                .order_by(desc(Transaction.id))
                                .limit(10).all())
                     rows = [{
-                        "transaction_no": r.transaction_no,
+                        "transaction_no":   r.transaction_no,
                         "transaction_date": str(r.transaction_date or ""),
                         "transaction_type": r.transaction_type,
-                        "totals_value": r.totals_value,
-                        "status": r.status,
-                        "client": r.client  # << جلب العميل
+                        "totals_value":     r.totals_value,
+                        "totals_gross_kg":  r.totals_gross_kg,
+                        "status":           r.status,
+                        "client":           r.client,
+                        "client_id":        r.client_id,
                     } for r in rows_db]
 
             self._trans_table.setSortingEnabled(False)
@@ -553,12 +555,22 @@ class DashboardTab(QWidget):
                     client_name = "—"
                     client_obj = t.get("client")
                     if client_obj:
-                        client_name = getattr(client_obj, "full_name", None) or getattr(client_obj, "username", "—")
+                        lang = self._tm.get_current_language() if hasattr(self, "_tm") else "ar"
+                        client_name = (
+                            getattr(client_obj, f"name_{lang}", None)
+                            or getattr(client_obj, "name_ar", None)
+                            or getattr(client_obj, "name_en", None)
+                            or "—"
+                        )
 
-                    # عمود الوزن (افتراضي —)
+                    # عمود الوزن
                     weight_txt = "—"
-                    if "totals_weight" in t and t["totals_weight"] is not None:
-                        weight_txt = f"{t['totals_weight']:,.2f}"
+                    gross = t.get("totals_gross_kg")
+                    if gross is not None:
+                        try:
+                            weight_txt = f"{float(gross):,.2f}"
+                        except (TypeError, ValueError):
+                            pass
 
                     # تعبئة الجدول بالترتيب الصحيح
                     self._trans_table.setItem(r, 0, _cell(t.get("transaction_no") or "—"))

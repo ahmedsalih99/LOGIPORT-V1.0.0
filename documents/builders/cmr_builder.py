@@ -79,7 +79,7 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             SELECT carrier_company_id, truck_plate, driver_name,
                    loading_place, delivery_place, shipment_date,
                    attached_documents, certificate_no, issuing_authority,
-                   origin_country, dest_country
+                   origin_country, dest_country, cmr_no
             FROM transport_details WHERE transaction_id = :i
         """), {"i": int(transaction_id)}).mappings().first()
 
@@ -157,8 +157,11 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         # (المستخدم يعبّئهم في تبويب الشحن)
 
         return {
-            # ── معرّف المستند ─────────────────────────────────────────────────
-            "cmr_no":       _val(t["no"]),
+            # ── رقم CMR: من transport_details إن وُجد، وإلا يُولَّد من رقم المعاملة ──
+            "cmr_no": (
+                _val(td["cmr_no"]) if td and td.get("cmr_no") else
+                f"CMR-{_val(t['no'])}"
+            ),
             # التاريخ من shipment_date التي يعبّئها المستخدم يدوياً
             "date":          shipment_date,
             "trx_date":      t["transaction_date"],

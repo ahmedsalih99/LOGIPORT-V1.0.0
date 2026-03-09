@@ -2,8 +2,11 @@
 from __future__ import annotations
 from typing import Any, Dict, Tuple, List
 from contextlib import closing
+import logging
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+
+_log = logging.getLogger(__name__)
 
 try:
     from documents.builders.invoice_syrian_entry import build_ctx as _entry_build_ctx2
@@ -300,8 +303,7 @@ def build_ctx(*args, **kwargs) -> Dict[str, Any]:
     interm = _try_fetch_intermediary_fields(int(call["transaction_id"]), lang)
     base.setdefault("transit", {})
     base["transit"]["intermediary"] = {k: v for k, v in interm.items() if not k.startswith("_")}
-    base.setdefault("debug", {})
-    base["debug"]["intermediary_source"] = interm.get("_source", "not_found")
+    _log.debug("intermediary_source=%s", interm.get("_source", "not_found"))
 
     tt = _compute_transit_to_text(int(call["transaction_id"]), base, lang)
     base["transit_to_text"]    = tt["selected"]

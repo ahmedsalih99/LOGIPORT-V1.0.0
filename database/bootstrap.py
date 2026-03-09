@@ -258,6 +258,22 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: office_id (transactions) migration skipped: %s", _e)
 
+    # Migration: origin_country / dest_country / certificate_date في transport_details
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
+        for col, typedef in [
+            ("cmr_no",           "VARCHAR(64)"),
+            ("origin_country",   "VARCHAR(128)"),
+            ("dest_country",     "VARCHAR(128)"),
+            ("certificate_date", "DATE"),
+        ]:
+            if col not in cols:
+                conn.execute(f"ALTER TABLE transport_details ADD COLUMN {col} {typedef}")
+                logger.info("Bootstrap: added %s to transport_details", col)
+        conn.commit()
+    except Exception as _e:
+        logger.warning("Bootstrap: transport_details migration skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

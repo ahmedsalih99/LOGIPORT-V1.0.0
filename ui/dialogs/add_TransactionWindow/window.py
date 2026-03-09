@@ -114,6 +114,12 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.setObjectName("AddTransactionWindow")
         self.setWindowTitle(self._("edit_transaction") if self._is_edit else self._("add_transaction"))
 
+        # ── اتجاه الواجهة حسب اللغة ──────────────────────────────────────────
+        from PySide6.QtCore import Qt as _Qt
+        self.setLayoutDirection(
+            _Qt.RightToLeft if self._lang == "ar" else _Qt.LeftToRight
+        )
+
         # حجم يراعي الشاشة — يأخذ 92% من المساحة المتاحة بحد أدنى ثابت
         try:
             from PySide6.QtWidgets import QApplication
@@ -158,8 +164,8 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.btn_save.setObjectName("primary-btn")
         self.btn_save.setToolTip(self._("save") + " (Ctrl+S)")
         # ✨ تحسين: حجم أكبر للأزرار
-        self.btn_save.setMinimumHeight(40)
-        self.btn_save.setMinimumWidth(120)
+        self.btn_save.setFixedHeight(36)
+        self.btn_save.setMinimumWidth(110)
         try:
             self.btn_save.setIcon(QIcon.fromTheme("document-save"))
         except:
@@ -168,8 +174,8 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.btn_cancel = QPushButton(self._("cancel"))
         self.btn_cancel.setObjectName("secondary-btn")
         self.btn_cancel.setToolTip(self._("cancel") + " (Esc)")
-        self.btn_cancel.setMinimumHeight(40)
-        self.btn_cancel.setMinimumWidth(120)
+        self.btn_cancel.setFixedHeight(36)
+        self.btn_cancel.setMinimumWidth(110)
         try:
             self.btn_cancel.setIcon(QIcon.fromTheme("dialog-cancel"))
         except:
@@ -178,8 +184,8 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.btn_generate_docs = QPushButton(self._("generate_documents"))
         self.btn_generate_docs.setObjectName("secondary-btn")
         self.btn_generate_docs.setToolTip(self._("generate_documents") + " (Ctrl+G)")
-        self.btn_generate_docs.setMinimumHeight(40)
-        self.btn_generate_docs.setMinimumWidth(150)
+        self.btn_generate_docs.setFixedHeight(36)
+        self.btn_generate_docs.setMinimumWidth(140)
         try:
             self.btn_generate_docs.setIcon(QIcon.fromTheme("document-new"))
         except:
@@ -207,42 +213,75 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         # General card
         card = QFrame(top)
         card.setObjectName("general-info-card")
-        form = QFormLayout(card)
-        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form.setFormAlignment(Qt.AlignTop)
-        form.setHorizontalSpacing(16)
-        form.setVerticalSpacing(8)  # ✅ أقل من 16
-        form.setContentsMargins(16, 12, 16, 12)
+        card_lay = QVBoxLayout(card)
+        card_lay.setContentsMargins(20, 12, 20, 12)
+        card_lay.setSpacing(8)
 
+        # ── سطر أول: رقم المعاملة + التاريخ ────────────────────────────────
+        row1 = QHBoxLayout()
+        row1.setSpacing(24)
+
+        col_no = QVBoxLayout()
+        col_no.setSpacing(4)
+        lbl_no = QLabel(self._("transaction_no"))
+        lbl_no.setObjectName("field-label")
         self.txt_trx_no = QLineEdit()
         self.txt_trx_no.setObjectName("transaction-number-input")
-        self.txt_trx_no.setMinimumHeight(40)
+        self.txt_trx_no.setFixedHeight(34)
         try:
             self.txt_trx_no.setPlaceholderText(self._generate_placeholder_number())
         except Exception:
             pass
+        col_no.addWidget(lbl_no)
+        col_no.addWidget(self.txt_trx_no)
 
+        col_date = QVBoxLayout()
+        col_date.setSpacing(4)
+        lbl_date = QLabel(self._("transaction_date"))
+        lbl_date.setObjectName("field-label")
         self.dt_trx_date = QDateEdit()
         self.dt_trx_date.setObjectName("transaction-date-input")
-        self.dt_trx_date.setMinimumHeight(40)
+        self.dt_trx_date.setFixedHeight(34)
         self.dt_trx_date.setDisplayFormat("yyyy-MM-dd")
         self.dt_trx_date.setCalendarPopup(True)
         self.dt_trx_date.setDate(QDate.currentDate())
+        col_date.addWidget(lbl_date)
+        col_date.addWidget(self.dt_trx_date)
 
+        row1.addLayout(col_no, 1)
+        row1.addLayout(col_date, 1)
+        card_lay.addLayout(row1)
+
+        # ── سطر ثاني: نوع المعاملة + الملاحظات ─────────────────────────────
+        row2 = QHBoxLayout()
+        row2.setSpacing(24)
+
+        col_type = QVBoxLayout()
+        col_type.setSpacing(4)
+        lbl_type = QLabel(self._("transaction_type"))
+        lbl_type.setObjectName("field-label")
         self.cmb_trx_type = QComboBox()
         self.cmb_trx_type.setObjectName("transaction-type-combo")
-        self.cmb_trx_type.setMinimumHeight(40)
+        self.cmb_trx_type.setFixedHeight(34)
         self._fill_trx_types()
+        col_type.addWidget(lbl_type)
+        col_type.addWidget(self.cmb_trx_type)
 
+        col_notes = QVBoxLayout()
+        col_notes.setSpacing(4)
+        lbl_notes = QLabel(self._("notes"))
+        lbl_notes.setObjectName("field-label")
         self.txt_notes = QTextEdit()
         self.txt_notes.setObjectName("transaction-notes-input")
-        self.txt_notes.setFixedHeight(56)  # ✅ ثابت 56px — سطرين تقريباً
+        self.txt_notes.setFixedHeight(50)
         self.txt_notes.setPlaceholderText(self._("enter_notes_optional"))
+        col_notes.addWidget(lbl_notes)
+        col_notes.addWidget(self.txt_notes)
 
-        form.addRow(self._("transaction_no"), self.txt_trx_no)
-        form.addRow(self._("transaction_date"), self.dt_trx_date)
-        form.addRow(self._("transaction_type"), self.cmb_trx_type)
-        form.addRow(self._("notes"), self.txt_notes)
+        row2.addLayout(col_type, 1)
+        row2.addLayout(col_notes, 1)
+        card_lay.addLayout(row2)
+
         top_layout.addWidget(card)
 
         # ── Horizontal splitter: tabs (يسار/وسط) + docs panel (يمين) ──────────
@@ -287,9 +326,10 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
 
         splitter.addWidget(top)
         splitter.addWidget(bottom)
-        splitter.setStretchFactor(0, 0)  # ✅ top لا يتمدد أبداً
-        splitter.setStretchFactor(1, 1)  # ✅ bottom يأخذ كل المساحة الزائدة
-        splitter.setSizes([300, 600])
+        splitter.setStretchFactor(0, 0)   # top: حجم ثابت
+        splitter.setStretchFactor(1, 1)   # bottom: يأخذ الباقي
+        # الارتفاع المحسوب: أزرار(40) + card(~160) + margins/spacing(~36) = ~236px
+        splitter.setSizes([236, 600])
 
         lay = QVBoxLayout(root)
         lay.setContentsMargins(0, 0, 0, 0)

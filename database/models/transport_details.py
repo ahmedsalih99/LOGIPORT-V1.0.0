@@ -5,9 +5,11 @@ transport_details.py — LOGIPORT
 
 العلاقة: one-to-one مع transactions (يمكن أن لا تكون موجودة إذا لم يحتجها المستخدم).
 
-CMR يحتاج:  carrier_company_id, truck_plate, driver_name,
-             loading_place, delivery_place, shipment_date
-Form A يحتاج: certificate_no, issuing_authority
+CMR يحتاج:    carrier_company_id, truck_plate, driver_name,
+               loading_place, delivery_place, shipment_date,
+               origin_country, dest_country
+Form A يحتاج: certificate_no, issuing_authority, certificate_date,
+               origin_country, dest_country
 كلاهما يحتاج: shipment_date
 """
 from __future__ import annotations
@@ -54,8 +56,17 @@ class TransportDetails(Base):
     attached_documents  = Column(String(512), nullable=True)  # الوثائق المرفقة — Box 5
 
     # ── Form A / EUR.1 fields ─────────────────────────────────────────────────
+    # ── CMR Number ───────────────────────────────────────────────────────────
+    cmr_no              = Column(String(64),  nullable=True)  # رقم CMR — يدوي أو تلقائي من النظام
+
     certificate_no      = Column(String(64),  nullable=True)  # رقم شهادة المنشأ
     issuing_authority   = Column(String(255), nullable=True)  # الجهة المُصدِرة للشهادة
+    certificate_date    = Column(Date,        nullable=True)  # تاريخ إصدار الشهادة (Form A) — يدوي مستقل
+
+    # ── Override نصي للدول (CMR / Form A) ────────────────────────────────────
+    # يُسمح للمستخدم بتجاوز اسم الدولة المسحوب من المعاملة إذا احتاج صياغة مختلفة
+    origin_country      = Column(String(128), nullable=True)  # override بلد المنشأ
+    dest_country        = Column(String(128), nullable=True)  # override بلد الوجهة
 
     # ── Audit ─────────────────────────────────────────────────────────────────
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -74,5 +85,7 @@ class TransportDetails(Base):
             self.carrier_company_id, self.truck_plate, self.driver_name,
             self.loading_place, self.delivery_place, self.shipment_date,
             self.attached_documents,
-            self.certificate_no, self.issuing_authority,
+            self.cmr_no,
+            self.certificate_no, self.issuing_authority, self.certificate_date,
+            self.origin_country, self.dest_country,
         ])

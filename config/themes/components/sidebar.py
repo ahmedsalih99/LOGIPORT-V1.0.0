@@ -38,14 +38,14 @@ def get_styles(theme):
         font-weight  : 500;
     }}
 
-    /* Hover — gradient من اليمين للأيسر (RTL-friendly) */
+    /* Hover - RTL-friendly gradient */
     QToolButton#sidebar-btn:hover {{
         background: rgba(255, 255, 255, 0.12);
         color     : {c["sidebar_text_hover"]};
         border-radius: {BorderRadius.MD};
     }}
 
-    /* Active/Checked — خلفية صلبة واضحة + خط على اليمين (RTL) */
+    /* Active/Checked - solid bg + right border (RTL) */
     QToolButton#sidebar-btn:checked {{
         background  : rgba(255, 255, 255, 0.22);
         color       : {c["sidebar_text"]};

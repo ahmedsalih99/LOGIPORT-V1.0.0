@@ -15,7 +15,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QDateEdit, QComboBox, QLabel,
-    QFrame, QScrollArea, QSizePolicy,
+    QFrame, QScrollArea, QSizePolicy, QPushButton,
 )
 from PySide6.QtCore import Qt, QDate
 
@@ -109,6 +109,22 @@ class TransportTabMixin:
     def _build_cmr_fields(self, form: QFormLayout):
         _ = self._ if hasattr(self, "_") else lambda k: k
 
+        # رقم CMR — يدوي أو تلقائي
+        cmr_row = QHBoxLayout()
+        cmr_row.setSpacing(6)
+        self.txt_cmr_no = QLineEdit()
+        self.txt_cmr_no.setObjectName("form-input")
+        self.txt_cmr_no.setPlaceholderText(_("cmr_no_placeholder"))
+        cmr_row.addWidget(self.txt_cmr_no, 1)
+        self._btn_gen_cmr_no = QPushButton("⚙ " + _("cmr_no_auto"))
+        self._btn_gen_cmr_no.setObjectName("secondary-btn")
+        self._btn_gen_cmr_no.setFixedHeight(32)
+        self._btn_gen_cmr_no.setCursor(Qt.PointingHandCursor)
+        self._btn_gen_cmr_no.setToolTip(_("cmr_no_auto_tooltip"))
+        self._btn_gen_cmr_no.clicked.connect(self._generate_cmr_no)
+        cmr_row.addWidget(self._btn_gen_cmr_no)
+        form.addRow(_("cmr_no_label"), cmr_row)
+
         # شركة الناقل
         self.cmb_carrier = QComboBox()
         self.cmb_carrier.setObjectName("carrier-combo")
@@ -165,6 +181,15 @@ class TransportTabMixin:
 
     def _on_shipment_date_changed(self, qdate: QDate):
         self._shipment_date_set = qdate.isValid() and qdate != QDate()
+
+    def _generate_cmr_no(self):
+        """يولّد رقم CMR تلقائياً بالصيغة: CMR-YYYYMMDD-XXXX"""
+        from datetime import date as _date
+        import random, string
+        today  = _date.today()
+        suffix = "".join(random.choices(string.digits, k=4))
+        auto   = f"CMR-{today.strftime('%Y%m%d')}-{suffix}"
+        self.txt_cmr_no.setText(auto)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Form A Fields
@@ -235,6 +260,7 @@ class TransportTabMixin:
                 "delivery_place":     self.txt_delivery_place.text().strip() or None,
                 "shipment_date":      shipment_date,
                 "attached_documents": self.txt_attached_docs.text().strip() or None,
+                "cmr_no":             self.txt_cmr_no.text().strip() or None,
                 "certificate_no":     self.txt_certificate_no.text().strip() or None,
                 "issuing_authority":  self.txt_issuing_authority.text().strip() or None,
             }
@@ -278,6 +304,7 @@ class TransportTabMixin:
 
         # حقول نصية
         for attr, widget in [
+            ("cmr_no",             self.txt_cmr_no),
             ("truck_plate",        self.txt_truck_plate),
             ("driver_name",        self.txt_driver_name),
             ("loading_place",      self.txt_loading_place),

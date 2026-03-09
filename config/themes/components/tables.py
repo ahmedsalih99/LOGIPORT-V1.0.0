@@ -56,7 +56,7 @@ def get_styles(theme):
         alternate-background-color: {c["bg_hover"]};
     }}
 
-    /* ── Header — أخف وأنظف ── */
+    /* Header - lighter and cleaner */
 
     QHeaderView {{
         background: transparent;

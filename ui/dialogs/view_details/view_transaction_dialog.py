@@ -84,6 +84,12 @@ class ViewTransactionDialog(BaseDialog):
 
         self.setWindowTitle(self._("transaction_view"))
 
+        # ── اتجاه الواجهة حسب اللغة ──────────────────────────────────────────
+        from PySide6.QtCore import Qt as _Qt
+        self.setLayoutDirection(
+            _Qt.RightToLeft if self._lang == "ar" else _Qt.LeftToRight
+        )
+
         # حجم يراعي الشاشة (لا يتجاوز 90%) مع حد أدنى مناسب
         try:
             from PySide6.QtWidgets import QApplication
@@ -175,13 +181,13 @@ class ViewTransactionDialog(BaseDialog):
         actions.addStretch()
         self.btn_copy = QPushButton(self._("copy_transaction"))
         self.btn_copy.setObjectName("secondary-btn")
-        self.btn_reprice = QPushButton(self._("reprice"))
-        self.btn_reprice.setObjectName("primary-btn")
+        self.btn_edit = QPushButton(self._("edit_transaction"))
+        self.btn_edit.setObjectName("primary-btn")
         self.btn_generate_docs = QPushButton(self._("generate_documents"))
         self.btn_generate_docs.setObjectName("primary-btn")
         self.btn_close = QPushButton(self._("close"))
         self.btn_close.setObjectName("secondary-btn")
-        for b in (self.btn_copy, self.btn_reprice,
+        for b in (self.btn_copy, self.btn_edit,
                   self.btn_generate_docs, self.btn_close):
             actions.addWidget(b)
         root.addLayout(actions)
@@ -215,7 +221,7 @@ class ViewTransactionDialog(BaseDialog):
         self.btn_close.clicked.connect(self.reject)
         self.btn_copy.clicked.connect(
             lambda: self.copy_requested.emit(int(self.trx_id or 0)))
-        self.btn_reprice.clicked.connect(
+        self.btn_edit.clicked.connect(
             lambda: self.reprice_requested.emit(int(self.trx_id or 0)))
         self.btn_generate_docs.clicked.connect(self._emit_generate_documents)
 

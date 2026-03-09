@@ -108,15 +108,18 @@ def get_styles(theme):
     }}
     
     QDialog#LoginDialog QComboBox::drop-down {{
-        border: none;
-        background: transparent;
+        width             : 1px;
+        border            : none;
+        background        : transparent;
+        subcontrol-origin : padding;
+        subcontrol-position: right center;
     }}
-    
+
     QDialog#LoginDialog QComboBox::down-arrow {{
         image: none;
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 6px solid {c["text_secondary"]};
+        width: 0;
+        height: 0;
+        border: none;
     }}
     
     /* Dropdown Items */

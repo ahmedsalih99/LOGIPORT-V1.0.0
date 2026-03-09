@@ -122,7 +122,7 @@ def get_styles(theme):
         height           : 16px;
     }}
 
-    /* ========== QCOMBOBOX DROPDOWN - أوسع وأكثر راحة ========== */
+    /* ========== QCOMBOBOX DROPDOWN ========== */
 
     QAbstractItemView {{
         background-color : {c["bg_card"]};
@@ -153,7 +153,7 @@ def get_styles(theme):
         font-weight      : 600;
     }}
 
-    /* ========== FILTER BAR - شريط الفلترة المشترك ========== */
+    /* ========== FILTER BAR ========== */
 
     QWidget#filter-bar {{
         background  : {c["bg_card"]};
@@ -168,7 +168,7 @@ def get_styles(theme):
         border-radius: 8px;
     }}
 
-    /* أزرار الـ preset (اليوم / الأسبوع / الشهر) */
+    /* preset buttons (today / week / month) */
     QPushButton#filter-preset-btn {{
         background   : transparent;
         border       : 1.5px solid {c["border"]};
@@ -190,7 +190,7 @@ def get_styles(theme):
         font-weight  : 600;
     }}
 
-    /* زر المسح (✖) */
+    /* clear button */
     QPushButton#filter-clear-btn {{
         background   : transparent;
         border       : 1.5px solid {c["danger"]}50;
@@ -208,14 +208,14 @@ def get_styles(theme):
         border-color : {c["danger"]};
     }}
 
-    /* فاصل عمودي داخل filter-bar */
+    /* vertical separator inside filter-bar */
     QFrame#filter-sep {{
         color        : {c["border"]};
         max-width    : 1px;
         min-width    : 1px;
     }}
 
-    /* label عدد النتائج */
+    /* results count label */
     QLabel#filter-count-lbl {{
         color        : {c["text_muted"]};
         font-size    : {s["sm"]}px;

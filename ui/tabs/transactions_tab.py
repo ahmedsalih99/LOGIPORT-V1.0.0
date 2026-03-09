@@ -53,7 +53,7 @@ class TransactionsTab(BaseTab):
         "client":                 160,
         "exporting_company":      160,
         "importing_company":      160,
-        "total_value":            120,
+        "office_name":            140,
     }
 
     required_permissions = {
@@ -84,7 +84,7 @@ class TransactionsTab(BaseTab):
                 {"label": "client",               "key": "client_name"},
                 {"label": "exporting_company",    "key": "exporter_name"},
                 {"label": "importing_company",    "key": "importer_name"},
-                {"label": "total_value",          "key": "totals_value_label"},
+                {"label": "office",             "key": "office_name"},
                 {"label": "actions",              "key": "actions"},
             ],
             admin_columns=[
@@ -272,18 +272,19 @@ class TransactionsTab(BaseTab):
         except TypeError:
             items = self.trx_crud.list_transactions(limit=1000) or []
 
-        client_ids, company_ids, currency_ids = set(), set(), set()
+        client_ids, company_ids, currency_ids, office_ids = set(), set(), set(), set()
         created_ids, updated_ids = set(), set()
         for t in items:
             if isinstance(getattr(t, "client_id",           None), int): client_ids.add(t.client_id)
             if isinstance(getattr(t, "exporter_company_id", None), int): company_ids.add(t.exporter_company_id)
             if isinstance(getattr(t, "importer_company_id", None), int): company_ids.add(t.importer_company_id)
             if isinstance(getattr(t, "currency_id",         None), int): currency_ids.add(t.currency_id)
+            if isinstance(getattr(t, "office_id",           None), int): office_ids.add(t.office_id)
             if isinstance(getattr(t, "created_by_id",       None), int): created_ids.add(t.created_by_id)
             if isinstance(getattr(t, "updated_by_id",       None), int): updated_ids.add(t.updated_by_id)
 
         id_to_user = {}; id_to_client = {}; id_to_company = {}
-        id_to_currency = {}
+        id_to_currency = {}; id_to_office = {}
 
         s = get_session_local()()
         try:
@@ -299,6 +300,17 @@ class TransactionsTab(BaseTab):
             if currency_ids and Currency:
                 for cid, code, sym in s.query(Currency.id, Currency.code, Currency.symbol).filter(Currency.id.in_(currency_ids)):
                     id_to_currency[cid] = {"code": code, "symbol": sym}
+            if office_ids:
+                try:
+                    from database.models.office import Office as _Office
+                    for oid, nar, nen, ntr, code in s.query(
+                        _Office.id, _Office.name_ar, _Office.name_en,
+                        _Office.name_tr if hasattr(_Office, "name_tr") else _Office.name_ar,
+                        _Office.code
+                    ).filter(_Office.id.in_(office_ids)):
+                        id_to_office[oid] = {"ar": nar, "en": nen or nar, "tr": ntr or nar, "code": code}
+                except Exception:
+                    pass
         finally:
             s.close()
 
@@ -309,11 +321,8 @@ class TransactionsTab(BaseTab):
 
         all_rows = []
         for t in items:
-            cur   = id_to_currency.get(getattr(t, "currency_id", None) or -1, {})
-            tval  = getattr(t, "totals_value", None)
-            tlbl  = str(tval) if tval is not None else "0"
-            cc    = cur.get("code") or cur.get("symbol")
-            if cc: tlbl += f" {cc}"
+            office_d = id_to_office.get(getattr(t, "office_id", None) or -1, {})
+            office_name = _pick(office_d) or office_d.get("code") or ""
 
             client_name = _pick(id_to_client.get(getattr(t, "client_id", None) or -1, {}))
 
@@ -328,7 +337,7 @@ class TransactionsTab(BaseTab):
                 "client_name":           client_name,
                 "exporter_name":         _pick(id_to_company.get(getattr(t, "exporter_company_id", None) or -1, {})),
                 "importer_name":         _pick(id_to_company.get(getattr(t, "importer_company_id", None) or -1, {})),
-                "totals_value_label":    tlbl,
+                "office_name":           office_name,
                 "status":                trx_status,
                 "actions":               t,
                 "_client_name_raw":      client_name,
@@ -383,7 +392,7 @@ class TransactionsTab(BaseTab):
 
                         if can_edit and status in ("draft", "active"):
                             b = QPushButton(self._("edit"))
-                            b.setObjectName("primary-btn")
+                            b.setObjectName("table-edit")
                             b.setFixedHeight(28)
                             b.setCursor(Qt.PointingHandCursor)
                             b.clicked.connect(lambda _=False, o=obj: self._open_edit_dialog(o))
@@ -420,7 +429,7 @@ class TransactionsTab(BaseTab):
 
                         if can_delete and status not in ("closed", "archived"):
                             b = QPushButton(self._("delete"))
-                            b.setObjectName("danger-btn")
+                            b.setObjectName("table-delete")
                             b.setFixedHeight(28)
                             b.setCursor(Qt.PointingHandCursor)
                             b.clicked.connect(lambda _=False, o=obj: self._delete_single(o))
@@ -833,21 +842,6 @@ class TransactionsTab(BaseTab):
 
         lay.addStretch()
 
-        # إجمالي القيم المالية
-        val_wrap = QWidget()
-        vwl = QVBoxLayout(val_wrap)
-        vwl.setContentsMargins(0, 0, 0, 0)
-        vwl.setSpacing(1)
-        lbl_vtitle = QLabel("Σ " + self._("total_value"))
-        lbl_vtitle.setObjectName("footer-stat-title")
-        lbl_vtitle.setAlignment(Qt.AlignCenter)
-        self._ft_value = QLabel("—")
-        self._ft_value.setObjectName("footer-stat-value-accent")
-        self._ft_value.setAlignment(Qt.AlignCenter)
-        vwl.addWidget(lbl_vtitle)
-        vwl.addWidget(self._ft_value)
-        lay.addWidget(val_wrap)
-
         try:
             self.layout.insertWidget(self.layout.count() - 1, footer)
         except Exception:
@@ -861,20 +855,10 @@ class TransactionsTab(BaseTab):
         imports = sum(1 for r in rows if r.get("transaction_type_badge") == "import")
         transit = sum(1 for r in rows if r.get("transaction_type_badge") == "transit")
 
-        # مجموع القيم المالية (من النص — نستخرج الرقم فقط)
-        total_val = 0.0
-        for r in rows:
-            try:
-                raw = str(r.get("totals_value_label", "") or "").split()[0]
-                total_val += float(raw)
-            except Exception:
-                pass
-
         self._ft_total.setText(str(total))
         self._ft_export.setText(str(exports))
         self._ft_import.setText(str(imports))
         self._ft_transit.setText(str(transit))
-        self._ft_value.setText(f"{total_val:,.2f}" if total_val else "—")
 
     # ── i18n ──────────────────────────────────────────────────────────
     def retranslate_ui(self):

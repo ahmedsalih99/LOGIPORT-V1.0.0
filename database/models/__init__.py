@@ -51,6 +51,12 @@ try:
 except Exception:
     Document = DocumentTemplate = None  # type: ignore
 
+# جداول المزامنة المستقبلية — تُنشأ مع البقية عبر Base.metadata.create_all()
+try:
+    from .sync_models import SyncState, OpLog  # noqa: F401  type: ignore
+except Exception:
+    SyncState = OpLog = None  # type: ignore
+
 __all__ = [
     # session / base
     "Base", "get_engine", "get_session_local",

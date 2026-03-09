@@ -76,37 +76,7 @@ def get_styles(theme):
         border-bottom: 1px solid {c["border_subtle"]};
     }}
 
-    /* ===== WARNING & DANGER BUTTONS ===== */
-
-    QPushButton#btn-warning {{
-        background: {c["warning"]};
-        color: white;
-        border: none;
-        border-radius: {BorderRadius.MD};
-        padding: 8px 20px;
-        font-weight: bold;
-    }}
-    QPushButton#btn-warning:hover {{
-        background: {c["warning_hover"]};
-    }}
-    QPushButton#btn-warning:pressed {{
-        background: {c["warning_active"]};
-    }}
-
-    QPushButton#btn-danger {{
-        background: {c["danger"]};
-        color: white;
-        border: none;
-        border-radius: {BorderRadius.MD};
-        padding: 8px 20px;
-        font-weight: bold;
-    }}
-    QPushButton#btn-danger:hover {{
-        background: {c["danger_hover"]};
-    }}
-    QPushButton#btn-danger:pressed {{
-        background: {c["danger_active"]};
-    }}
+    /* btn-warning / btn-danger — defined in buttons.py */
 
     /* ===== DASHBOARD HEADER ===== */
 

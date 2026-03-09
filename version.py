@@ -10,8 +10,8 @@ version.py — LOGIPORT
 
 APP_NAME    = "LOGIPORT"
 VERSION     = "1.0.0"
-BUILD       = "2026.02.20"
-GITHUB_REPO = "ahmedsalih99/LOGIPORT"   # ← غيّر هذا
+BUILD       = "2026.03.09"
+GITHUB_REPO = "ahmedsalih99/LOGIPORT-V1.0.0"
 
 # URL يتحقق منه نظام التحديثات
 RELEASES_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

@@ -64,13 +64,13 @@ def get_styles(theme):
         border     : 1px solid {c["border_subtle"]};
     }}
 
-    /* حقل البحث — حواف مدوّرة أكثر */
+    /* search field - rounded */
     QLineEdit#search-field {{
         padding-right: {Spacing.XL};
         border-radius : {BorderRadius.LG};
     }}
 
-    /* حقل خطأ */
+    /* error field */
     QLineEdit[error="true"] {{
         border: {BORDER_ERROR};
         background: {c["danger_light"]};
@@ -107,26 +107,64 @@ def get_styles(theme):
         border     : 1px solid {c["border_subtle"]};
     }}
 
+    /* form-combo - editable search support */
+    QComboBox#form-combo {{
+        background    : {c["input_bg"]};
+        border        : 1.5px solid {c["border"]};
+        border-radius : {BorderRadius.SM};
+        color         : {c["text_primary"]};
+        font-size     : 13px;
+        padding       : 2px 10px;
+        min-height    : 34px;
+    }}
+
+    QComboBox#form-combo:focus,
+    QComboBox#form-combo:on {{
+        border-color  : {c["accent"]};
+        border-width  : 2px;
+        background    : {c["input_bg"]};
+    }}
+
+    QComboBox#form-combo QLineEdit {{
+        background    : transparent;
+        border        : none;
+        color         : {c["text_primary"]};
+        font-size     : 13px;
+        padding       : 0 2px;
+        selection-background-color: {c["accent_soft"]};
+    }}
+
+    QComboBox#form-combo::drop-down {{
+        width             : 1px;
+        border            : none;
+        background        : transparent;
+        subcontrol-origin : padding;
+        subcontrol-position: right center;
+    }}
+
+    QComboBox#form-combo::down-arrow {{
+        image  : none;
+        width  : 0;
+        height : 0;
+        border : none;
+    }}
+
     QComboBox::drop-down {{
-        background : transparent;
-        subcontrol-origin   : padding;
-        subcontrol-position : left center;
-        border: none;
-        width: 24px;
+        width             : 1px;
+        border            : none;
+        background        : transparent;
+        subcontrol-origin : padding;
+        subcontrol-position: right center;
     }}
 
     QComboBox::down-arrow {{
-        border-left  : 4px solid transparent;
-        border-right : 4px solid transparent;
-        border-top   : 5px solid {c["text_secondary"]};
-        margin-left  : 4px;
+        image  : none;
+        width  : 0;
+        height : 0;
+        border : none;
     }}
 
-    QComboBox::down-arrow:hover {{
-        border-top-color: {c["primary"]};
-    }}
-
-    QComboBox     /* ComboBox داخل الجداول — padding مضغوط */
+    QComboBox     /* ComboBox inside tables - compact padding */
     QTableWidget QComboBox,
     QTableView  QComboBox {{
         padding      : 2px 4px;
@@ -137,10 +175,10 @@ def get_styles(theme):
 
     QTableWidget QComboBox::down-arrow,
     QTableView  QComboBox::down-arrow {{
-        border-left  : 3px solid transparent;
-        border-right : 3px solid transparent;
-        border-top   : 4px solid {c["text_secondary"]};
-        margin-left  : 2px;
+        image  : none;
+        width  : 0;
+        height : 0;
+        border : none;
     }}
 
     /* =======================================================================
@@ -206,31 +244,32 @@ def get_styles(theme):
     }}
 
     QDateEdit::drop-down {{
-        background          : transparent;
-        subcontrol-origin   : padding;
-        subcontrol-position : left center;
-        border: none;
-        width: 24px;
+        width             : 1px;
+        border            : none;
+        background        : transparent;
+        subcontrol-origin : padding;
+        subcontrol-position: right center;
     }}
 
     QDateEdit::down-arrow {{
-        border-left  : 4px solid transparent;
-        border-right : 4px solid transparent;
-        border-top   : 5px solid {c["text_secondary"]};
+        image  : none;
+        width  : 0;
+        height : 0;
+        border : none;
     }}
 
     /* =======================================================================
        QCalendarWidget
     ======================================================================= */
 
-    /* شريط التنقل: الشهر والسنة والأسهم */
+    /* calendar nav bar: month, year, arrows */
     QCalendarWidget QWidget#qt_calendar_navigationbar {{
         background   : {c["primary"]};
         min-height   : 40px;
         padding      : 2px 6px;
     }}
 
-    /* أزرار التنقل (اسم الشهر / السنة / الأسهم) */
+    /* nav buttons: month / year / arrows */
     QCalendarWidget QToolButton {{
         background   : transparent;
         color        : #FFFFFF;
@@ -254,7 +293,7 @@ def get_styles(theme):
         width : 0px;
     }}
 
-    /* SpinBox السنة داخل شريط التنقل */
+    /* year SpinBox inside nav bar */
     QCalendarWidget QSpinBox {{
         background   : rgba(255,255,255,0.15);
         color        : #FFFFFF;
@@ -289,7 +328,7 @@ def get_styles(theme):
         height : 0px;
     }}
 
-    /* صف رؤوس الأيام (Sun Mon ...) */
+    /* day headers row (Sun Mon ...) */
     QCalendarWidget QHeaderView {{
         background : {c["bg_hover"]};
     }}
@@ -302,7 +341,7 @@ def get_styles(theme):
         padding    : 4px 0;
     }}
 
-    /* خلايا الأيام */
+    /* day cells */
     QCalendarWidget QAbstractItemView {{
         background                 : {c["bg_card"]};
         color                      : {c["text_primary"]};

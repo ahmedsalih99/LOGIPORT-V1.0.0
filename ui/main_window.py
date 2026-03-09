@@ -76,6 +76,7 @@ class MainWindow(BaseWindow):
             pass
 
         self._init_ui()
+        self.update_layout_direction()   # تأكد من اتجاه الـ Sidebar عند أول تشغيل
         self._restore_window_geometry()
         self.retranslate_ui()
 
