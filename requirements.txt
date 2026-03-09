@@ -7,6 +7,8 @@
 
 # ── واجهة المستخدم ──────────────────────────────────────────
 PySide6>=6.6.0
+# ملاحظة: QtWebEngine (محرك PDF) مضمَّن تلقائياً في PySide6_Addons
+# لا حاجة لتثبيت أي مكتبة إضافية لتوليد PDF
 
 # ── قاعدة البيانات ──────────────────────────────────────────
 SQLAlchemy>=2.0.0
@@ -22,12 +24,8 @@ openpyxl>=3.1.0
 # ── قوالب HTML للمستندات ────────────────────────────────────
 Jinja2>=3.1.0
 
-# ── Playwright (محرك PDF الرئيسي) ───────────────────────────
-# بعد التثبيت شغّل: playwright install chromium
-playwright>=1.40.0
-
 # ── WeasyPrint (محرك PDF احتياطي — اختياري) ─────────────────
-# غير مضمَّن في EXE (مستثنى من main.spec) — للتطوير فقط
+# غير مضمَّن في EXE — للتطوير فقط
 # Linux/macOS: sudo apt install libcairo2 libpango-1.0-0 libpangocairo-1.0-0
 # Windows: GTK3 من https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
 # weasyprint>=62.0
