@@ -104,7 +104,7 @@ class _Worker(QObject):
         try:
             from services import render_document, check_pdf_runtime
             report = check_pdf_runtime()
-            force_html_only = not (report.weasyprint_stack or report.playwright)
+            force_html_only = not (report.weasyprint_stack or report.qtwebengine)
             files = []
             for j in self.jobs:
                 res = render_document(

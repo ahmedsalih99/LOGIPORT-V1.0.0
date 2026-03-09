@@ -150,6 +150,13 @@ def _fetch_company_localized(s, company_id: int, lang: str) -> Dict[str, Any]:
 
 
 def _try_fetch_intermediary_fields(transaction_id: int, lang: str) -> Dict[str, Any]:
+    """
+    Fetches intermediary/broker company data.
+    Uses broker_company_id (the actual DB column).
+    Optional columns (intermediary_invoice_no, intermediary_invoice_date,
+    intermediary_supplier_id) are fetched with COALESCE/NULL fallback
+    so they never raise OperationalError on older DBs.
+    """
     result: Dict[str, Any] = {
         "intermediary_invoice_no": "",
         "intermediary_invoice_date": "",
@@ -161,29 +168,57 @@ def _try_fetch_intermediary_fields(transaction_id: int, lang: str) -> Dict[str, 
     }
     SessionLocal = get_session_local()
     with closing(SessionLocal()) as s:
+        # First: try full query with all optional columns
         try:
             row = s.execute(text("""
-                SELECT intermediary_invoice_no,
-                       intermediary_invoice_date,
-                       intermediary_supplier_id,
-                       broker_company_id
+                SELECT
+                    COALESCE(intermediary_invoice_no,  '')  AS ino,
+                    COALESCE(intermediary_invoice_date, '') AS idate,
+                    COALESCE(intermediary_supplier_id,  0)  AS supplier_id,
+                    COALESCE(broker_company_id,         0)  AS broker_id
                 FROM transactions
                 WHERE id = :i
-            """), {"i": int(transaction_id)}).first()
+            """), {"i": int(transaction_id)}).mappings().first()
         except OperationalError:
+            # Optional columns missing — fall back to broker_company_id only
+            try:
+                row2 = s.execute(text("""
+                    SELECT broker_company_id
+                    FROM transactions
+                    WHERE id = :i
+                """), {"i": int(transaction_id)}).first()
+            except OperationalError:
+                return result
+
+            if not row2:
+                return result
+
+            broker_id = row2[0]
+            result["_source"] = "transactions.broker_company_id" if broker_id else "not_found"
+            if broker_id:
+                result.update(_fetch_company_localized(s, int(broker_id), lang))
             return result
 
         if not row:
             return result
 
-        ino, idate, supplier_id, broker_id = row
-        result["intermediary_invoice_no"] = (ino or "")
-        result["intermediary_invoice_date"] = (idate or "")
+        ino       = str(row["ino"]   or "").strip()
+        idate     = str(row["idate"] or "").strip()
+        supplier_id = int(row["supplier_id"] or 0)
+        broker_id   = int(row["broker_id"]   or 0)
+
+        result["intermediary_invoice_no"]   = ino
+        result["intermediary_invoice_date"] = idate
+
         company_id = supplier_id or broker_id
-        result["_source"] = "transactions.intermediary_supplier_id" if supplier_id else (
-                             "transactions.broker_company_id" if broker_id else "not_found")
+        result["_source"] = (
+            "transactions.intermediary_supplier_id" if supplier_id else
+            "transactions.broker_company_id"        if broker_id   else
+            "not_found"
+        )
         if company_id:
             result.update(_fetch_company_localized(s, int(company_id), lang))
+
     return result
 
 

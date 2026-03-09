@@ -228,7 +228,7 @@ def render_document(
     if not force_html_only:
         try:
             base_url = str(out_html.parent)
-            prefer_engine = "playwright"
+            prefer_engine = "qtwebengine"
 
             ok, info = render_html_to_pdf(
                 html=html_str,

@@ -365,16 +365,43 @@ class DocumentsTab(BaseTab):
         self.reload_data()
 
     def _refresh_transactions_seed(self):
+        """
+        Fills the combo with the last 50 transactions.
+        - If _selected_transaction_id is set: selects it (fetches it separately if outside top-50).
+        - If _selected_transaction_id is None: sets index to -1 so no transaction is
+          visually pre-selected and the table shows all documents correctly.
+        """
         txs = self._db_find_transactions(limit=50)
         self.cmb_transaction.blockSignals(True)
         self.cmb_transaction.clear()
         for tid, label in txs:
             self.cmb_transaction.addItem(label, tid)
+
         if self._selected_transaction_id:
+            found_idx = -1
             for i in range(self.cmb_transaction.count()):
                 if self.cmb_transaction.itemData(i) == self._selected_transaction_id:
-                    self.cmb_transaction.setCurrentIndex(i)
+                    found_idx = i
                     break
+
+            if found_idx == -1:
+                # Transaction not in top-50 — fetch it separately
+                try:
+                    extra = self._db_find_transactions(
+                        transaction_id=self._selected_transaction_id, limit=1
+                    )
+                    if extra:
+                        tid, label = extra[0]
+                        self.cmb_transaction.insertItem(0, label, tid)
+                        found_idx = 0
+                except Exception:
+                    pass
+
+            self.cmb_transaction.setCurrentIndex(found_idx)
+        else:
+            # No transaction selected — force combo to show placeholder (-1)
+            self.cmb_transaction.setCurrentIndex(-1)
+
         self.cmb_transaction.blockSignals(False)
 
     # ------------------------------------------------------------------
@@ -660,7 +687,7 @@ class DocumentsTab(BaseTab):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _db_find_transactions(limit: int = 50) -> List[Tuple[int, str]]:
+    def _db_find_transactions(limit: int = 50, transaction_id: Optional[int] = None) -> List[Tuple[int, str]]:
         if get_session_local is None or text is None:
             return [(i, f"T{i:04d} - Client X - 2026-01-{i:02d}") for i in range(1, min(limit, 20))]
 
@@ -672,6 +699,11 @@ class DocumentsTab(BaseTab):
         else:
             name_expr = "COALESCE(c.name_ar, c.name_en, c.name_tr, '')"
 
+        where  = "WHERE t.id = :tid" if transaction_id else ""
+        params: dict = {"lim": limit}
+        if transaction_id:
+            params["tid"] = transaction_id
+
         sql = text(f"""
             SELECT t.id,
                    COALESCE(t.transaction_no, CAST(t.id AS TEXT)) || ' - ' ||
@@ -679,13 +711,14 @@ class DocumentsTab(BaseTab):
                    COALESCE(substr(t.created_at, 1, 10), '') AS label
             FROM transactions t
             LEFT JOIN clients c ON c.id = t.client_id
+            {where}
             ORDER BY t.created_at DESC
             LIMIT :lim
         """)
 
         s = _open_session()
         try:
-            rows = s.execute(sql, {"lim": limit}).fetchall()
+            rows = s.execute(sql, params).fetchall()
             return [(int(r[0]), str(r[1])) for r in rows]
         finally:
             try:

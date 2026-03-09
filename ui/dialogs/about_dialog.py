@@ -323,11 +323,13 @@ class AboutDialog(QDialog):
         try:
             from services.healthcheck import check_pdf_runtime
             r = check_pdf_runtime()
-            return [
-                ("WeasyPrint",   self._("lib_available") if r.weasyprint_stack  else self._("lib_not_available")),
-                ("Cairo",        self._("lib_available") if r.cairo       else self._("lib_not_available")),
-                ("Pango",        self._("lib_available") if r.pango       else self._("lib_not_available")),
-                ("GDK Pixbuf",   self._("lib_available") if r.gdk_pixbuf  else self._("lib_not_available")),
+            rows = [
+                ("QtWebEngine",  self._("lib_available") if r.qtwebengine      else self._("lib_not_available")),
+                ("WeasyPrint",   self._("lib_available") if r.weasyprint_stack else self._("lib_not_available")),
+                ("Cairo",        self._("lib_available") if r.cairo            else self._("lib_not_available")),
+                ("Pango",        self._("lib_available") if r.pango            else self._("lib_not_available")),
+                ("GDK Pixbuf",   self._("lib_available") if r.gdk_pixbuf       else self._("lib_not_available")),
             ]
+            return rows
         except Exception as e:
             return [(self._("error"), str(e))]
