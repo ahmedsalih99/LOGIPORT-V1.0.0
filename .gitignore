@@ -23,10 +23,9 @@ venv/
 env/
 .env/
 
-# PyInstaller
+# PyInstaller — استثناء main.spec (مطلوب للبناء)
 *.spec
-# ملاحظة: main.spec موجود في المشروع للبناء، يمكن إلغاء التعليق إذا أردت استثناءه
-# main.spec
+!main.spec
 
 # قاعدة البيانات (تُنشأ تلقائياً عند التشغيل)
 *.db

@@ -62,13 +62,11 @@ python main.py
 
 ---
 
-## 📄 ميزة توليد PDF
+## 📄 توليد PDF
 
-توليد PDF يتطلب تثبيت **GTK3 Runtime** على Windows:
+يعتمد التطبيق على **QtWebEngine** لتوليد ملفات PDF — وهو مضمَّن تلقائياً مع `PySide6` ولا يحتاج أي تثبيت إضافي.
 
-👉 [تحميل GTK3 لـ Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer)
-
-> بدون GTK3 يعمل التطبيق بشكل كامل ويمكن توليد HTML فقط بدلاً من PDF.
+> توليد PDF يعمل مباشرةً بعد `pip install -r requirements.txt` بدون أي خطوات إضافية.
 
 ---
 
@@ -77,21 +75,26 @@ python main.py
 ```
 LOGIPORT/
 ├── main.py              # نقطة الدخول
+├── main.spec            # إعدادات PyInstaller للبناء
 ├── version.py           # رقم الإصدار
 ├── requirements.txt     # المكتبات المطلوبة
-├── config/              # إعدادات التطبيق
-├── core/                # المنطق الأساسي
-├── database/            # النماذج والـ CRUD
+├── installer.iss        # إعدادات Inno Setup للمثبّت
+├── config/              # إعدادات التطبيق والثيم
+├── core/                # المنطق الأساسي (i18n، ثيم، إعدادات)
+├── database/            # النماذج والـ CRUD وBootstrap
 │   ├── models/
 │   └── crud/
-├── services/            # طبقة الخدمات
+├── services/            # طبقة الخدمات (PDF، مستندات، بحث)
 ├── ui/                  # واجهة المستخدم (PySide6)
-│   ├── components/
 │   ├── dialogs/
-│   └── windows/
-├── documents/           # قوالب المستندات
+│   ├── tabs/
+│   └── widgets/
+├── documents/           # builders وقوالب HTML للمستندات
+│   ├── builders/
+│   └/templates/
+├── hooks/               # hooks لـ PyInstaller
 ├── utils/               # أدوات مساعدة
-└── tests/               # اختبارات شاملة (590+)
+└── tests/               # اختبارات
 ```
 
 ---
@@ -101,10 +104,10 @@ LOGIPORT/
 | التقنية | الاستخدام |
 |---------|-----------|
 | PySide6 / Qt6 | واجهة المستخدم |
+| QtWebEngine | توليد PDF (مضمَّن مع PySide6) |
 | SQLAlchemy 2.0 | قاعدة البيانات ORM |
 | SQLite | قاعدة البيانات |
 | Jinja2 | قوالب المستندات |
-| WeasyPrint | توليد PDF |
 | openpyxl | تصدير Excel |
 | bcrypt | تشفير كلمات المرور |
 
@@ -115,6 +118,18 @@ LOGIPORT/
 يحفظ التطبيق قاعدة البيانات والإعدادات في:
 ```
 Windows: %APPDATA%\LOGIPORT\
+```
+
+---
+
+## 🏗️ بناء المثبّت (للمطورين)
+
+```bash
+# 1. بناء EXE
+pyinstaller main.spec
+
+# 2. إنشاء المثبّت (يتطلب Inno Setup 6)
+# افتح installer.iss في Inno Setup وانقر Build
 ```
 
 ---
