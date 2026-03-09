@@ -1249,4 +1249,10 @@ translations ={
 "pricing_deleted_success": "Fiyatlandırma başarıyla silindi",
 "confirm_action": "İşlemi Onayla",
 "toggle_sidebar": "Kenar Çubuğunu Aç/Kapat",
+# Update dialog
+"check_for_updates": "Güncellemeleri Kontrol Et",
+"checking_updates": "Kontrol ediliyor...",
+"already_latest_version": "En son sürümü kullanıyorsunuz.",
+"update_check_failed": "Güncelleme kontrolü başarısız: {error}",
+"updates": "Güncellemeler",
 }

@@ -1250,4 +1250,10 @@ translations ={
 "pricing_deleted_success": "تم حذف التسعيرة بنجاح",
 "confirm_action": "تأكيد الإجراء",
 "toggle_sidebar": "إظهار/إخفاء الشريط الجانبي",
+# Update dialog
+"check_for_updates": "تحقق من التحديثات",
+"checking_updates": "جارٍ التحقق...",
+"already_latest_version": "أنت تستخدم أحدث إصدار.",
+"update_check_failed": "فشل التحقق من التحديثات: {error}",
+"updates": "التحديثات",
 }

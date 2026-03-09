@@ -294,6 +294,12 @@ def _run_migrations(conn) -> None:
         # op_log (sync)
         ("idx_oplog_status",   "CREATE INDEX IF NOT EXISTS idx_oplog_status   ON op_log(status)"),
         ("idx_oplog_entity",   "CREATE INDEX IF NOT EXISTS idx_oplog_entity   ON op_log(entity_name)"),
+        # entry_items (defined as Index() in model — need migration for existing DBs)
+        ("idx_entry_items_entry",   "CREATE INDEX IF NOT EXISTS idx_entry_items_entry   ON entry_items(entry_id)"),
+        ("idx_entry_items_mat",     "CREATE INDEX IF NOT EXISTS idx_entry_items_mat     ON entry_items(material_id)"),
+        ("idx_entry_items_origin",  "CREATE INDEX IF NOT EXISTS idx_entry_items_origin  ON entry_items(origin_country_id)"),
+        # client contacts
+        ("idx_contacts_primary",    "CREATE INDEX IF NOT EXISTS idx_contacts_primary    ON client_contacts(is_primary)"),
     ]
     for idx_name, idx_sql in _indexes:
         try:

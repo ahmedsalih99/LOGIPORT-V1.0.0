@@ -1249,4 +1249,10 @@ translations ={
 "pricing_deleted_success": "Pricing deleted successfully",
 "confirm_action": "Confirm Action",
 "toggle_sidebar": "Toggle Sidebar",
+# Update dialog
+"check_for_updates": "Check for Updates",
+"checking_updates": "Checking...",
+"already_latest_version": "You are using the latest version.",
+"update_check_failed": "Update check failed: {error}",
+"updates": "Updates",
 }

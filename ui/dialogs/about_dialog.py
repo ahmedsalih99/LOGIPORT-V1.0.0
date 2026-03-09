@@ -20,9 +20,12 @@ from PySide6.QtGui import QFont, QPixmap, QIcon
 
 from core.translator import TranslationManager
 
-APP_VERSION   = "3.2.0"
-APP_NAME      = "LOGIPORT"
-APP_YEAR      = "2025 – 2026"
+try:
+    from version import VERSION as APP_VERSION, APP_NAME
+except Exception:
+    APP_VERSION = "1.0.0"
+    APP_NAME    = "LOGIPORT"
+APP_YEAR = "2025 – 2026"
 
 
 class AboutDialog(QDialog):
@@ -43,12 +46,20 @@ class AboutDialog(QDialog):
         main.setSpacing(0)
 
         # ── Hero section ──────────────────────────────────────────────
+        try:
+            from core.theme_manager import ThemeManager
+            _c   = ThemeManager.get_instance().current_theme.colors
+            _pri = _c.get("primary",        "#2563EB")
+            _pa  = _c.get("primary_active", "#2C5AA0")
+        except Exception:
+            _pri, _pa = "#2563EB", "#2C5AA0"
+
         hero = QFrame()
         hero.setObjectName("card")
         hero.setStyleSheet(
-            "QFrame#card { background: qlineargradient("
-            "x1:0,y1:0,x2:1,y2:1, stop:0 #2C5AA0, stop:1 #4A7EC8);"
-            "border-radius: 0px; padding: 24px; }"
+            f"QFrame#card {{ background: qlineargradient("
+            f"x1:0,y1:0,x2:1,y2:1, stop:0 {_pa}, stop:1 {_pri});"
+            f"border-radius: 0px; padding: 24px; }}"
         )
         hero_lay = QVBoxLayout(hero)
         hero_lay.setAlignment(Qt.AlignCenter)
@@ -120,6 +131,14 @@ class AboutDialog(QDialog):
         copy_lbl.setObjectName("text-muted")
         foot_lay.addWidget(copy_lbl)
         foot_lay.addStretch()
+
+        self._btn_check_update = QPushButton(self._("check_for_updates"))
+        self._btn_check_update.setObjectName("secondary-btn")
+        self._btn_check_update.setMinimumHeight(34)
+        self._btn_check_update.setFont(QFont("Tajawal", 10))
+        self._btn_check_update.setCursor(Qt.PointingHandCursor)
+        self._btn_check_update.clicked.connect(self._check_updates)
+        foot_lay.addWidget(self._btn_check_update)
 
         close_btn = QPushButton(self._("close_btn"))
         close_btn.setObjectName("btn-primary")
@@ -240,6 +259,65 @@ class AboutDialog(QDialog):
             ("📦 PySide6",    pyside_ver),
             ("🗃️ SQLAlchemy", sa_ver),
         ]
+
+    # ── update check ─────────────────────────────────────────────────────────
+
+    def _check_updates(self):
+        """تحقق يدوي من التحديثات عند الضغط على الزر."""
+        from PySide6.QtWidgets import QMessageBox
+        self._btn_check_update.setEnabled(False)
+        self._btn_check_update.setText(self._("checking_updates"))
+
+        def _on_found(info):
+            from PySide6.QtCore import QMetaObject, Qt
+            QMetaObject.invokeMethod(self, "_show_update_found",
+                                     Qt.QueuedConnection)
+            self._pending_update = info
+
+        def _on_no_update():
+            from PySide6.QtCore import QMetaObject, Qt
+            QMetaObject.invokeMethod(self, "_show_no_update", Qt.QueuedConnection)
+
+        def _on_error(msg):
+            from PySide6.QtCore import QMetaObject, Qt
+            self._update_error = msg
+            QMetaObject.invokeMethod(self, "_show_update_error", Qt.QueuedConnection)
+
+        try:
+            from services.updater_service import UpdaterService
+            UpdaterService.get_instance().check_async(
+                on_update_found=_on_found,
+                on_no_update=_on_no_update,
+                on_error=_on_error,
+            )
+        except Exception as e:
+            self._restore_check_btn()
+            QMessageBox.warning(self, self._("error"), str(e))
+
+    def _restore_check_btn(self):
+        self._btn_check_update.setEnabled(True)
+        self._btn_check_update.setText(self._("check_for_updates"))
+
+    def _show_update_found(self):
+        self._restore_check_btn()
+        info = getattr(self, "_pending_update", None)
+        if not info:
+            return
+        self.accept()
+        from ui.dialogs.update_dialog import UpdateDialog
+        dlg = UpdateDialog(info, parent=self.parent())
+        dlg.exec()
+
+    def _show_no_update(self):
+        self._restore_check_btn()
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(self, self._("updates"), self._("already_latest_version"))
+
+    def _show_update_error(self):
+        self._restore_check_btn()
+        from PySide6.QtWidgets import QMessageBox
+        msg = getattr(self, "_update_error", "Unknown error")
+        QMessageBox.warning(self, self._("error"), self._("update_check_failed").format(error=msg))
 
     def _get_health_rows(self) -> list:
         try:
