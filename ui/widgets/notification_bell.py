@@ -15,8 +15,10 @@ from ui.utils.svg_icons import set_icon
 def _theme_colors() -> dict:
     try:
         from core.theme_manager import ThemeManager
-        tm = ThemeManager.get_instance()
-        return tm.current_theme.colors if tm.current_theme else {}
+        from core.settings_manager import SettingsManager
+        theme_name = SettingsManager.get_instance().get("theme", "light")
+        from config.themes.semantic_colors import SemanticColors
+        return SemanticColors.get(theme_name)
     except Exception:
         return {}
 
@@ -237,8 +239,10 @@ class NotificationBell(QWidget):
         if self._popup and self._popup.isVisible():
             self._popup.hide()
             return
-        if self._popup is None:
-            self._popup = NotificationPopup()
+        # نعيد الإنشاء في كل مرة حتى يأخذ ألوان الثيم الحالي
+        if self._popup is not None:
+            self._popup.deleteLater()
+        self._popup = NotificationPopup()
         global_pos = self._btn.mapToGlobal(QPoint(0, self._btn.height() + 4))
         screen_rect = QApplication.primaryScreen().availableGeometry()
         px = global_pos.x() - self._popup.width() + self._btn.width()

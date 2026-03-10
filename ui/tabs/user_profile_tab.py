@@ -39,8 +39,10 @@ def _current_user():
 
 def _theme_colors():
     try:
-        from core.theme_manager import ThemeManager
-        c = ThemeManager.get_instance().current_theme.colors
+        from core.settings_manager import SettingsManager
+        from config.themes.semantic_colors import SemanticColors
+        theme_name = SettingsManager.get_instance().get("theme", "light")
+        c = SemanticColors.get(theme_name)
         return {
             "primary":    c.get("primary",        "#2563EB"),
             "primary_d":  c.get("primary_active",  "#1D4ED8"),
