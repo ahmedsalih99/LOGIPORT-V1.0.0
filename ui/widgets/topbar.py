@@ -17,6 +17,7 @@ from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from ui.widgets.notification_bell import NotificationBell
 from ui.utils.svg_icons import set_icon
+from ui.widgets.sync_widget import SyncWidget
 
 
 # ─── Avatar دائرة ملوّنة ────────────────────────────────────────────────────
@@ -139,6 +140,7 @@ class TopBar(QWidget):
     logout_requested  = Signal()
     about_requested   = Signal()
     search_requested  = Signal()
+    sync_settings_requested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -207,6 +209,13 @@ class TopBar(QWidget):
         self.office_badge = _OfficeBadge()
         lay.addWidget(self.office_badge)
 
+        # ══ RIGHT: مؤشر المزامنة ══════════════════════════════════════════════
+        self.sync_widget = SyncWidget()
+        self.sync_widget.sync_settings_requested.connect(
+            self.sync_settings_requested.emit
+        )
+        lay.addWidget(self.sync_widget)
+
         # ══ RIGHT: User chip (avatar + اسم) ══════════════════════════════════
         self.user_chip = _UserChip()
         self.user_chip.clicked.connect(self.profile_requested.emit)
@@ -236,6 +245,9 @@ class TopBar(QWidget):
 
         # تحديث الصورة فوراً عند تغيير user في الـ settings
         self.settings.setting_changed.connect(self._on_setting_changed)
+
+        # ── بدء polling مؤشر المزامنة ─────────────────────────────────────────
+        self.sync_widget.start()
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -296,6 +308,16 @@ class TopBar(QWidget):
         set_icon(self.about_btn,    "info",     17)
         set_icon(self.logout_btn,   "logout",   17)
         set_icon(self.search_btn,   "search",   15)
+        # أيقونة الإشعارات
+        try:
+            set_icon(self.notif_bell._btn, "bell", 18)
+        except Exception:
+            pass
+        # أيقونة المزامنة
+        try:
+            set_icon(self.sync_widget._btn, "sync", 17)
+        except Exception:
+            pass
 
     def toggle_language(self):
         lang     = self.settings.get("language")

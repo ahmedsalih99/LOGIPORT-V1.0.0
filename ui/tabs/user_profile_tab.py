@@ -1,112 +1,327 @@
 """
-UserProfileTab - LOGIPORT
-==========================
-"""
+ui/tabs/user_profile_tab.py — LOGIPORT
+========================================
+صفحة معلومات المستخدم — النسخة المطوّرة.
 
+الأقسام:
+  1. Hero   — صورة + اسم + دور + مكتب + badge online
+  2. Stats  — إجمالي العمليات / اليوم / المعاملات
+  3. Info   — معلومات الحساب (display-only)
+  4. Edit   — تعديل الاسم الكامل (inline)
+  5. Password — تغيير كلمة المرور
+  6. Activity — آخر 10 أنشطة مع timeline مرئي
+  7. Actions  — تسجيل خروج / إغلاق
+"""
+from __future__ import annotations
+
+import os
+import shutil
+from datetime import date
+
+from PySide6.QtCore import Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, QRect
+from PySide6.QtGui import QFont, QPixmap, QPainter, QBrush, QColor, QPainterPath, QLinearGradient
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QLineEdit, QMessageBox, QScrollArea, QGridLayout,
-    QSizePolicy, QApplication, QFileDialog
+    QFrame, QLineEdit, QMessageBox, QScrollArea, QSizePolicy,
+    QFileDialog, QGraphicsOpacityEffect, QSpacerItem,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QPixmap, QPainter, QBrush, QColor, QPainterPath
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
 from database.db_utils import format_local_dt
 from database.models import get_session_local, AuditLog, Transaction
 from sqlalchemy import func, desc
-import os
-import shutil
+
 
 def _current_user():
     return SettingsManager.get_instance().get("user")
 
 
-class _SectionFrame(QFrame):
-    """بطاقة قسم مع عنوان."""
+def _theme_colors():
+    try:
+        from core.theme_manager import ThemeManager
+        c = ThemeManager.get_instance().current_theme.colors
+        return {
+            "primary":    c.get("primary",        "#2563EB"),
+            "primary_d":  c.get("primary_active",  "#1D4ED8"),
+            "bg":         c.get("background",      "#F8FAFC"),
+            "surface":    c.get("surface",         "#FFFFFF"),
+            "border":     c.get("border",          "#E2E8F0"),
+            "text":       c.get("text_primary",    "#1E293B"),
+            "muted":      c.get("text_secondary",  "#64748B"),
+            "success":    c.get("success",         "#10B981"),
+            "danger":     c.get("danger",          "#EF4444"),
+            "warning":    c.get("warning",         "#F59E0B"),
+        }
+    except Exception:
+        return {
+            "primary": "#2563EB", "primary_d": "#1D4ED8",
+            "bg": "#F8FAFC", "surface": "#FFFFFF",
+            "border": "#E2E8F0", "text": "#1E293B",
+            "muted": "#64748B", "success": "#10B981",
+            "danger": "#EF4444", "warning": "#F59E0B",
+        }
 
-    def __init__(self, title: str, parent=None):
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _Card(QFrame):
+    """بطاقة موحّدة مع عنوان اختياري."""
+    def __init__(self, title: str = "", parent=None):
         super().__init__(parent)
         self.setObjectName("card")
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 16, 20, 16)
-        outer.setSpacing(12)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(14)
 
-        self._title_lbl = QLabel(title)
-        self._title_lbl.setFont(QFont("Tajawal", 13, QFont.Bold))
-        self._title_lbl.setObjectName("section-title-lbl")
-        outer.addWidget(self._title_lbl)
+        if title:
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            self._title_lbl = QLabel(title)
+            self._title_lbl.setObjectName("card-title")
+            f = QFont()
+            f.setPointSize(12)
+            f.setBold(True)
+            self._title_lbl.setFont(f)
+            row.addWidget(self._title_lbl)
+            row.addStretch()
+            lay.addLayout(row)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setObjectName("separator")
-        outer.addWidget(sep)
+            sep = QFrame()
+            sep.setFrameShape(QFrame.HLine)
+            sep.setObjectName("separator")
+            lay.addWidget(sep)
 
-        self.content = QWidget()
-        self.content_layout = QVBoxLayout(self.content)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        self.content_layout.setSpacing(10)
-        outer.addWidget(self.content)
+        self.body = QVBoxLayout()
+        self.body.setContentsMargins(0, 0, 0, 0)
+        self.body.setSpacing(10)
+        lay.addLayout(self.body)
 
-    def set_title(self, title: str):
-        self._title_lbl.setText(title)
+    def set_title(self, t: str):
+        if hasattr(self, "_title_lbl"):
+            self._title_lbl.setText(t)
+
+
+class _StatCard(QFrame):
+    """بطاقة إحصائية صغيرة."""
+    def __init__(self, value: str, label: str, accent: str, parent=None):
+        super().__init__(parent)
+        self.setObjectName("stat-card")
+        self._accent = accent
+        self._apply_style()
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(4)
+
+        self._val = QLabel(str(value))
+        f = QFont()
+        f.setPointSize(24)
+        f.setBold(True)
+        self._val.setFont(f)
+        self._val.setStyleSheet(f"color: {accent}; background: transparent;")
+        self._val.setAlignment(Qt.AlignCenter)
+        lay.addWidget(self._val)
+
+        self._lbl = QLabel(label)
+        f2 = QFont()
+        f2.setPointSize(9)
+        self._lbl.setFont(f2)
+        self._lbl.setAlignment(Qt.AlignCenter)
+        self._lbl.setObjectName("text-muted")
+        lay.addWidget(self._lbl)
+
+    def _apply_style(self):
+        self.setStyleSheet(f"""
+            QFrame#stat-card {{
+                border: 1px solid transparent;
+                border-top: 3px solid {self._accent};
+                border-radius: 10px;
+                min-width: 120px;
+            }}
+        """)
+
+    def set_label(self, t: str):
+        self._lbl.setText(t)
+
+    def set_value(self, v: str):
+        self._val.setText(str(v))
+
+
+class _Field(QLineEdit):
+    def __init__(self, placeholder="", password=False, parent=None):
+        super().__init__(parent)
+        self.setObjectName("form-input")
+        self.setMinimumHeight(40)
+        self.setPlaceholderText(placeholder)
+        if password:
+            self.setEchoMode(QLineEdit.Password)
+
+
+class _Btn(QPushButton):
+    def __init__(self, text: str, style: str = "primary", parent=None):
+        super().__init__(text, parent)
+        obj = {"primary": "primary-btn", "danger": "danger-btn",
+               "secondary": "secondary-btn", "warning": "warning-btn"}.get(style, "primary-btn")
+        self.setObjectName(obj)
+        self.setMinimumHeight(40)
+        self.setCursor(Qt.PointingHandCursor)
 
 
 class _InfoRow(QWidget):
     def __init__(self, label: str, value: str, parent=None):
         super().__init__(parent)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(0, 4, 0, 4)
 
-        lbl = QLabel(label + ":")
-        lbl.setFont(QFont("Tajawal", 10, QFont.DemiBold))
-        lbl.setObjectName("info-label")
-        lbl.setFixedWidth(140)
+        lbl = QLabel(label)
+        lbl.setObjectName("text-muted")
+        f = QFont()
+        f.setPointSize(10)
+        lbl.setFont(f)
+        lbl.setFixedWidth(130)
         lay.addWidget(lbl)
 
+        sep = QLabel("·")
+        sep.setObjectName("text-muted")
+        sep.setFixedWidth(16)
+        sep.setAlignment(Qt.AlignCenter)
+        lay.addWidget(sep)
+
         val = QLabel(value or "—")
-        val.setFont(QFont("Tajawal", 10))
-        val.setObjectName("info-value")
+        f2 = QFont()
+        f2.setPointSize(10)
+        f2.setBold(True)
+        val.setFont(f2)
         val.setTextInteractionFlags(Qt.TextSelectableByMouse)
         lay.addWidget(val, 1)
 
 
-class _StatMini(QFrame):
-    def __init__(self, icon, value, label, color, parent=None):
+# ─────────────────────────────────────────────────────────────────────────────
+# Avatar Widget
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _AvatarWidget(QLabel):
+    clicked = Signal()
+
+    def __init__(self, size=90, parent=None):
         super().__init__(parent)
-        self.setObjectName("stat-mini")
+        self._size = size
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAlignment(Qt.AlignCenter)
+
+    def mousePressEvent(self, e):
+        self.clicked.emit()
+
+    def set_image(self, path: str | None):
+        if path and os.path.isfile(path):
+            px = QPixmap(path)
+            if not px.isNull():
+                s = self._size
+                px = px.scaled(s, s, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                out = QPixmap(s, s)
+                out.fill(Qt.transparent)
+                p = QPainter(out)
+                p.setRenderHint(QPainter.Antialiasing)
+                path2 = QPainterPath()
+                path2.addEllipse(0, 0, s, s)
+                p.setClipPath(path2)
+                x = (px.width()  - s) // 2
+                y = (px.height() - s) // 2
+                p.drawPixmap(-x, -y, px)
+                p.end()
+                self.setPixmap(out)
+                self.setStyleSheet(f"""
+                    border-radius: {s//2}px;
+                    border: 3px solid rgba(255,255,255,0.7);
+                """)
+                return
+
+        # Default
+        self.setPixmap(QPixmap())
+        self.setText("👤")
+        f = QFont("Segoe UI Emoji")
+        f.setPointSize(32)
+        self.setFont(f)
         self.setStyleSheet(f"""
-            QFrame#stat-mini {{
-                background: {color};
-                border-radius: 10px;
-                min-width: 110px;
-                min-height: 80px;
-            }}
-            QLabel {{ background: transparent; color: white; }}
+            background: rgba(255,255,255,0.25);
+            border-radius: {self._size//2}px;
+            border: 2px solid rgba(255,255,255,0.45);
         """)
-        lay = QVBoxLayout(self)
-        lay.setSpacing(4)
-        lay.setContentsMargins(14, 12, 14, 12)
 
-        ico = QLabel(icon)
-        ico.setFont(QFont("Segoe UI Emoji", 20))
-        ico.setAlignment(Qt.AlignCenter)
-        lay.addWidget(ico)
 
-        self._val_lbl = QLabel(str(value))
-        self._val_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
-        self._val_lbl.setAlignment(Qt.AlignCenter)
-        lay.addWidget(self._val_lbl)
+# ─────────────────────────────────────────────────────────────────────────────
+# Timeline Activity Item
+# ─────────────────────────────────────────────────────────────────────────────
 
-        self._label_lbl = QLabel(label)
-        self._label_lbl.setFont(QFont("Tajawal", 9))
-        self._label_lbl.setAlignment(Qt.AlignCenter)
-        lay.addWidget(self._label_lbl)
+class _ActivityItem(QFrame):
+    _ACTION_META = {
+        "create": ("#10B981", "＋"),
+        "insert": ("#10B981", "＋"),
+        "update": ("#F59E0B", "✎"),
+        "delete": ("#EF4444", "✕"),
+        "export": ("#6366F1", "↗"),
+        "import": ("#8B5CF6", "↙"),
+        "print":  ("#3B82F6", "⎙"),
+    }
 
-    def set_label(self, label: str):
-        self._label_lbl.setText(label)
+    def __init__(self, action: str, table: str, timestamp: str, is_last=False, parent=None):
+        super().__init__(parent)
+        action_l = (action or "update").lower()
+        accent, symbol = self._ACTION_META.get(action_l, ("#64748B", "●"))
 
+        self.setObjectName("activity-row")
+        self.setStyleSheet("QFrame#activity-row { background: transparent; }")
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+
+        # ── Dot ──────────────────────────────────────────────
+        dot = QLabel(symbol)
+        dot.setFixedSize(24, 24)
+        dot.setAlignment(Qt.AlignCenter)
+        f = QFont()
+        f.setPointSize(10)
+        f.setBold(True)
+        dot.setFont(f)
+        dot.setStyleSheet(f"background:{accent}; color:white; border-radius:12px;")
+        row.addWidget(dot, 0, Qt.AlignTop)
+
+        # ── Content ───────────────────────────────────────────
+        content = QFrame()
+        content.setObjectName("card")   # يرث خلفية وبوردر من الـ theme CSS مباشرة
+        content.setStyleSheet(f"""
+            QFrame#card {{
+                border-radius: 8px;
+                margin-bottom: {'0' if is_last else '6'}px;
+            }}
+        """)
+        c_lay = QHBoxLayout(content)
+        c_lay.setContentsMargins(12, 8, 12, 8)
+
+        msg = QLabel(f"{action.title()} · {table}")
+        f2 = QFont()
+        f2.setPointSize(10)
+        msg.setFont(f2)
+        msg.setObjectName("activity-msg")   # يرث لون النص من الـ theme
+        c_lay.addWidget(msg, 1)
+
+        ts_lbl = QLabel(timestamp)
+        f3 = QFont()
+        f3.setPointSize(8)
+        ts_lbl.setFont(f3)
+        ts_lbl.setObjectName("activity-ts")
+        c_lay.addWidget(ts_lbl)
+
+        row.addWidget(content, 1)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Tab
+# ─────────────────────────────────────────────────────────────────────────────
 
 class UserProfileTab(QWidget):
     logout_requested = Signal()
@@ -115,10 +330,21 @@ class UserProfileTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tm = TranslationManager.get_instance()
-        self._ = self._tm.translate
+        self._    = self._tm.translate
         self.setObjectName("user-profile-tab")
+        self._edit_mode = False
+        self._build()
         self._tm.language_changed.connect(self.retranslate_ui)
+        # تحديث الألوان عند تغيير الثيم
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(self._on_theme_changed)
+        except Exception:
+            pass
 
+    # ── Build ─────────────────────────────────────────────────────────────────
+
+    def _build(self):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -126,14 +352,14 @@ class UserProfileTab(QWidget):
 
         container = QWidget()
         container.setObjectName("profile-container")
-
         main = QVBoxLayout(container)
-        main.setContentsMargins(32, 28, 32, 28)
-        main.setSpacing(22)
+        main.setContentsMargins(32, 28, 32, 32)
+        main.setSpacing(20)
 
         main.addWidget(self._build_hero())
         main.addWidget(self._build_stats())
         main.addWidget(self._build_info())
+        main.addWidget(self._build_edit_name())
         main.addWidget(self._build_password())
         main.addWidget(self._build_activity())
         main.addWidget(self._build_actions())
@@ -144,305 +370,351 @@ class UserProfileTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
-    # ─── builders ────────────────────────────────────────────────────────────
+    # ── Hero ──────────────────────────────────────────────────────────────────
 
     def _build_hero(self) -> QFrame:
+        tc = _theme_colors()
         frame = QFrame()
         frame.setObjectName("profile-hero")
-        try:
-            from core.theme_manager import ThemeManager
-            c = ThemeManager.get_instance().current_theme.colors
-            pri   = c.get("primary",        "#2563EB")
-            pri_a = c.get("primary_active", "#2C5AA0")
-        except Exception:
-            pri, pri_a = "#2563EB", "#2C5AA0"
         frame.setStyleSheet(f"""
             QFrame#profile-hero {{
                 background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {pri}, stop:1 {pri_a}
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {tc['primary']}, stop:1 {tc['primary_d']}
                 );
                 border-radius: 16px;
-                min-height: 120px;
+                min-height: 130px;
             }}
             QLabel {{ background: transparent; color: white; }}
+            QPushButton {{
+                background: rgba(255,255,255,0.18);
+                color: white;
+                border: 1px solid rgba(255,255,255,0.35);
+                border-radius: 8px;
+                padding: 4px 14px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{ background: rgba(255,255,255,0.30); }}
         """)
+
         lay = QHBoxLayout(frame)
-        lay.setContentsMargins(28, 20, 28, 20)
-        lay.setSpacing(20)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(22)
 
         user = _current_user()
 
-        # ── Avatar container ──────────────────────────────────
-        avatar_container = QWidget()
-        avatar_container.setFixedSize(80, 80)
-        avatar_container.setStyleSheet("background: transparent;")
-        avatar_vlay = QVBoxLayout(avatar_container)
-        avatar_vlay.setContentsMargins(0, 0, 0, 0)
-        avatar_vlay.setSpacing(0)
-
-        self._avatar_lbl = QLabel()
-        self._avatar_lbl.setFixedSize(80, 80)
-        self._avatar_lbl.setAlignment(Qt.AlignCenter)
-        self._avatar_lbl.setCursor(Qt.PointingHandCursor)
-        self._avatar_lbl.setToolTip(self._("change_avatar") if hasattr(self, "_") else "Change photo")
-        self._avatar_lbl.mousePressEvent = lambda e: self._pick_avatar()
-        avatar_vlay.addWidget(self._avatar_lbl)
-
+        # Avatar
+        self._avatar = _AvatarWidget(size=88)
+        self._avatar.clicked.connect(self._pick_avatar)
         self._refresh_avatar()
-        lay.addWidget(avatar_container)
+        lay.addWidget(self._avatar)
 
+        # Info col
         col = QVBoxLayout()
-        col.setSpacing(4)
+        col.setSpacing(5)
 
-        display  = "—"
+        name = "—"
         role_txt = "—"
+        office_txt = "—"
+        username_txt = "—"
         if user:
-            display  = getattr(user, "full_name", None) or getattr(user, "username", None) or "—"
-            role     = getattr(user, "role", None)
+            name = getattr(user, "full_name", None) or getattr(user, "username", "—")
+            username_txt = getattr(user, "username", "—")
+            role = getattr(user, "role", None)
             role_txt = getattr(role, "name", "—") if role else "—"
+            office = getattr(user, "office", None)
+            if office:
+                office_txt = getattr(office, "name_ar", None) or getattr(office, "name_en", "—")
 
-        self._hero_name_lbl = QLabel(display)
-        self._hero_name_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
-        col.addWidget(self._hero_name_lbl)
+        self._hero_name = QLabel(name)
+        f = QFont()
+        f.setPointSize(18)
+        f.setBold(True)
+        self._hero_name.setFont(f)
+        col.addWidget(self._hero_name)
 
-        self._hero_role_lbl = QLabel(self._("user_role").format(role=role_txt))
-        self._hero_role_lbl.setFont(QFont("Tajawal", 11))
-        self._hero_role_lbl.setStyleSheet("color: rgba(255,255,255,0.85); background: transparent;")
-        col.addWidget(self._hero_role_lbl)
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(16)
 
-        # زر تغيير الصورة
-        self._btn_avatar = QPushButton("📷 " + (self._("change_avatar") if hasattr(self, "_") else ""))
-        self._btn_avatar.setObjectName("secondary-btn-small")
-        self._btn_avatar.setFixedHeight(26)
-        self._btn_avatar.setStyleSheet("""
-            QPushButton {
-                background: rgba(255,255,255,0.2);
-                color: white;
-                border: 1px solid rgba(255,255,255,0.4);
-                border-radius: 8px;
-                padding: 2px 10px;
-                font-size: 11px;
-            }
-            QPushButton:hover { background: rgba(255,255,255,0.35); }
-        """)
-        self._btn_avatar.clicked.connect(self._pick_avatar)
-        col.addWidget(self._btn_avatar)
+        self._hero_role = self._hero_chip(f"◎  {role_txt}")
+        self._hero_office = self._hero_chip(f"⊞  {office_txt}")
+        meta_row.addWidget(self._hero_role)
+        meta_row.addWidget(self._hero_office)
+        meta_row.addStretch()
+        col.addLayout(meta_row)
+
+        self._hero_username = QLabel(f"@{username_txt}")
+        f2 = QFont()
+        f2.setPointSize(10)
+        self._hero_username.setFont(f2)
+        self._hero_username.setStyleSheet("color: rgba(255,255,255,0.7); background: transparent;")
+        col.addWidget(self._hero_username)
 
         lay.addLayout(col, 1)
 
-        self._hero_badge = QLabel(self._("user_online"))
-        self._hero_badge.setFont(QFont("Tajawal", 10, QFont.DemiBold))
-        self._hero_badge.setStyleSheet("""
-            color: #2ECC71;
-            background: rgba(0,0,0,0.25);
-            border-radius: 12px;
-            padding: 4px 12px;
-        """)
-        lay.addWidget(self._hero_badge, 0, Qt.AlignTop)
+        # Right buttons
+        right = QVBoxLayout()
+        right.setSpacing(8)
+        right.setAlignment(Qt.AlignTop)
 
+        self._online_badge = QLabel("● متصل")
+        self._online_badge.setStyleSheet("""
+            color: #6EE7B7;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 3px 10px;
+            font-size: 11px;
+        """)
+        right.addWidget(self._online_badge)
+
+        self._btn_avatar_hero = QPushButton("📷  " + self._("change_avatar"))
+        self._btn_avatar_hero.setMinimumHeight(32)
+        self._btn_avatar_hero.setCursor(Qt.PointingHandCursor)
+        self._btn_avatar_hero.clicked.connect(self._pick_avatar)
+        right.addWidget(self._btn_avatar_hero)
+
+        self._btn_delete_avatar = QPushButton("🗑  حذف الصورة")
+        self._btn_delete_avatar.setMinimumHeight(32)
+        self._btn_delete_avatar.setCursor(Qt.PointingHandCursor)
+        self._btn_delete_avatar.setStyleSheet("""
+            QPushButton {
+                background: rgba(239,68,68,0.25);
+                color: white;
+                border: 1px solid rgba(239,68,68,0.5);
+                border-radius: 8px;
+                padding: 4px 14px;
+                font-size: 11px;
+            }
+            QPushButton:hover { background: rgba(239,68,68,0.45); }
+        """)
+        self._btn_delete_avatar.clicked.connect(self._delete_avatar)
+        user_has_avatar = bool(getattr(_current_user(), "avatar_path", None))
+        self._btn_delete_avatar.setVisible(user_has_avatar)
+        right.addWidget(self._btn_delete_avatar)
+
+        lay.addLayout(right)
         return frame
 
-    def _refresh_avatar(self):
-        """تحديث صورة الأفاتار من مسار المستخدم أو emoji افتراضي."""
-        user = _current_user()
-        avatar_path = getattr(user, "avatar_path", None) if user else None
-
-        if avatar_path and os.path.isfile(avatar_path):
-            pixmap = QPixmap(avatar_path)
-            if not pixmap.isNull():
-                # اقتطاع دائري
-                size = 80
-                pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-                rounded = QPixmap(size, size)
-                rounded.fill(Qt.transparent)
-                painter = QPainter(rounded)
-                painter.setRenderHint(QPainter.Antialiasing)
-                path = QPainterPath()
-                path.addEllipse(0, 0, size, size)
-                painter.setClipPath(path)
-                x = (pixmap.width() - size) // 2
-                y = (pixmap.height() - size) // 2
-                painter.drawPixmap(-x, -y, pixmap)
-                painter.end()
-                self._avatar_lbl.setPixmap(rounded)
-                self._avatar_lbl.setStyleSheet("""
-                    border-radius: 40px;
-                    border: 3px solid rgba(255,255,255,0.6);
-                """)
-                return
-
-        # Default emoji
-        self._avatar_lbl.setText("👤")
-        self._avatar_lbl.setFont(QFont("Segoe UI Emoji", 36))
-        self._avatar_lbl.setStyleSheet("""
-            background: rgba(255,255,255,0.2);
-            border-radius: 40px;
-            border: 2px solid rgba(255,255,255,0.4);
+    def _hero_chip(self, text: str) -> QLabel:
+        lbl = QLabel(text)
+        f = QFont()
+        f.setPointSize(9)
+        lbl.setFont(f)
+        lbl.setStyleSheet("""
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-radius: 6px;
+            padding: 3px 8px;
         """)
+        return lbl
+
+    def _refresh_avatar(self):
+        user = _current_user()
+        path = getattr(user, "avatar_path", None) if user else None
+        self._avatar.set_image(path)
 
     def _pick_avatar(self):
-        """فتح نافذة اختيار صورة وحفظها."""
-        from database.models import get_session_local, User as UserModel
+        from database.models import User as UserModel
         file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            self._("select_avatar_image"),
-            "",
+            self, self._("select_avatar_image"), "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
         )
         if not file_path:
             return
+        user = _current_user()
+        if not user:
+            return
+
+        avatars_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "avatars"
+        )
+        os.makedirs(avatars_dir, exist_ok=True)
+        ext  = os.path.splitext(file_path)[1].lower()
+        dest = os.path.join(avatars_dir, f"user_{user.id}{ext}")
+
+        # فكّ lock ويندوز
+        self._avatar.setPixmap(QPixmap())
+
+        shutil.copy2(file_path, dest)
+        try:
+            with get_session_local()() as s:
+                db_user = s.get(UserModel, user.id)
+                if db_user:
+                    db_user.avatar_path = dest
+                    s.commit()
+            user.avatar_path = dest
+            SettingsManager.get_instance().set("user", user)
+            self._refresh_avatar()
+            self._btn_delete_avatar.setVisible(True)
+            QMessageBox.information(self, self._("success"), self._("avatar_updated"))
+        except Exception as e:
+            QMessageBox.warning(self, self._("error"), str(e))
+
+    # ── Stats ─────────────────────────────────────────────────────────────────
+
+    def _build_stats(self) -> QFrame:
+        self._stats_card = _Card(self._("my_stats_title"))
+        tc = _theme_colors()
+        user = _current_user()
+        uid  = getattr(user, "id", None)
+        total_actions = today_actions = total_trans = 0
+        try:
+            with get_session_local()() as s:
+                total_actions = s.query(AuditLog).filter(AuditLog.user_id == uid).count()
+                today_actions = (s.query(AuditLog)
+                                  .filter(AuditLog.user_id == uid,
+                                          func.date(AuditLog.timestamp) == date.today()).count())
+                total_trans   = s.query(Transaction).count()
+        except Exception:
+            pass
+
+        row = QHBoxLayout()
+        row.setSpacing(14)
+        self._stat_total = _StatCard(str(total_actions), self._("total_operations"), tc["primary"])
+        self._stat_today = _StatCard(str(today_actions), self._("today_operations"),  tc["success"])
+        self._stat_trans = _StatCard(str(total_trans),   self._("transactions"),      "#8B5CF6")
+        for w in [self._stat_total, self._stat_today, self._stat_trans]:
+            row.addWidget(w)
+        row.addStretch()
+        self._stats_card.body.addLayout(row)
+        return self._stats_card
+
+    # ── Info ─────────────────────────────────────────────────────────────────
+
+    def _build_info(self) -> QFrame:
+        self._info_card = _Card(self._("personal_info_title"))
+        self._populate_info()
+        return self._info_card
+
+    def _populate_info(self):
+        while self._info_card.body.count():
+            w = self._info_card.body.takeAt(0)
+            if w.widget():
+                w.widget().deleteLater()
 
         user = _current_user()
         if not user:
             return
 
-        # إنشاء مجلد الصور إن لم يكن موجوداً
-        avatars_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "avatars")
-        os.makedirs(avatars_dir, exist_ok=True)
+        role      = getattr(user, "role", None)
+        role_name = getattr(role, "name", "—") if role else "—"
+        office    = getattr(user, "office", None)
+        office_name = "—"
+        if office:
+            office_name = getattr(office, "name_ar", None) or getattr(office, "name_en", "—")
+        created   = getattr(user, "created_at", None)
+        status    = self._("user_status_active") if getattr(user, "is_active", True) else self._("user_status_suspended")
 
-        # نسخ الملف مع اسم مميز
-        ext = os.path.splitext(file_path)[1].lower()
-        dest = os.path.join(avatars_dir, f"user_{user.id}{ext}")
-        # حرر lock على الصورة الحالية قبل الكتابة (Windows PermissionError)
-        if hasattr(self, "_avatar_lbl"):
-            from PySide6.QtGui import QPixmap as _QPixmap
-            self._avatar_lbl.setPixmap(_QPixmap())
-        shutil.copy2(file_path, dest)
-
-        # تحديث قاعدة البيانات
-        try:
-            with get_session_local()() as session:
-                db_user = session.get(UserModel, user.id)
-                if db_user:
-                    db_user.avatar_path = dest
-                    session.commit()
-
-            # تحديث كائن المستخدم في الإعدادات
-            user.avatar_path = dest
-            # حفظ في SettingsManager حتى يراه TopBar فوراً
-            from core.settings_manager import SettingsManager as _SM
-            _SM.get_instance().set("user", user)
-
-            self._refresh_avatar()
-            QMessageBox.information(self, self._("success"), self._("avatar_updated"))
-        except Exception as e:
-            QMessageBox.warning(self, self._("error"), str(e))
-
-
-
-    def _build_stats(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card")
-        lay = QVBoxLayout(frame)
-        lay.setContentsMargins(20, 16, 20, 16)
-        lay.setSpacing(12)
-
-        self._stats_title_lbl = QLabel(self._("my_stats_title"))
-        self._stats_title_lbl.setFont(QFont("Tajawal", 13, QFont.Bold))
-        lay.addWidget(self._stats_title_lbl)
-
-        user = _current_user()
-        uid  = getattr(user, "id", None)
-        total_actions = today_actions = total_trans = 0
-
-        try:
-            from datetime import date
-            with get_session_local()() as session:
-                total_actions = session.query(AuditLog).filter(AuditLog.user_id == uid).count()
-                today_actions = (session.query(AuditLog)
-                                 .filter(AuditLog.user_id == uid,
-                                         func.date(AuditLog.timestamp) == date.today()).count())
-                total_trans   = session.query(Transaction).count()
-        except Exception:
-            pass
-
-        grid = QHBoxLayout()
-        grid.setSpacing(12)
-
-        self._stat_total  = _StatMini("📋", total_actions, self._("total_operations"), "#4A7EC8")
-        self._stat_today  = _StatMini("📅", today_actions, self._("today_operations"),  "#2ECC71")
-        self._stat_trans  = _StatMini("📦", total_trans,   self._("transactions"),      "#9B59B6")
-
-        for w in [self._stat_total, self._stat_today, self._stat_trans]:
-            grid.addWidget(w)
-        grid.addStretch()
-        lay.addLayout(grid)
-
-        return frame
-
-    def _build_info(self) -> QFrame:
-        self._info_sec = _SectionFrame(self._("personal_info_title"))
-        self._populate_info()
-        return self._info_sec
-
-    def _populate_info(self):
-        """يملأ (أو يعيد ملء) قسم المعلومات الشخصية."""
-        # حذف المحتوى القديم
-        while self._info_sec.content_layout.count():
-            w = self._info_sec.content_layout.takeAt(0)
-            if w.widget():
-                w.widget().deleteLater()
-
-        user = _current_user()
-        if user:
-            role       = getattr(user, "role", None)
-            role_name  = getattr(role, "name", "—") if role else "—"
-            created    = getattr(user, "created_at", None)
-            created_str = format_local_dt(created, "%Y-%m-%d")
-            status     = self._("user_status_active") if getattr(user, "is_active", True) else self._("user_status_suspended")
-            rows = [
-                (self._("username"),   getattr(user, "username",  "—")),
-                (self._("full_name"),  getattr(user, "full_name", "—")),
-                (self._("role"),       role_name),
-                (self._("status"),     status),
-                (self._("created_at"), created_str),
-            ]
-        else:
-            rows = [(self._("username"), "—")]
-
+        rows = [
+            (self._("username"),   getattr(user, "username",  "—")),
+            (self._("full_name"),  getattr(user, "full_name", "—")),
+            (self._("role"),       role_name),
+            ("المكتب",             office_name),
+            (self._("status"),     status),
+            (self._("created_at"), format_local_dt(created, "%Y-%m-%d") if created else "—"),
+        ]
         for label, value in rows:
-            self._info_sec.content_layout.addWidget(_InfoRow(label, value))
+            self._info_card.body.addWidget(_InfoRow(label, value))
+
+    # ── Edit name ─────────────────────────────────────────────────────────────
+
+    def _build_edit_name(self) -> QFrame:
+        self._edit_card = _Card("تعديل الاسم الكامل")
+
+        user = _current_user()
+        self._name_edit = _Field(self._("full_name"))
+        self._name_edit.setText(getattr(user, "full_name", "") or "")
+        self._edit_card.body.addWidget(self._name_edit)
+
+        btn_row = QHBoxLayout()
+        self._save_name_btn = _Btn("💾  حفظ الاسم", "primary")
+        self._save_name_btn.setMaximumWidth(160)
+        self._save_name_btn.clicked.connect(self._save_name)
+        btn_row.addWidget(self._save_name_btn)
+        btn_row.addStretch()
+        self._edit_card.body.addLayout(btn_row)
+        return self._edit_card
+
+    def _save_name(self):
+        from database.models import User as UserModel
+        new_name = self._name_edit.text().strip()
+        if not new_name:
+            QMessageBox.warning(self, self._("warning"), "أدخل الاسم أولاً")
+            return
+        user = _current_user()
+        if not user:
+            return
+        try:
+            with get_session_local()() as s:
+                db_user = s.get(UserModel, user.id)
+                if db_user:
+                    db_user.full_name = new_name
+                    s.commit()
+            user.full_name = new_name
+            SettingsManager.get_instance().set("user", user)
+            self._hero_name.setText(new_name)
+            self._populate_info()
+            self._flash_success(self._save_name_btn)
+        except Exception as e:
+            QMessageBox.critical(self, self._("error"), str(e))
+
+    # ── Password ──────────────────────────────────────────────────────────────
 
     def _build_password(self) -> QFrame:
-        self._pw_sec = _SectionFrame(self._("change_password_title"))
+        self._pw_card = _Card(self._("change_password_title"))
+        tc = _theme_colors()
 
-        def make_field(ph):
-            f = QLineEdit()
-            f.setEchoMode(QLineEdit.Password)
-            f.setPlaceholderText(ph)
-            f.setObjectName("form-input")
-            f.setMinimumHeight(38)
-            return f
+        self._old_pw  = _Field(self._("current_password"), password=True)
+        self._new_pw  = _Field(self._("new_password"),     password=True)
+        self._conf_pw = _Field(self._("confirm_password"), password=True)
 
-        self._old_pw  = make_field(self._("current_password"))
-        self._new_pw  = make_field(self._("new_password"))
-        self._conf_pw = make_field(self._("confirm_password"))
+        # strength bar
+        self._strength_bar = QFrame()
+        self._strength_bar.setFixedHeight(4)
+        self._strength_bar.setStyleSheet(f"background: {tc['border']}; border-radius: 2px;")
+        self._new_pw.textChanged.connect(self._update_strength)
 
-        for w in [self._old_pw, self._new_pw, self._conf_pw]:
-            self._pw_sec.content_layout.addWidget(w)
+        for w in [self._old_pw, self._new_pw, self._strength_bar, self._conf_pw]:
+            self._pw_card.body.addWidget(w)
 
-        self._save_pw_btn = QPushButton(self._("save_password_btn"))
-        self._save_pw_btn.setObjectName("btn-primary")
-        self._save_pw_btn.setMinimumHeight(38)
-        self._save_pw_btn.setCursor(Qt.PointingHandCursor)
-        self._save_pw_btn.setFont(QFont("Tajawal", 10, QFont.DemiBold))
+        btn_row = QHBoxLayout()
+        self._save_pw_btn = _Btn(self._("save_password_btn"), "primary")
+        self._save_pw_btn.setMaximumWidth(180)
         self._save_pw_btn.clicked.connect(self._change_password)
-        self._pw_sec.content_layout.addWidget(self._save_pw_btn)
+        btn_row.addWidget(self._save_pw_btn)
+        btn_row.addStretch()
+        self._pw_card.body.addLayout(btn_row)
+        return self._pw_card
 
-        return self._pw_sec
+    def _update_strength(self, text: str):
+        n = len(text)
+        has_upper = any(c.isupper() for c in text)
+        has_digit = any(c.isdigit() for c in text)
+        has_sym   = any(c in "!@#$%^&*" for c in text)
+        score = sum([n >= 6, n >= 10, has_upper, has_digit, has_sym])
+        colors = ["#EF4444", "#F97316", "#F59E0B", "#84CC16", "#10B981"]
+        widths = [20, 40, 60, 80, 100]
+        c = colors[min(score, 4)] if text else "#E2E8F0"
+        w = widths[min(score, 4)] if text else 100
+        self._strength_bar.setStyleSheet(f"""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 {c}, stop:{w/100:.2f} {c}, stop:{w/100+0.01:.2f} #E2E8F0, stop:1 #E2E8F0);
+            border-radius: 2px;
+        """)
+
+    # ── Activity ──────────────────────────────────────────────────────────────
 
     def _build_activity(self) -> QFrame:
-        self._act_sec = _SectionFrame(self._("recent_activities_mine"))
+        self._act_card = _Card(self._("recent_activities_mine"))
         self._populate_activity()
-        return self._act_sec
+        return self._act_card
 
     def _populate_activity(self):
-        """يملأ (أو يعيد ملء) قسم الأنشطة الأخيرة."""
-        while self._act_sec.content_layout.count():
-            w = self._act_sec.content_layout.takeAt(0)
-            if w.widget():
-                w.widget().deleteLater()
+        while self._act_card.body.count():
+            item = self._act_card.body.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         user = _current_user()
         uid  = getattr(user, "id", None)
@@ -452,104 +724,63 @@ class UserProfileTab(QWidget):
             "clients": "table_clients", "users": "table_users",
             "documents": "table_documents", "entries": "table_entries",
         }
-        ACTION_KEYS = {
-            "create": "action_create", "insert": "action_insert",
-            "update": "action_update", "delete": "action_delete",
-        }
-        ICONS = {
-            "create": ("➕", "#2ECC71"), "insert": ("➕", "#2ECC71"),
-            "update": ("✏️", "#F39C12"), "delete": ("🗑️", "#E74C3C"),
-        }
 
         try:
-            with get_session_local()() as session:
-                rows = (session.query(AuditLog)
-                        .filter(AuditLog.user_id == uid)
-                        .order_by(desc(AuditLog.id))
-                        .limit(8).all())
+            with get_session_local()() as s:
+                rows = (s.query(AuditLog)
+                         .filter(AuditLog.user_id == uid)
+                         .order_by(desc(AuditLog.id))
+                         .limit(10).all())
 
             if not rows:
                 empty = QLabel(self._("no_activity_yet"))
                 empty.setAlignment(Qt.AlignCenter)
                 empty.setObjectName("empty-label")
-                self._act_sec.content_layout.addWidget(empty)
+                self._act_card.body.addWidget(empty)
                 return
 
-            for row in rows:
-                action   = (row.action or "update").lower()
-                icon, color = ICONS.get(action, ("📝", "#3498DB"))
-                tbl_key  = TABLE_KEYS.get(row.table_name)
-                tbl      = self._(tbl_key) if tbl_key else (row.table_name or "—")
-                act_key  = ACTION_KEYS.get(action)
-                act      = self._(act_key) if act_key else action
-                ts       = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
-
-                item = QFrame()
-                item.setStyleSheet(f"""
-                    QFrame {{
-                        background: rgba(0,0,0,0.03);
-                        border-radius: 8px;
-                        border-right: 3px solid {color};
-                    }}
-                """)
-                row_lay = QHBoxLayout(item)
-                row_lay.setContentsMargins(10, 6, 10, 6)
-
-                ico = QLabel(icon)
-                ico.setFont(QFont("Segoe UI Emoji", 14))
-                ico.setFixedWidth(24)
-                row_lay.addWidget(ico)
-
-                msg = QLabel(self._("activity_in").format(action=act, table=tbl))
-                msg.setFont(QFont("Tajawal", 10))
-                row_lay.addWidget(msg, 1)
-
-                ts_lbl = QLabel(ts)
-                ts_lbl.setFont(QFont("Tajawal", 8))
-                ts_lbl.setObjectName("text-muted")
-                row_lay.addWidget(ts_lbl)
-
-                self._act_sec.content_layout.addWidget(item)
-
+            for i, row in enumerate(rows):
+                action = row.action or "update"
+                tbl_key = TABLE_KEYS.get(row.table_name)
+                tbl     = self._(tbl_key) if tbl_key else (row.table_name or "—")
+                ts      = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
+                is_last = (i == len(rows) - 1)
+                self._act_card.body.addWidget(
+                    _ActivityItem(action, tbl, ts, is_last=is_last)
+                )
         except Exception as e:
-            err = QLabel(f"⚠️ {e}")
+            err = QLabel(f"⚠  {e}")
             err.setObjectName("text-danger")
-            self._act_sec.content_layout.addWidget(err)
+            self._act_card.body.addWidget(err)
+
+    # ── Actions ───────────────────────────────────────────────────────────────
 
     def _build_actions(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card")
-        lay = QHBoxLayout(frame)
-        lay.setContentsMargins(20, 16, 20, 16)
-        lay.setSpacing(16)
+        card = QFrame()
+        card.setObjectName("card")
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(24, 16, 24, 16)
+        lay.setSpacing(14)
 
-        self._logout_btn = QPushButton(self._("logout_btn"))
-        self._logout_btn.setObjectName("btn-warning")
-        self._logout_btn.setMinimumSize(160, 42)
-        self._logout_btn.setFont(QFont("Tajawal", 11, QFont.DemiBold))
-        self._logout_btn.setCursor(Qt.PointingHandCursor)
+        self._logout_btn = _Btn(self._("logout_btn"), "warning")
+        self._logout_btn.setMinimumWidth(150)
         self._logout_btn.clicked.connect(self._confirm_logout)
 
-        self._close_btn = QPushButton(self._("close_app_btn"))
-        self._close_btn.setObjectName("btn-danger")
-        self._close_btn.setMinimumSize(160, 42)
-        self._close_btn.setFont(QFont("Tajawal", 11, QFont.DemiBold))
-        self._close_btn.setCursor(Qt.PointingHandCursor)
+        self._close_btn = _Btn(self._("close_app_btn"), "danger")
+        self._close_btn.setMinimumWidth(150)
         self._close_btn.clicked.connect(self._confirm_close)
 
         lay.addWidget(self._logout_btn)
         lay.addWidget(self._close_btn)
         lay.addStretch()
+        return card
 
-        return frame
-
-    # ─── handlers ────────────────────────────────────────────────────────────
+    # ── Logic ─────────────────────────────────────────────────────────────────
 
     def _change_password(self):
         old  = self._old_pw.text().strip()
         new  = self._new_pw.text().strip()
         conf = self._conf_pw.text().strip()
-
         if not old or not new or not conf:
             QMessageBox.warning(self, self._("warning"), self._("fill_all_password_fields"))
             return
@@ -559,94 +790,143 @@ class UserProfileTab(QWidget):
         if len(new) < 6:
             QMessageBox.warning(self, self._("warning"), self._("password_too_short"))
             return
-
         user = _current_user()
         if not user:
-            QMessageBox.critical(self, self._("error"), self._("no_user_logged_in"))
             return
-
         try:
             from passlib.hash import bcrypt
             if not bcrypt.verify(old, user.password):
                 QMessageBox.warning(self, self._("error"), self._("wrong_password"))
                 return
-
             new_hash = bcrypt.hash(new)
-            with get_session_local()() as session:
-                db_user = session.get(type(user), user.id)
+            with get_session_local()() as s:
+                from database.models import User as UserModel
+                db_user = s.get(UserModel, user.id)
                 if db_user:
                     db_user.password = new_hash
-                    session.commit()
-
+                    s.commit()
             self._old_pw.clear()
             self._new_pw.clear()
             self._conf_pw.clear()
-
-            from services.notification_service import NotificationService
-            NotificationService.get_instance().add_manual(
-                self._("password_changed_success"), level="success", icon="🔒"
-            )
+            try:
+                from services.notification_service import NotificationService
+                NotificationService.get_instance().add_manual(
+                    self._("password_changed_success"), level="success", icon="🔒"
+                )
+            except Exception:
+                pass
+            self._flash_success(self._save_pw_btn)
             QMessageBox.information(self, self._("success"), self._("password_change_success_dialog"))
-
         except Exception as e:
             QMessageBox.critical(self, self._("error"), self._("password_change_failed") + f"\n{e}")
 
+    def _on_theme_changed(self, _=None):
+        """إعادة رسم العناصر المعتمدة على الثيم عند التغيير."""
+        self._populate_activity()
+
+    def _delete_avatar(self):
+        """حذف الصورة الشخصية والرجوع للافتراضية."""
+        from database.models import User as UserModel
+        user = _current_user()
+        if not user:
+            return
+        r = QMessageBox.question(
+            self, "حذف الصورة", "هل تريد حذف صورتك الشخصية؟",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if r != QMessageBox.Yes:
+            return
+        try:
+            # حرر lock ويندوز أولاً
+            self._avatar.setPixmap(QPixmap())
+            # حذف الملف
+            old_path = getattr(user, "avatar_path", None)
+            if old_path and os.path.isfile(old_path):
+                os.remove(old_path)
+            # تحديث DB
+            with get_session_local()() as s:
+                db_user = s.get(UserModel, user.id)
+                if db_user:
+                    db_user.avatar_path = None
+                    s.commit()
+            user.avatar_path = None
+            SettingsManager.get_instance().set("user", user)
+            self._refresh_avatar()
+            self._btn_delete_avatar.setVisible(False)
+        except Exception as e:
+            QMessageBox.warning(self, self._("error"), str(e))
+
     def _confirm_logout(self):
-        reply = QMessageBox.question(
+        r = QMessageBox.question(
             self, self._("logout_confirm_title"), self._("logout_confirm_msg"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
-        if reply == QMessageBox.Yes:
+        if r == QMessageBox.Yes:
             self.logout_requested.emit()
 
     def _confirm_close(self):
-        reply = QMessageBox.question(
+        r = QMessageBox.question(
             self, self._("close_app_title"), self._("close_app_msg"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
-        if reply == QMessageBox.Yes:
+        if r == QMessageBox.Yes:
             self.close_requested.emit()
 
-    # ─── retranslate ─────────────────────────────────────────────────────────
+    def _flash_success(self, btn: QPushButton):
+        """وميض أخضر لمدة 1.5 ثانية على الزر عند النجاح."""
+        original = btn.styleSheet()
+        btn.setStyleSheet("background: #10B981; color: white; border-radius: 8px;")
+        btn.setText("✓  " + self._("success"))
+        def _restore():
+            btn.setStyleSheet(original)
+            btn.setText(btn.text().replace("✓  " + self._("success") + "  ", "").lstrip("✓  "))
+        QTimer.singleShot(1500, _restore)
+
+    # ── Retranslate ───────────────────────────────────────────────────────────
 
     def retranslate_ui(self):
-        """يُستدعى عند تغيير اللغة — يُحدّث جميع نصوص الواجهة."""
         self._ = TranslationManager.get_instance().translate
-
         user = _current_user()
+
+        # Hero
+        if hasattr(self, "_btn_avatar_hero"):
+            self._btn_avatar_hero.setText("📷  " + self._("change_avatar"))
+        self._online_badge.setText("● " + self._("user_online"))
         role_txt = "—"
+        office_txt = "—"
         if user:
             role = getattr(user, "role", None)
             role_txt = getattr(role, "name", "—") if role else "—"
+            office = getattr(user, "office", None)
+            if office:
+                office_txt = getattr(office, "name_ar", None) or "—"
+        self._hero_role.setText(f"◎  {role_txt}")
+        self._hero_office.setText(f"⊞  {office_txt}")
 
-        # Hero
-        self._hero_role_lbl.setText(self._("user_role").format(role=role_txt))
-        self._hero_badge.setText(self._("user_online"))
-        if hasattr(self, "_btn_avatar"):
-            self._btn_avatar.setText("📷 " + self._("change_avatar"))
-            self._avatar_lbl.setToolTip(self._("change_avatar"))
-
-        # Stats section title + card labels
-        self._stats_title_lbl.setText(self._("my_stats_title"))
+        # Stats
+        self._stats_card.set_title(self._("my_stats_title"))
         self._stat_total.set_label(self._("total_operations"))
         self._stat_today.set_label(self._("today_operations"))
         self._stat_trans.set_label(self._("transactions"))
 
-        # Info section
-        self._info_sec.set_title(self._("personal_info_title"))
+        # Info
+        self._info_card.set_title(self._("personal_info_title"))
         self._populate_info()
 
-        # Password section
-        self._pw_sec.set_title(self._("change_password_title"))
+        # Edit name
+        self._edit_card.set_title("تعديل الاسم الكامل")
+
+        # Password
+        self._pw_card.set_title(self._("change_password_title"))
         self._old_pw.setPlaceholderText(self._("current_password"))
         self._new_pw.setPlaceholderText(self._("new_password"))
         self._conf_pw.setPlaceholderText(self._("confirm_password"))
         self._save_pw_btn.setText(self._("save_password_btn"))
 
-        # Activity section
-        self._act_sec.set_title(self._("recent_activities_mine"))
+        # Activity
+        self._act_card.set_title(self._("recent_activities_mine"))
         self._populate_activity()
 
-        # Action buttons
+        # Actions
         self._logout_btn.setText(self._("logout_btn"))
         self._close_btn.setText(self._("close_app_btn"))

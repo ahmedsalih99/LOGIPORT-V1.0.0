@@ -173,6 +173,12 @@ _APP_SETTINGS = [
     ("transaction_auto_increment",     "true", "numbering", "تفعيل الترقيم التلقائي"),
     ("document_naming_use_transaction","true", "numbering", "استخدام رقم المعاملة"),
     ("documents_output_path",          "",     "storage",   "مسار حفظ المستندات"),
+    # Sync settings
+    ("sync_supabase_url",              "",     "sync",      "رابط مشروع Supabase"),
+    ("sync_anon_key",                  "",     "sync",      "مفتاح Supabase anon"),
+    ("sync_office_id",                 "",     "sync",      "ID المكتب الحالي للمزامنة"),
+    ("sync_enabled",                   "false","sync",      "تفعيل المزامنة التلقائية"),
+    ("sync_interval_min",              "5",    "sync",      "فترة المزامنة التلقائية بالدقائق"),
 ]
 
 
@@ -308,6 +314,92 @@ def _run_migrations(conn) -> None:
             logger.warning("Bootstrap: index %s skipped: %s", idx_name, _ie)
     conn.commit()
     logger.info("Bootstrap: performance indexes checked/created")
+
+    # Migration: sync columns (server_id + synced_at + office_id)
+    _SYNC_COLS = [
+        ("clients",              "server_id",  "TEXT"),
+        ("clients",              "synced_at",  "DATETIME"),
+        ("client_contacts",      "server_id",  "TEXT"),
+        ("client_contacts",      "synced_at",  "DATETIME"),
+        ("companies",            "server_id",  "TEXT"),
+        ("companies",            "synced_at",  "DATETIME"),
+        ("company_banks",        "server_id",  "TEXT"),
+        ("company_banks",        "synced_at",  "DATETIME"),
+        ("company_role_links",   "server_id",  "TEXT"),
+        ("company_partner_links","server_id",  "TEXT"),
+        ("entries",              "server_id",  "TEXT"),
+        ("entries",              "synced_at",  "DATETIME"),
+        ("entries",              "office_id",  "INTEGER"),
+        ("entry_items",          "server_id",  "TEXT"),
+        ("entry_items",          "synced_at",  "DATETIME"),
+        ("transactions",         "server_id",  "TEXT"),
+        ("transactions",         "synced_at",  "DATETIME"),
+        ("transaction_items",    "server_id",  "TEXT"),
+        ("transaction_items",    "synced_at",  "DATETIME"),
+        ("transaction_entries",  "server_id",  "TEXT"),
+        ("transport_details",    "server_id",  "TEXT"),
+        ("transport_details",    "synced_at",  "DATETIME"),
+        ("doc_groups",           "server_id",  "TEXT"),
+        ("doc_groups",           "synced_at",  "DATETIME"),
+        ("documents",            "server_id",  "TEXT"),
+        ("documents",            "synced_at",  "DATETIME"),
+        ("documents",            "office_id",  "INTEGER"),
+        ("users",                "server_id",  "TEXT"),
+        ("users",                "synced_at",  "DATETIME"),
+        ("audit_log",            "server_id",  "TEXT"),
+    ]
+    _col_cache = {}
+    for _tbl, _col, _typedef in _SYNC_COLS:
+        try:
+            if _tbl not in _col_cache:
+                _col_cache[_tbl] = [
+                    r[1] for r in conn.execute(f"PRAGMA table_info({_tbl})").fetchall()
+                ]
+            if _col not in _col_cache[_tbl]:
+                conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN {_col} {_typedef}")
+                _col_cache[_tbl].append(_col)
+                logger.info("Bootstrap: added %s.%s", _tbl, _col)
+        except Exception as _me:
+            logger.warning("Bootstrap: %s.%s sync migration skipped: %s", _tbl, _col, _me)
+
+    # Seed server_id للصفوف القديمة التي لا تملك server_id
+    import uuid as _uuid
+    _NEEDS_SERVER_ID = [
+        "clients", "client_contacts", "companies", "company_banks",
+        "entries", "entry_items",
+        "transactions", "transaction_items",
+        "transport_details", "doc_groups", "documents", "users",
+    ]
+    for _tbl in _NEEDS_SERVER_ID:
+        try:
+            if "server_id" not in _col_cache.get(_tbl, []):
+                continue
+            _rows = conn.execute(
+                f"SELECT id FROM {_tbl} WHERE server_id IS NULL"
+            ).fetchall()
+            for (_rid,) in _rows:
+                conn.execute(
+                    f"UPDATE {_tbl} SET server_id=? WHERE id=?",
+                    (str(_uuid.uuid4()), _rid)
+                )
+            if _rows:
+                logger.info("Bootstrap: seeded server_id for %d rows in %s", len(_rows), _tbl)
+        except Exception as _se:
+            logger.warning("Bootstrap: server_id seed for %s skipped: %s", _tbl, _se)
+
+    # جدول local_sync_cursors — يحفظ آخر cursor للمزامنة محلياً
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS local_sync_cursors (
+                table_name   TEXT NOT NULL,
+                direction    TEXT NOT NULL,
+                last_cursor  TEXT NOT NULL DEFAULT '1970-01-01T00:00:00+00:00',
+                PRIMARY KEY (table_name, direction)
+            )
+        """)
+        logger.info("Bootstrap: local_sync_cursors ready")
+    except Exception as _lse:
+        logger.warning("Bootstrap: local_sync_cursors skipped: %s", _lse)
 
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")

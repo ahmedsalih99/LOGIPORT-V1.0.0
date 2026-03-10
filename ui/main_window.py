@@ -197,7 +197,14 @@ class MainWindow(BaseWindow):
             self.top_bar.search_requested.connect(self._open_global_search)
         except Exception:
             pass
+        try:
+            self.top_bar.sync_settings_requested.connect(self._open_sync_settings)
+        except Exception:
+            pass
         right_col_layout.addWidget(self.top_bar)
+
+        # ── بدء SyncService التلقائي ──────────────────────────────────────────
+        self._start_sync_service()
 
         # Content Stack
         self.stack = QStackedWidget()
@@ -342,6 +349,33 @@ class MainWindow(BaseWindow):
             dlg.exec()
         except Exception as e:
             QMessageBox.information(self, "LOGIPORT", f"v3.2.0\n{e}")
+
+    def _open_sync_settings(self):
+        try:
+            from ui.dialogs.sync_settings_dialog import SyncSettingsDialog
+            dlg = SyncSettingsDialog(self)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "خطأ", f"تعذّر فتح إعدادات المزامنة:\n{e}")
+
+    def _start_sync_service(self):
+        """يبدأ SyncService عند فتح الـ MainWindow إذا كان الـ sync مفعّلاً."""
+        try:
+            from core.settings_manager import SettingsManager
+            from services.sync_service import get_sync_service
+            sm  = SettingsManager.get_instance()
+            svc = get_sync_service()
+            if sm.get("sync_enabled", "false").lower() == "true":
+                office_id = sm.get("sync_office_id", "")
+                interval  = int(sm.get("sync_interval_min", "5") or "5")
+                if office_id:
+                    svc.configure(
+                        office_id=int(office_id),
+                        interval_seconds=interval * 60,
+                    )
+                    svc.start_auto_sync()
+        except Exception:
+            pass
 
     def _open_profile(self):
         self.stack.setCurrentWidget(self._get_or_build_profile_tab())

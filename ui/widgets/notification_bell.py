@@ -219,6 +219,12 @@ class NotificationBell(QWidget):
         lay.addWidget(btn_container)
         self._svc.unread_count_changed.connect(self._update_badge)
         self._update_badge(self._svc.unread_count)
+        # ربط تغيير الثيم
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(self._on_theme_changed)
+        except Exception:
+            pass
 
     def _update_badge(self, count: int):
         if count > 0:
@@ -244,3 +250,6 @@ class NotificationBell(QWidget):
     def retranslate_ui(self):
         self._ = TranslationManager.get_instance().translate
         self._btn.setToolTip(self._("notifications"))
+
+    def _on_theme_changed(self, _=None):
+        set_icon(self._btn, "bell", 18)

@@ -159,6 +159,24 @@ _ICONS: dict[str, str] = {
         <line x1="3" y1="12" x2="21" y2="12"/>
         <line x1="3" y1="18" x2="21" y2="18"/>
     </svg>""",
+
+    "office": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18"/>
+        <path d="M9 21V9"/>
+    </svg>""",
+
+    "offices": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18"/>
+        <path d="M9 21V9"/>
+    </svg>""",
+
+    "sync": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="1 4 1 10 7 10"/>
+        <polyline points="23 20 23 14 17 14"/>
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+    </svg>""",
 }
 
 # fallback text للـ SVG إذا QtSvg غير متوفر
@@ -184,6 +202,9 @@ _FALLBACK_TEXT: dict[str, str] = {
     "control_panel":     "⚙",
     "users_permissions": "◉",
     "menu_burger":       "≡",
+    "office":            "⊞",
+    "offices":           "⊞",
+    "sync":              "↻",
 }
 
 
