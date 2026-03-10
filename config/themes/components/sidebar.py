@@ -75,16 +75,16 @@ def get_styles(theme):
     /* ========== LOGO BOX ========== */
 
     QFrame#SidebarLogoBox {{
-        background   : transparent;
+        background   : rgba(255, 255, 255, 0.05);
         border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 0px;
     }}
 
     QLabel#sidebar-app-name {{
-        color      : {c["sidebar_text"]};
-        font-size  : {s["lg"]}px;
-        font-weight: 800;
-        letter-spacing: 1px;
+        color         : {c["sidebar_text"]};
+        font-size     : {s["xl"]}px;
+        font-weight   : 900;
+        letter-spacing: 2px;
     }}
 
     /* ========== SEPARATOR ========== */

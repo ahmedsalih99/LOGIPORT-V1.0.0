@@ -129,11 +129,11 @@ class Sidebar(QFrame):
         """Logo (أيقونة) فوق + اسم التطبيق تحته — عمودي مريح"""
         self.logo_box = QFrame(self)
         self.logo_box.setObjectName("SidebarLogoBox")
-        self.logo_box.setFixedHeight(80)
+        self.logo_box.setFixedHeight(110)
 
         logo_layout = QVBoxLayout(self.logo_box)
-        logo_layout.setContentsMargins(0, 10, 0, 10)
-        logo_layout.setSpacing(4)
+        logo_layout.setContentsMargins(0, 14, 0, 14)
+        logo_layout.setSpacing(8)
         logo_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
         # Logo image
@@ -142,9 +142,9 @@ class Sidebar(QFrame):
         pix = QPixmap(resource_path("icons", "logo.png"))
         if not pix.isNull():
             self.logo_img.setPixmap(
-                pix.scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pix.scaled(52, 52, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
-        self.logo_img.setFixedSize(36, 36)
+        self.logo_img.setFixedSize(52, 52)
         self.logo_img.setAlignment(Qt.AlignCenter)
         logo_layout.addWidget(self.logo_img, 0, Qt.AlignHCenter)
 
