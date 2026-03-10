@@ -30,7 +30,6 @@
         <div class="label">Liste No.</div><div style="font-family:monospace">{{ trx.no or '' }}</div>
         <div class="label">Tarih</div><div>{{ trx.issue_date or '' }}</div>
         {% if incoterms %}<div class="label">Incoterms</div><div>{{ incoterms }}</div>{% endif %}
-        {% if delivery_method %}<div class="label">Teslimat</div><div>{{ delivery_method }}</div>{% endif %}
         {% if country_of_origin %}<div class="label">Menşe</div><div>{{ country_of_origin }}</div>{% endif %}
         {% if port_of_loading %}<div class="label">Yükleme Lim.</div><div>{{ port_of_loading }}</div>{% endif %}
         {% if port_of_discharge %}<div class="label">Boşaltma Lim.</div><div>{{ port_of_discharge }}</div>{% endif %}
@@ -60,10 +59,10 @@
     <table>
       <thead>
         <tr>
-          <th style="width:7%" class="center">Satır No</th>
           <th style="width:5%">No.</th>
           <th style="width:18%">Konteyner / Kamyon</th>
           <th>Ürün Açıklaması</th>
+          <th style="width:9%">HS Kodu</th>
           <th class="num" style="width:10%">Miktar</th>
           <th class="num" style="width:12%">Brüt (kg)</th>
           <th class="num" style="width:12%">Net (kg)</th>
@@ -73,10 +72,10 @@
       <tbody>
         {% for r in list %}
         <tr>
-          <td class="center">{{ r.entry_item_id or r.line_id or '' }}</td>
           <td class="num">{{ r.line_no }}</td>
           <td>{{ r.container_no or '-' }}</td>
           <td>{{ r.description or '' }}</td>
+          <td>{{ r.material_code or '' }}</td>
           <td class="num">{{ "%.2f"|format(r.quantity or 0) }}</td>
           <td class="num">{{ "%.2f"|format(r.gross_kg or 0) }}</td>
           <td class="num">{{ "%.2f"|format(r.net_kg or 0) }}</td>
@@ -86,7 +85,8 @@
       </tbody>
       <tfoot>
         <tr>
-          <td></td><td></td><td></td>
+          <td></td><td></td>
+          <td></td>
           <td class="label">TOPLAM</td>
           <td class="num">{{ "%.2f"|format((tots or {}).quantity or 0) }}</td>
           <td class="num">{{ "%.2f"|format((tots or {}).gross_kg or 0) }}</td>

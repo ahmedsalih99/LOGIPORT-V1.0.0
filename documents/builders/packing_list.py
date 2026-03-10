@@ -127,6 +127,7 @@ def _fetch_rows(transaction_id: int, lang: str) -> List[Dict[str, Any]]:
                 ti.packaging_type_id,
                 ti.transport_ref,
                 ti.entry_item_id,
+                m.code              AS mat_code,
                 m.name_ar           AS mat_ar,
                 m.name_en           AS mat_en,
                 m.name_tr           AS mat_tr,
@@ -162,6 +163,7 @@ def _fetch_rows(transaction_id: int, lang: str) -> List[Dict[str, Any]]:
         result.append({
             "line_no":        i,
             "line_id":        str(r.get("entry_item_id") or ""),
+            "material_code":  r.get("mat_code") or "",
             "container_no":   r.get("transport_ref") or "",
             "description":    mat,
             "quantity":       float(r.get("quantity")        or 0),
