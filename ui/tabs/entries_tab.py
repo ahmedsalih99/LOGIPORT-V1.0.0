@@ -17,6 +17,15 @@ from database.models.country import Country
 from ui.dialogs.add_entry_dialog import AddEntryDialog
 from ui.dialogs.view_details.view_entry_dialog import ViewEntryDialog
 
+# container linking (lazy import to avoid circular)
+def _get_container_crud():
+    from database.crud.container_tracking_crud import ContainerTrackingCRUD
+    return ContainerTrackingCRUD()
+
+def _get_container_dialog():
+    from ui.tabs.container_tracking_tab import _ContainerDialog
+    return _ContainerDialog
+
 from PySide6.QtWidgets import (
     QMessageBox, QTableWidgetItem, QHBoxLayout, QWidget, QPushButton,
     QDateEdit, QLabel, QFrame
@@ -80,14 +89,15 @@ class EntriesTab(BaseTab):
 
         actions_col = {"label": "actions", "key": "actions"}
         base_cols = [
-            {"label": "entry_no", "key": "entry_no"},
-            {"label": "entry_date", "key": "entry_date"},
-            {"label": "transport_unit_type", "key": "transport_unit_label"},
-            {"label": "owner_client", "key": "owner_client_name"},
-            {"label": "items_count", "key": "items_count"},
-            {"label": "total_pcs", "key": "total_pcs"},
-            {"label": "total_net", "key": "total_net"},
-            {"label": "total_gross", "key": "total_gross"},
+            {"label": "entry_no",           "key": "entry_no"},
+            {"label": "entry_date",         "key": "entry_date"},
+            {"label": "transport_unit_type","key": "transport_unit_label"},
+            {"label": "owner_client",       "key": "owner_client_name"},
+            {"label": "containers",         "key": "containers_display"},
+            {"label": "items_count",        "key": "items_count"},
+            {"label": "total_pcs",          "key": "total_pcs"},
+            {"label": "total_net",          "key": "total_net"},
+            {"label": "total_gross",        "key": "total_gross"},
             actions_col,
         ]
         self.set_columns_for_role(
@@ -108,6 +118,13 @@ class EntriesTab(BaseTab):
         self.row_double_clicked.connect(self.on_row_double_clicked)
         if hasattr(self, "request_refresh"):
             self.request_refresh.connect(self.reload_data)
+
+        # زر "ربط بكونتينر" في toolbar
+        self._btn_link_container = QPushButton(f"🚢  {self._('link_container')}")
+        self._btn_link_container.setObjectName("secondary-btn")
+        self._btn_link_container.setToolTip(self._("link_container_tooltip"))
+        self._btn_link_container.clicked.connect(self._link_container)
+        self.top_bar.addWidget(self._btn_link_container)
 
         self._build_filter_bar()
         self.reload_data()
@@ -186,6 +203,7 @@ class EntriesTab(BaseTab):
                 "entry_date": str(r.get("entry_date") or ""),
                 "transport_unit_label": unit_label,
                 "owner_client_name": client_name,
+                "containers_display": "",          # يُملأ بعد جلب البيانات
                 "items_count": int(r.get("items_count") or 0),
                 "total_pcs": f"{float(r.get('total_pcs') or 0):.0f}",
                 "total_net": f"{float(r.get('total_net') or 0):.2f}",
@@ -199,6 +217,21 @@ class EntriesTab(BaseTab):
                 "_raw_entry_no": entry_no,
                 "_raw_client": client_name,
             })
+
+        # جلب الكونتينرات المرتبطة دفعة واحدة
+        try:
+            c_crud = _get_container_crud()
+            for row in self.data:
+                eid = row.get("id")
+                if eid:
+                    containers = c_crud.get_containers_for_entry(eid)
+                    if containers:
+                        nos = ", ".join(c.container_no for c in containers[:2])
+                        if len(containers) > 2:
+                            nos += f" +{len(containers)-2}"
+                        row["containers_display"] = f"🚢 {nos}"
+        except Exception:
+            pass
 
         # فلترة البحث على العميل أو رقم الإدخال
         if search:
@@ -217,6 +250,123 @@ class EntriesTab(BaseTab):
 
     def display_data(self):
         self._display_with_actions("edit_entry", "delete_entry")
+
+    # ---------- container linking ----------
+
+    def _link_container(self):
+        """
+        ربط الإدخالات المحددة بكونتينر.
+        يفتح نافذة بحث لاختيار كونتينر موجود أو إنشاء جديد.
+        """
+        rows = self.get_selected_rows()
+        if not rows:
+            QMessageBox.information(self, self._("info"), self._("select_entry_first"))
+            return
+
+        entry_ids = []
+        for row in rows:
+            eid = self.data[row].get("id")
+            if eid:
+                entry_ids.append(eid)
+        if not entry_ids:
+            return
+
+        # اختيار العملية
+        from PySide6.QtWidgets import QInputDialog, QDialog
+        choice, ok = QInputDialog.getItem(
+            self,
+            self._("link_container"),
+            self._("link_container_action"),
+            [self._("link_existing_container"), self._("create_new_container")],
+            0, False,
+        )
+        if not ok:
+            return
+
+        if choice == self._("create_new_container"):
+            # فتح ديالوج إنشاء كونتينر جديد
+            _Dialog = _get_container_dialog()
+            dlg = _Dialog(None, current_user=self.current_user, parent=self)
+            if dlg.exec() != QDialog.Accepted:
+                return
+            # الكونتينر الجديد — نجلبه
+            c_crud = _get_container_crud()
+            all_c = c_crud.get_all(limit=1)
+            if not all_c:
+                return
+            container_id = all_c[0].id
+        else:
+            # بحث عن كونتينر موجود
+            container_no, ok2 = QInputDialog.getText(
+                self, self._("link_container"), self._("enter_container_no")
+            )
+            if not (ok2 and container_no.strip()):
+                return
+            c_crud = _get_container_crud()
+            results = c_crud.get_all(search=container_no.strip(), limit=5)
+            if not results:
+                QMessageBox.warning(self, self._("not_found"), self._("container_not_found"))
+                return
+            if len(results) == 1:
+                container_id = results[0].id
+            else:
+                items = [
+                    f"{c.container_no}  ({self._(f'container_status_{c.status}')})"
+                    for c in results
+                ]
+                choice2, ok3 = QInputDialog.getItem(
+                    self, self._("select_container"), self._("select_from_list"),
+                    items, 0, False,
+                )
+                if not ok3:
+                    return
+                container_id = results[items.index(choice2)].id
+
+        # تنفيذ الربط
+        c_crud = _get_container_crud()
+        success = c_crud.link_entries(container_id, entry_ids, current_user=self.current_user)
+        if success:
+            count = len(entry_ids)
+            QMessageBox.information(
+                self, self._("linked"),
+                self._("entries_linked_success").format(n=count),
+            )
+            self.reload_data()
+        else:
+            QMessageBox.warning(self, self._("error"), self._("link_failed"))
+
+    def _on_container_badge_clicked(self, entry_id: int):
+        """فتح قائمة الكونتينرات المرتبطة بإدخال معين."""
+        from PySide6.QtWidgets import QInputDialog
+        from ui.dialogs.view_details.view_container_dialog import ViewContainerDialog
+        c_crud = _get_container_crud()
+        containers = c_crud.get_containers_for_entry(entry_id)
+        if not containers:
+            QMessageBox.information(self, self._("info"), self._("no_containers_linked"))
+            return
+
+        def _open_view(c):
+            try:
+                full = c_crud.get_by_id(c.id)
+            except Exception:
+                full = c
+            dlg = ViewContainerDialog(full, current_user=self.current_user, parent=self)
+            if dlg.exec():
+                self.reload_data()
+
+        if len(containers) == 1:
+            _open_view(containers[0])
+        else:
+            items = [
+                f"{c.container_no}  ({self._(f'container_status_{c.status}')})"
+                for c in containers
+            ]
+            choice, ok = QInputDialog.getItem(
+                self, self._("select_container"), self._("select_from_list"),
+                items, 0, False,
+            )
+            if ok:
+                _open_view(containers[items.index(choice)])
 
     # ---------- actions ----------
     def add_new_item(self):

@@ -173,6 +173,14 @@ class UsersCRUD(BaseCRUD):
         if getattr(user, "role", None):
             label_field = f"label_{lang}"
             role_label = getattr(user.role, label_field, getattr(user.role, "name", ""))
+        office_name = ""
+        if getattr(user, "office", None):
+            office_name = (
+                getattr(user.office, "name_ar", None)
+                or getattr(user.office, "name_en", None)
+                or getattr(user.office, "name",    None)
+                or ""
+            )
         return {
             "id": user.id,
             "username": user.username,
@@ -181,6 +189,8 @@ class UsersCRUD(BaseCRUD):
             "role": getattr(user.role, "name", "") if getattr(user, "role", None) else "",
             "role_label": role_label,
             "is_active": user.is_active,
+            "office_id":   getattr(user, "office_id", None),
+            "office_name": office_name,
         }
 
     # -----------------------------

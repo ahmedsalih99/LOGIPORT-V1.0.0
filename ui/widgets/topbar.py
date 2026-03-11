@@ -18,6 +18,7 @@ from core.settings_manager import SettingsManager
 from ui.widgets.notification_bell import NotificationBell
 from ui.utils.svg_icons import set_icon
 from ui.widgets.sync_widget import SyncWidget
+from core.permissions import has_perm, is_admin
 
 
 # ─── Avatar دائرة ملوّنة ────────────────────────────────────────────────────
@@ -161,6 +162,11 @@ class TopBar(QWidget):
         self.settings_btn = self._icon_btn("settings", self.open_settings)
         self.theme_btn    = self._icon_btn("theme",    self.toggle_theme)
         self.about_btn    = self._icon_btn("info",     self.about_requested.emit)
+
+        # إخفاء زر الإعدادات إذا لم يملك المستخدم صلاحية manage_settings
+        _u = self.settings.get("user")
+        self.settings_btn.setVisible(is_admin(_u) or has_perm(_u, "manage_settings"))
+
         lay.addWidget(self.settings_btn)
         lay.addWidget(self.theme_btn)
         lay.addWidget(self.about_btn)
@@ -283,6 +289,8 @@ class TopBar(QWidget):
             avatar_path = getattr(user, "avatar_path", None)
         self.user_chip.set_user(name, avatar_path)
         self._refresh_office()
+        # تحديث رؤية زر الإعدادات بناءً على صلاحية المستخدم الحالي
+        self.settings_btn.setVisible(is_admin(user) or has_perm(user, "manage_settings"))
 
     def _refresh_office(self):
         """يحدّث badge المكتب من OfficeContext."""

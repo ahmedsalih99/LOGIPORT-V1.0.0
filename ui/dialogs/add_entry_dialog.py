@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.base_dialog import BaseDialog
+from ui.widgets.searchable_combo import SearchableComboBox
 
 
 class _NoHoverTable(QTableWidget):
@@ -96,8 +97,12 @@ class AddEntryDialog(BaseDialog):
 
         self.le_seal_no = QLineEdit()
 
-        self.cmb_owner = QComboBox()
-        self._fill_clients()
+        self.cmb_owner = SearchableComboBox(parent=self)
+        self.cmb_owner.set_loader(
+            loader=self._search_clients,
+            display=self._client_display,
+            value=lambda c: c.id,
+        )
 
         r = 0
         grid.addWidget(QLabel(self._("entry_date")), r, 0)
@@ -242,11 +247,20 @@ class AddEntryDialog(BaseDialog):
             return obj.name_tr
         return getattr(obj, "name_en", None) or getattr(obj, "name_ar", None) or getattr(obj, "name_tr", None) or ""
 
-    def _fill_clients(self):
-        self.cmb_owner.clear()
-        self.cmb_owner.addItem(self._("choose"), None)
-        for c in self.clients:
-            self.cmb_owner.addItem(self._label(c), getattr(c, "id", None))
+    def _search_clients(self, q: str = "") -> list:
+        if not q:
+            return self.clients[:60]
+        q = q.casefold()
+        return [
+            c for c in self.clients
+            if q in (getattr(c, "name_ar", "") or "").casefold()
+            or q in (getattr(c, "name_en", "") or "").casefold()
+            or q in (getattr(c, "name_tr", "") or "").casefold()
+            or q in (getattr(c, "client_code", "") or "").casefold()
+        ][:60]
+
+    def _client_display(self, c, lang: str) -> str:
+        return self._label(c)
 
     def _add_row(self, preset: dict | None = None):
         self.table.setUpdatesEnabled(False)
@@ -365,9 +379,10 @@ class AddEntryDialog(BaseDialog):
         self.le_seal_no.setText(getattr(self.entry, "seal_no", "") or "")
 
         owner_id = getattr(self.entry, "owner_client_id", None)
-        idx = self.cmb_owner.findData(owner_id)
-        if idx != -1:
-            self.cmb_owner.setCurrentIndex(idx)
+        if owner_id:
+            owner_obj = next((c for c in self.clients if getattr(c, "id", None) == owner_id), None)
+            if owner_obj:
+                self.cmb_owner.set_value(owner_id, display_text=self._label(owner_obj))
 
         self.te_notes.setPlainText(getattr(self.entry, "notes", "") or "")
 
@@ -391,7 +406,7 @@ class AddEntryDialog(BaseDialog):
 
     # ---------- validation ----------
     def _accept(self):
-        if self.cmb_owner.currentData() is None:
+        if self.cmb_owner.current_value() is None:
             self._warn(self._("please_choose_owner_client"))
             return
 
@@ -435,7 +450,7 @@ class AddEntryDialog(BaseDialog):
             "transport_unit_type": self.cmb_transport_type.currentData() or None,
             "transport_ref": (self.le_transport_ref.text().strip() or None),
             "seal_no": (self.le_seal_no.text().strip() or None),
-            "owner_client_id": self.cmb_owner.currentData(),
+            "owner_client_id": self.cmb_owner.current_value(),
             "notes": (self.te_notes.toPlainText().strip() or None),
         }
 

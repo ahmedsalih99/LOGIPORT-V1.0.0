@@ -29,39 +29,65 @@ class Notification:
     LEVEL_DANGER  = "danger"
 
     ICONS = {
-        "create":  ("➕", "success"),
-        "insert":  ("➕", "success"),
-        "update":  ("✏️", "info"),
-        "delete":  ("🗑️", "danger"),
-        "import":  ("📥", "info"),
-        "export":  ("📤", "info"),
-        "print":   ("🖨️", "info"),
+        "create":       ("➕", "success"),
+        "insert":       ("➕", "success"),
+        "update":       ("✏️",  "info"),
+        "delete":       ("🗑️", "danger"),
+        "import":       ("📥", "info"),
+        "export":       ("📤", "info"),
+        "print":        ("🖨️", "info"),
+        "bulk_create":  ("📦", "success"),
+        "bulk_insert":  ("📦", "success"),
+        "bulk_delete":  ("🗑️", "danger"),
+        "login":        ("🔓", "success"),
+        "logout":       ("🔒", "info"),
+        "sync_ok":      ("☁️",  "success"),
+        "sync_error":   ("⚠️",  "warning"),
+        "backup_ok":    ("💾", "success"),
+        "backup_error": ("⚠️",  "warning"),
+        "pdf":          ("📄", "info"),
+        "manual":       ("📢", "info"),
     }
 
     TABLE_KEYS = {
-        "transactions":    "table_transactions",
-        "materials":       "table_materials",
-        "clients":         "table_clients",
-        "users":           "table_users",
-        "documents":       "table_documents",
-        "entries":         "table_entries",
-        "companies":       "table_companies",
-        "pricing":         "table_pricing",
-        "material_types":  "table_material_types",
-        "currencies":      "table_currencies",
-        "countries":       "table_countries",
-        "delivery_methods":"table_delivery_methods",
-        "packaging_types": "table_packaging_types",
+        "transactions":       "table_transactions",
+        "transaction_items":  "table_transaction_items",
+        "materials":          "table_materials",
+        "clients":            "table_clients",
+        "client_contacts":    "table_client_contacts",
+        "users":              "table_users",
+        "documents":          "table_documents",
+        "doc_groups":         "table_doc_groups",
+        "entries":            "table_entries",
+        "entry_items":        "table_entry_items",
+        "companies":          "table_companies",
+        "company_banks":      "table_company_banks",
+        "pricing":            "table_pricing",
+        "material_types":     "table_material_types",
+        "currencies":         "table_currencies",
+        "countries":          "table_countries",
+        "delivery_methods":   "table_delivery_methods",
+        "packaging_types":    "table_packaging_types",
+        "offices":            "table_offices",
+        "roles":              "table_roles",
+        "transport_details":  "table_transport_details",
+        "container_tracking": "table_container_tracking",
     }
 
     ACTION_KEYS = {
-        "create": "action_create",
-        "insert": "action_insert",
-        "update": "action_update",
-        "delete": "action_delete",
-        "import": "action_import",
-        "export": "action_export",
-        "print":  "action_print",
+        "create":       "action_create",
+        "insert":       "action_insert",
+        "update":       "action_update",
+        "delete":       "action_delete",
+        "import":       "action_import",
+        "export":       "action_export",
+        "print":        "action_print",
+        "bulk_create":  "action_bulk_create",
+        "bulk_insert":  "action_bulk_insert",
+        "bulk_delete":  "action_bulk_delete",
+        "login":        "action_login",
+        "logout":       "action_logout",
+        "pdf":          "action_pdf",
     }
 
     @classmethod
@@ -164,6 +190,39 @@ class NotificationService(QObject, QObjectSingletonMixin):
         n._msg  = message
         n.__class__ = _ManualNotif
         self._push(n)
+
+    def notify_login(self, user_name: str = ""):
+        _t = TranslationManager.get_instance().translate
+        msg = _t("notif_login").format(name=user_name) if user_name else _t("notif_login_generic")
+        self.add_manual(msg, level="success", icon="🔓")
+
+    def notify_logout(self, user_name: str = ""):
+        _t = TranslationManager.get_instance().translate
+        msg = _t("notif_logout").format(name=user_name) if user_name else _t("notif_logout_generic")
+        self.add_manual(msg, level="info", icon="🔒")
+
+    def notify_sync(self, success: bool, pushed: int = 0, pulled: int = 0, error: str = ""):
+        _t = TranslationManager.get_instance().translate
+        if success:
+            msg = _t("notif_sync_ok").format(pushed=pushed, pulled=pulled)
+            self.add_manual(msg, level="success", icon="☁️")
+        else:
+            msg = _t("notif_sync_error").format(error=error)
+            self.add_manual(msg, level="warning", icon="⚠️")
+
+    def notify_backup(self, success: bool, path: str = "", error: str = ""):
+        _t = TranslationManager.get_instance().translate
+        if success:
+            msg = _t("notif_backup_ok").format(path=path)
+            self.add_manual(msg, level="success", icon="💾")
+        else:
+            msg = _t("notif_backup_error").format(error=error)
+            self.add_manual(msg, level="warning", icon="⚠️")
+
+    def notify_pdf(self, doc_name: str = ""):
+        _t = TranslationManager.get_instance().translate
+        msg = _t("notif_pdf").format(name=doc_name) if doc_name else _t("notif_pdf_generic")
+        self.add_manual(msg, level="info", icon="📄")
 
     # ── private ─────────────────────────────────────────────────────────────
 

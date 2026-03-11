@@ -207,9 +207,6 @@ class BaseDialog(QDialog):
         if min_height:
             self.setMinimumHeight(min_height)
 
-        # Set window flags
-        self.setWindowFlag(Qt.Window, True)
-
         # Set modal by default
         self.setModal(True)
 

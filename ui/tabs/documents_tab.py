@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from core.base_tab import BaseTab, DateRangeBar
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from core.permissions import has_perm, is_admin
 
 try:
     from sqlalchemy import text
@@ -127,9 +128,10 @@ class DocumentsTab(BaseTab):
     COL_ACTIONS     = 5
 
     required_permissions: dict = {
-        "add":     None,
-        "export":  None,
-        "refresh": None,
+        "view":    ["view_documents"],
+        "add":     ["view_documents"],
+        "export":  ["view_documents"],
+        "refresh": ["view_documents"],
     }
 
     # ------------------------------------------------------------------
@@ -482,16 +484,19 @@ class DocumentsTab(BaseTab):
         btn_folder.clicked.connect(lambda _=False, r=rec: self._open_folder(r))
 
         # ── حذف ─────────────────────────────────────────
-        btn_delete = QPushButton("🗑")
-        btn_delete.setObjectName("table-delete")
-        btn_delete.setFixedSize(28, 26)
-        btn_delete.setCursor(Qt.PointingHandCursor)
-        btn_delete.setToolTip(_tr("delete"))
-        btn_delete.clicked.connect(lambda _=False, r=rec: self._delete_document(r))
+        _user = SettingsManager.get_instance().get("user")
+        _can_delete = is_admin(_user) or has_perm(_user, "delete_transaction")
+        if _can_delete:
+            btn_delete = QPushButton("🗑")
+            btn_delete.setObjectName("table-delete")
+            btn_delete.setFixedSize(28, 26)
+            btn_delete.setCursor(Qt.PointingHandCursor)
+            btn_delete.setToolTip(_tr("delete"))
+            btn_delete.clicked.connect(lambda _=False, r=rec: self._delete_document(r))
+            lay.addWidget(btn_delete)
 
         lay.addWidget(btn_open)
         lay.addWidget(btn_folder)
-        lay.addWidget(btn_delete)
         return cell
 
     # ------------------------------------------------------------------

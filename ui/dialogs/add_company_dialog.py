@@ -1,4 +1,5 @@
 from core.base_dialog import BaseDialog
+from ui.widgets.searchable_combo import SearchableComboBox
 from core.translator import TranslationManager
 
 from PySide6.QtWidgets import (
@@ -122,8 +123,12 @@ class AddCompanyDialog(BaseDialog):
         # ── Tab 2: Details ──
         t2 = self._make_tab()
         r = 0
-        self.cmb_owner = QComboBox()
-        self._fill_clients()
+        self.cmb_owner = SearchableComboBox(parent=self)
+        self.cmb_owner.set_loader(
+            loader=self._search_owner_clients,
+            display=self._owner_display,
+            value=lambda c: c.id if not isinstance(c, dict) else c.get("id"),
+        )
         self._row(t2, r, "owner_client", self.cmb_owner, required=True); r += 1
 
         self.cmb_country = QComboBox()
@@ -214,17 +219,25 @@ class AddCompanyDialog(BaseDialog):
             label = _name_by_lang(c, self._lang) or f"#{cid}"
             self.cmb_country.addItem(label, cid)
 
-    def _fill_clients(self):
-        self.cmb_owner.clear()
-        self.cmb_owner.addItem(self._("select_owner"), None)
-        for c in (self.clients or []):
-            cid = c.get("id") if isinstance(c, dict) else getattr(c, "id", None)
-            if isinstance(c, dict):
-                name = c.get("name_ar") or c.get("name_en") or c.get("name_tr") or f"#{cid}"
-            else:
-                name = (getattr(c, "name_ar", None) or getattr(c, "name_en", None) or
-                        getattr(c, "name_tr", None) or getattr(c, "name", None) or f"#{cid}")
-            self.cmb_owner.addItem(name, cid)
+    def _search_owner_clients(self, q: str = "") -> list:
+        clients = self.clients or []
+        if not q:
+            return clients[:60]
+        q = q.casefold()
+        return [
+            c for c in clients
+            if q in (getattr(c, "name_ar", "") or (c.get("name_ar") if isinstance(c, dict) else "") or "").casefold()
+            or q in (getattr(c, "name_en", "") or (c.get("name_en") if isinstance(c, dict) else "") or "").casefold()
+            or q in (getattr(c, "name_tr", "") or (c.get("name_tr") if isinstance(c, dict) else "") or "").casefold()
+        ][:60]
+
+    def _owner_display(self, c, lang: str) -> str:
+        if isinstance(c, dict):
+            return c.get(f"name_{lang}") or c.get("name_ar") or c.get("name_en") or f"#{c.get('id','?')}"
+        name = (getattr(c, f"name_{lang}", None) or getattr(c, "name_ar", None)
+                or getattr(c, "name_en", None) or getattr(c, "name_tr", None)
+                or getattr(c, "name", None))
+        return name or f"#{getattr(c, 'id', '?')}"
 
     # ──────────────────────────────────────────────
     # Prefill (edit mode)
@@ -263,7 +276,11 @@ class AddCompanyDialog(BaseDialog):
             oc = get("owner_client")
             if oc is not None:
                 owner_id = (oc.get("id") if isinstance(oc, dict) else getattr(oc, "id", None))
-        _set_combo(self.cmb_owner, owner_id)
+        if owner_id:
+            objs = self._search_owner_clients("")
+            obj  = next((c for c in objs if (c.get("id") if isinstance(c, dict) else getattr(c, "id", None)) == owner_id), None)
+            if obj:
+                self.cmb_owner.set_value(owner_id, display_text=self._owner_display(obj, self._lang))
 
         # country: من العمود المباشر او من relationship
         country_id = get("country_id") or None
@@ -301,7 +318,7 @@ class AddCompanyDialog(BaseDialog):
             "name_ar":             (self.name_ar.text() or "").strip().upper(),
             "name_en":             (self.name_en.text() or "").strip().upper(),
             "name_tr":             (self.name_tr.text() or "").strip().upper(),
-            "owner_client_id":     self.cmb_owner.currentData(),
+            "owner_client_id":     self.cmb_owner.current_value(),
             "country_id":          self.cmb_country.currentData(),
             "city":                (self.city.text() or "").strip(),
             "phone":               (self.phone.text() or "").strip(),

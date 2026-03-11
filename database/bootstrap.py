@@ -94,10 +94,16 @@ _PERMISSIONS = [
     (67, "add_office",            "Add new office",               "إضافة مكتب",        "Add Office",         "Ofis Ekle",                  "OFFICES"),
     (68, "edit_office",           "Edit office",                  "تعديل مكتب",        "Edit Office",        "Ofisi Düzenle",              "OFFICES"),
     (69, "delete_office",         "Delete office",                "حذف مكتب",          "Delete Office",      "Ofisi Sil",                  "OFFICES"),
+    # Container Tracking
+    (70, "view_containers",          "View container tracking",      "عرض تتبع الحاويات", "View Containers",    "Konteynerleri Görüntüle",    "CONTAINERS"),
+    (71, "add_container",            "Add container",                "إضافة حاوية",       "Add Container",      "Konteyner Ekle",             "CONTAINERS"),
+    (72, "edit_container",           "Edit container",               "تعديل حاوية",       "Edit Container",     "Konteyneri Düzenle",         "CONTAINERS"),
+    (73, "delete_container",         "Delete container",             "حذف حاوية",         "Delete Container",   "Konteyneri Sil",             "CONTAINERS"),
+    (74, "export_container_report",  "Export container report",      "تصدير تقرير الحاويات","Export Container Report","Konteyner Raporu",       "CONTAINERS"),
 ]
 
 _ROLE_PERMISSIONS = {
-    1: list(range(1, 70)),  # Admin → كل الصلاحيات (1-69)
+    1: list(range(1, 75)),  # Admin → كل الصلاحيات (1-74)
     3: [  # Manager
         1,2,3,4,6,7,8,10,11,12,14,
         16,17,18,19,          # materials
@@ -116,11 +122,12 @@ _ROLE_PERMISSIONS = {
         43,44,45,             # material types crud
         46,47,48,49,          # view lookups
         66,                   # view offices
+        70, 71, 72,           # containers (view+add+edit) بدون delete/export
     ],
     4: [16, 25, 49, 66],     # User: view materials/transactions/currencies + offices
     5: [],                   # Accountant — محذوف (غير مستخدم)
     6: [1, 16, 17, 18],      # Operator: view+add+edit materials
-    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49, 66],  # Viewer
+    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49, 66, 70],  # Viewer
     8: [1, 16],              # Client
     9: [1, 25, 26],          # Customs: dashboard + view transactions + view documents
 }
@@ -173,12 +180,6 @@ _APP_SETTINGS = [
     ("transaction_auto_increment",     "true", "numbering", "تفعيل الترقيم التلقائي"),
     ("document_naming_use_transaction","true", "numbering", "استخدام رقم المعاملة"),
     ("documents_output_path",          "",     "storage",   "مسار حفظ المستندات"),
-    # Sync settings
-    ("sync_supabase_url",              "",     "sync",      "رابط مشروع Supabase"),
-    ("sync_anon_key",                  "",     "sync",      "مفتاح Supabase anon"),
-    ("sync_office_id",                 "",     "sync",      "ID المكتب الحالي للمزامنة"),
-    ("sync_enabled",                   "false","sync",      "تفعيل المزامنة التلقائية"),
-    ("sync_interval_min",              "5",    "sync",      "فترة المزامنة التلقائية بالدقائق"),
 ]
 
 
@@ -228,6 +229,16 @@ def _run_migrations(conn) -> None:
             logger.info("Bootstrap: added avatar_path to users")
     except Exception as _e:
         logger.warning("Bootstrap: avatar_path migration skipped: %s", _e)
+
+    # Migration: category column for permissions
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(permissions)").fetchall()]
+        if "category" not in cols:
+            conn.execute("ALTER TABLE permissions ADD COLUMN category VARCHAR(50)")
+            conn.commit()
+            logger.info("Bootstrap: added category to permissions")
+    except Exception as _e:
+        logger.warning("Bootstrap: category (permissions) migration skipped: %s", _e)
 
     # Migration: office_id column for users
     try:
@@ -315,91 +326,61 @@ def _run_migrations(conn) -> None:
     conn.commit()
     logger.info("Bootstrap: performance indexes checked/created")
 
-    # Migration: sync columns (server_id + synced_at + office_id)
-    _SYNC_COLS = [
-        ("clients",              "server_id",  "TEXT"),
-        ("clients",              "synced_at",  "DATETIME"),
-        ("client_contacts",      "server_id",  "TEXT"),
-        ("client_contacts",      "synced_at",  "DATETIME"),
-        ("companies",            "server_id",  "TEXT"),
-        ("companies",            "synced_at",  "DATETIME"),
-        ("company_banks",        "server_id",  "TEXT"),
-        ("company_banks",        "synced_at",  "DATETIME"),
-        ("company_role_links",   "server_id",  "TEXT"),
-        ("company_partner_links","server_id",  "TEXT"),
-        ("entries",              "server_id",  "TEXT"),
-        ("entries",              "synced_at",  "DATETIME"),
-        ("entries",              "office_id",  "INTEGER"),
-        ("entry_items",          "server_id",  "TEXT"),
-        ("entry_items",          "synced_at",  "DATETIME"),
-        ("transactions",         "server_id",  "TEXT"),
-        ("transactions",         "synced_at",  "DATETIME"),
-        ("transaction_items",    "server_id",  "TEXT"),
-        ("transaction_items",    "synced_at",  "DATETIME"),
-        ("transaction_entries",  "server_id",  "TEXT"),
-        ("transport_details",    "server_id",  "TEXT"),
-        ("transport_details",    "synced_at",  "DATETIME"),
-        ("doc_groups",           "server_id",  "TEXT"),
-        ("doc_groups",           "synced_at",  "DATETIME"),
-        ("documents",            "server_id",  "TEXT"),
-        ("documents",            "synced_at",  "DATETIME"),
-        ("documents",            "office_id",  "INTEGER"),
-        ("users",                "server_id",  "TEXT"),
-        ("users",                "synced_at",  "DATETIME"),
-        ("audit_log",            "server_id",  "TEXT"),
-    ]
-    _col_cache = {}
-    for _tbl, _col, _typedef in _SYNC_COLS:
-        try:
-            if _tbl not in _col_cache:
-                _col_cache[_tbl] = [
-                    r[1] for r in conn.execute(f"PRAGMA table_info({_tbl})").fetchall()
-                ]
-            if _col not in _col_cache[_tbl]:
-                conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN {_col} {_typedef}")
-                _col_cache[_tbl].append(_col)
-                logger.info("Bootstrap: added %s.%s", _tbl, _col)
-        except Exception as _me:
-            logger.warning("Bootstrap: %s.%s sync migration skipped: %s", _tbl, _col, _me)
-
-    # Seed server_id للصفوف القديمة التي لا تملك server_id
-    import uuid as _uuid
-    _NEEDS_SERVER_ID = [
-        "clients", "client_contacts", "companies", "company_banks",
-        "entries", "entry_items",
-        "transactions", "transaction_items",
-        "transport_details", "doc_groups", "documents", "users",
-    ]
-    for _tbl in _NEEDS_SERVER_ID:
-        try:
-            if "server_id" not in _col_cache.get(_tbl, []):
-                continue
-            _rows = conn.execute(
-                f"SELECT id FROM {_tbl} WHERE server_id IS NULL"
-            ).fetchall()
-            for (_rid,) in _rows:
-                conn.execute(
-                    f"UPDATE {_tbl} SET server_id=? WHERE id=?",
-                    (str(_uuid.uuid4()), _rid)
-                )
-            if _rows:
-                logger.info("Bootstrap: seeded server_id for %d rows in %s", len(_rows), _tbl)
-        except Exception as _se:
-            logger.warning("Bootstrap: server_id seed for %s skipped: %s", _tbl, _se)
-
-    # جدول local_sync_cursors — يحفظ آخر cursor للمزامنة محلياً
+    # Migration: جدول container_tracking + container_entry_links
     try:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS local_sync_cursors (
-                table_name   TEXT NOT NULL,
-                direction    TEXT NOT NULL,
-                last_cursor  TEXT NOT NULL DEFAULT '1970-01-01T00:00:00+00:00',
-                PRIMARY KEY (table_name, direction)
+            CREATE TABLE IF NOT EXISTS container_tracking (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                transaction_id    INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+                client_id         INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+                container_no      VARCHAR(32) NOT NULL,
+                bl_number         VARCHAR(64),
+                booking_no        VARCHAR(64),
+                shipping_line     VARCHAR(128),
+                vessel_name       VARCHAR(128),
+                voyage_no         VARCHAR(32),
+                port_of_loading   VARCHAR(128),
+                port_of_discharge VARCHAR(128),
+                final_destination VARCHAR(128),
+                etd               DATE,
+                eta               DATE,
+                atd               DATE,
+                ata               DATE,
+                customs_date      DATE,
+                delivery_date     DATE,
+                status            VARCHAR(32) NOT NULL DEFAULT 'booked',
+                notes             TEXT,
+                created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        logger.info("Bootstrap: local_sync_cursors ready")
-    except Exception as _lse:
-        logger.warning("Bootstrap: local_sync_cursors skipped: %s", _lse)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS container_entry_links (
+                container_id INTEGER NOT NULL REFERENCES container_tracking(id) ON DELETE CASCADE,
+                entry_id     INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+                PRIMARY KEY (container_id, entry_id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_transaction_id ON container_tracking(transaction_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id      ON container_tracking(client_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_container_no   ON container_tracking(container_no)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_status         ON container_tracking(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_cel_entry_id      ON container_entry_links(entry_id)")
+        conn.commit()
+        logger.info("Bootstrap: container_tracking + container_entry_links جاهزين")
+    except Exception as _e:
+        logger.warning("Bootstrap: container_tracking migration skipped: %s", _e)
+
+    # Migration: client_id على container_tracking (للـ DBs القديمة التي أُنشئت بدونه)
+    try:
+        _ct_cols = [r[1] for r in conn.execute("PRAGMA table_info(container_tracking)").fetchall()]
+        if _ct_cols and "client_id" not in _ct_cols:
+            conn.execute("ALTER TABLE container_tracking ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL")
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id ON container_tracking(client_id)")
+            conn.commit()
+            logger.info("Bootstrap: added client_id to container_tracking")
+    except Exception as _e:
+        logger.warning("Bootstrap: container_tracking client_id migration skipped: %s", _e)
 
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
@@ -570,39 +551,26 @@ def _seed_roles(cur: sqlite3.Cursor) -> None:
 
 
 def _seed_permissions(cur: sqlite3.Cursor) -> None:
-    # تحقق هل العمود category موجود
-    cols = {row[1] for row in cur.execute("PRAGMA table_info(permissions)").fetchall()}
-    has_category = "category" in cols
-
-    for row in _PERMISSIONS:
-        pid, code, desc, label_ar, label_en, label_tr, category = row
+    for pid, code, desc, label_ar, label_en, label_tr, category in _PERMISSIONS:
         exists = cur.execute("SELECT 1 FROM permissions WHERE id=?", (pid,)).fetchone()
         if exists:
-            if has_category:
-                cur.execute(
-                    "UPDATE permissions SET code=?, description=?, label_ar=?, label_en=?, label_tr=?, category=? WHERE id=?",
-                    (code, desc, label_ar, label_en, label_tr, category, pid)
-                )
-            else:
-                cur.execute(
-                    "UPDATE permissions SET code=?, description=?, label_ar=?, label_en=?, label_tr=? WHERE id=?",
-                    (code, desc, label_ar, label_en, label_tr, pid)
-                )
+            cur.execute(
+                "UPDATE permissions SET code=?, description=?, label_ar=?, label_en=?, label_tr=?, category=? WHERE id=?",
+                (code, desc, label_ar, label_en, label_tr, category, pid)
+            )
         else:
-            if has_category:
-                cur.execute(
-                    "INSERT INTO permissions (id, code, description, label_ar, label_en, label_tr, category) VALUES (?,?,?,?,?,?,?)",
-                    (pid, code, desc, label_ar, label_en, label_tr, category)
-                )
-            else:
-                cur.execute(
-                    "INSERT INTO permissions (id, code, description, label_ar, label_en, label_tr) VALUES (?,?,?,?,?,?)",
-                    (pid, code, desc, label_ar, label_en, label_tr)
-                )
+            cur.execute(
+                "INSERT INTO permissions (id, code, description, label_ar, label_en, label_tr, category) VALUES (?,?,?,?,?,?,?)",
+                (pid, code, desc, label_ar, label_en, label_tr, category)
+            )
 
 
 def _seed_role_permissions(cur: sqlite3.Cursor) -> None:
     for role_id, perm_ids in _ROLE_PERMISSIONS.items():
+        if not perm_ids:
+            # الدور معرَّف بقائمة فارغة — امسح أي صلاحيات موجودة له (تنظيف بيانات قديمة)
+            cur.execute("DELETE FROM role_permissions WHERE role_id=?", (role_id,))
+            continue
         for perm_id in perm_ids:
             exists = cur.execute(
                 "SELECT 1 FROM role_permissions WHERE role_id=? AND permission_id=?",
@@ -665,34 +633,18 @@ def _seed_pricing_types(cur: sqlite3.Cursor) -> None:
     if not exists_tbl:
         return
 
-    # تحقق هل الأعمدة الممتدة موجودة
-    cols = {row[1] for row in cur.execute("PRAGMA table_info(pricing_types)").fetchall()}
-    has_extended = "compute_by" in cols
-
     for pid, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor in _PRICING_TYPES:
         exists = cur.execute("SELECT 1 FROM pricing_types WHERE id=?", (pid,)).fetchone()
         if exists:
-            if has_extended:
-                cur.execute(
-                    "UPDATE pricing_types SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, sort_order=?, compute_by=?, price_unit=?, divisor=? WHERE id=?",
-                    (code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor, pid)
-                )
-            else:
-                cur.execute(
-                    "UPDATE pricing_types SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, sort_order=? WHERE id=?",
-                    (code, name_ar, name_en, name_tr, is_active, sort_order, pid)
-                )
+            cur.execute(
+                "UPDATE pricing_types SET code=?, name_ar=?, name_en=?, name_tr=?, is_active=?, sort_order=?, compute_by=?, price_unit=?, divisor=? WHERE id=?",
+                (code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor, pid)
+            )
         else:
-            if has_extended:
-                cur.execute(
-                    "INSERT INTO pricing_types (id, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (pid, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor)
-                )
-            else:
-                cur.execute(
-                    "INSERT INTO pricing_types (id, code, name_ar, name_en, name_tr, is_active, sort_order) VALUES (?,?,?,?,?,?,?)",
-                    (pid, code, name_ar, name_en, name_tr, is_active, sort_order)
-                )
+            cur.execute(
+                "INSERT INTO pricing_types (id, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (pid, code, name_ar, name_en, name_tr, is_active, sort_order, compute_by, price_unit, divisor)
+            )
 
 
 

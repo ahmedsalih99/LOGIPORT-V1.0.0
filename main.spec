@@ -20,16 +20,19 @@ a = Analysis(
         ('documents/builders', 'documents/builders'),
         ('documents/__init__.py', 'documents'),
         ('documents/registry.py', 'documents'),
+        ('data/avatars', 'data/avatars'),
     ],
     hiddenimports=[
-        # ── PySide6 ────────────────────────────────────────────────────
+        # PySide6
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
         'PySide6.QtPrintSupport',
-        'PySide6.QtSvg',               # SVG icons (with fallback if unavailable)
+        'PySide6.QtSvg',
+        'PySide6.QtWebEngineCore',
+        'PySide6.QtWebEngineWidgets',
 
-        # ── SQLAlchemy ─────────────────────────────────────────────────
+        # SQLAlchemy
         'sqlalchemy',
         'sqlalchemy.orm',
         'sqlalchemy.orm.session',
@@ -41,42 +44,39 @@ a = Analysis(
         'sqlalchemy.engine',
         'sqlalchemy.engine.url',
 
-        # -- QtWebEngine (PDF rendering -- replaces Playwright) --------------------
-        'PySide6.QtWebEngineCore',
-        'PySide6.QtWebEngineWidgets',
-
-        # ── Jinja2 ─────────────────────────────────────────────────────
+        # Jinja2
         'jinja2',
         'jinja2.ext',
         'jinja2.loaders',
         'markupsafe',
 
-        # ── bcrypt / passlib ───────────────────────────────────────────
+        # bcrypt / passlib
         'bcrypt',
         'passlib',
         'passlib.handlers',
         'passlib.handlers.bcrypt',
 
-        # ── openpyxl ───────────────────────────────────────────────────
+        # openpyxl
         'openpyxl',
         'openpyxl.styles',
         'openpyxl.utils',
 
-        # ── dotenv ─────────────────────────────────────────────────────
+        # dotenv
         'dotenv',
 
-        # ── stdlib ─────────────────────────────────────────────────────
+        # stdlib
         'pkgutil',
         'importlib.util',
         'importlib.machinery',
         'concurrent.futures',
         'logging.handlers',
 
-        # ── UI Tabs (Lazy loaded — PyInstaller لا يكتشفها تلقائياً) ────
+        # UI Tabs
         'ui.tabs.admin_dashboard_tab',
         'ui.tabs.audit_trail_tab',
         'ui.tabs.clients_tab',
         'ui.tabs.companies_tab',
+        'ui.tabs.container_tracking_tab',
         'ui.tabs.countries_tab',
         'ui.tabs.currencies_tab',
         'ui.tabs.dashboard_tab',
@@ -95,15 +95,16 @@ a = Analysis(
         'ui.tabs.users_tab',
         'ui.tabs.values_tab',
 
-        # ── UI Dialogs ─────────────────────────────────────────────────
+        # UI Dialogs
         'ui.dialogs.about_dialog',
-        'ui.dialogs.global_search_dialog',     # Global Search (Ctrl+F)
+        'ui.dialogs.global_search_dialog',
         'ui.dialogs.add_TransactionWindow.window',
         'ui.dialogs.add_client_dialog',
         'ui.dialogs.add_company_dialog',
         'ui.dialogs.add_country_dialog',
         'ui.dialogs.add_currency_dialog',
         'ui.dialogs.add_delivery_method_dialog',
+        'ui.dialogs.add_edit_container_dialog',
         'ui.dialogs.add_entry_dialog',
         'ui.dialogs.add_material_dialog',
         'ui.dialogs.add_material_type_dialog',
@@ -123,24 +124,27 @@ a = Analysis(
         'ui.dialogs.mixins.parties_geo_tab',
         'ui.dialogs.mixins.transport_tab',
         'ui.dialogs.pick_entries_dialog',
+        'ui.dialogs.sync_settings_dialog',
         'ui.dialogs.update_dialog',
         'ui.dialogs.users_dialogs',
         'ui.dialogs.view_details._view_helpers',
         'ui.dialogs.view_details.view_client_dialog',
         'ui.dialogs.view_details.view_company_dialog',
+        'ui.dialogs.view_details.view_container_dialog',
         'ui.dialogs.view_details.view_country_dialog',
         'ui.dialogs.view_details.view_currency_dialog',
         'ui.dialogs.view_details.view_delivery_method_dialog',
         'ui.dialogs.view_details.view_entry_dialog',
         'ui.dialogs.view_details.view_material_dialog',
         'ui.dialogs.view_details.view_material_type_dialog',
+        'ui.dialogs.view_details.view_office_dialog',
         'ui.dialogs.view_details.view_packaging_type_dialog',
         'ui.dialogs.view_details.view_pricing_dialog',
         'ui.dialogs.view_details.view_role_dialog',
         'ui.dialogs.view_details.view_transaction_dialog',
         'ui.dialogs.view_details.view_user_dialog',
 
-        # ── UI Widgets ─────────────────────────────────────────────────
+        # UI Widgets
         'ui.login_window',
         'ui.main_window',
         'ui.settings_window',
@@ -148,20 +152,23 @@ a = Analysis(
         'ui.widgets.custom_button',
         'ui.widgets.custom_table',
         'ui.widgets.notification_bell',
+        'ui.widgets.searchable_combo',
         'ui.widgets.sidebar',
+        'ui.widgets.sync_widget',
         'ui.widgets.topbar',
 
-        # ── UI Utils ───────────────────────────────────────────────────
+        # UI Utils
         'ui.utils',
-        'ui.utils.svg_icons',          # SVG icon helpers for topbar & sidebar
+        'ui.utils.svg_icons',
+        'ui.utils.__init___utils',
 
-        # ── Utils ──────────────────────────────────────────────────────
+        # Utils
         'utils.auth_utils',
         'utils.password_utils',
         'utils.paths',
         'utils.user_utils',
 
-        # ── Core ───────────────────────────────────────────────────────
+        # Core
         'core.admin_columns',
         'core.base_details_view',
         'core.base_dialog',
@@ -181,15 +188,15 @@ a = Analysis(
         'core.theme_manager',
         'core.translator',
 
-        # ── Database ───────────────────────────────────────────────────
+        # Database
         'database.audit_helper',
         'database.bootstrap',
         'database.crud.audit_log_crud',
         'database.crud.base_crud',
-        # base_crud_v5 removed — file deleted
         'database.crud.clients_crud',
         'database.crud.companies_crud',
         'database.crud.company_roles_crud',
+        'database.crud.container_tracking_crud',
         'database.crud.countries_crud',
         'database.crud.currencies_crud',
         'database.crud.delivery_methods_crud',
@@ -213,6 +220,7 @@ a = Analysis(
         'database.models.client',
         'database.models.company',
         'database.models.company_role',
+        'database.models.container_tracking',
         'database.models.country',
         'database.models.currency',
         'database.models.delivery_method',
@@ -230,19 +238,21 @@ a = Analysis(
         'database.models.pricing_type',
         'database.models.role',
         'database.models.role_permission',
+        'database.models.sync_models',
         'database.models.transaction',
         'database.models.transaction_item',
         'database.models.transport_details',
         'database.models.user',
         'database.models.utils',
 
-        # ── Services ───────────────────────────────────────────────────
+        # Services
         'services.backup_service',
         'services.builder_router',
+        'services.container_report_service',
         'services.excel_service',
         'services.exceptions',
         'services.facade',
-        'services.global_search_service',  # Global Search backend
+        'services.global_search_service',
         'services.healthcheck',
         'services.html_engine',
         'services.notification_service',
@@ -251,19 +261,24 @@ a = Analysis(
         'services.persist_generated_doc',
         'services.pricing_service',
         'services.storage_service',
+        'services.supabase_client',
         'services.sync_service',
         'services.tafqit_service',
         'services.updater_service',
 
-        # ── config/themes ──────────────────────────────────────────────
+        # config / themes
+        'config.settings',
         'config.themes',
         'config.themes.builder',
         'config.themes.palettes',
+        'config.themes.presets.dark',
+        'config.themes.presets.light',
         'config.themes.semantic_colors',
         'config.themes.border_radius',
         'config.themes.spacing',
         'config.themes.typography',
         'config.themes.components',
+        'config.themes.components.base',
         'config.themes.components.buttons',
         'config.themes.components.cards',
         'config.themes.components.forms',

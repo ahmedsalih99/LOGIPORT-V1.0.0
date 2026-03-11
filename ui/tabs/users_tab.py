@@ -53,11 +53,12 @@ class UsersTab(BaseTab):
 
         self.set_columns_for_role(
             base_columns=[
-                {"label": "username",  "key": "username"},
-                {"label": "full_name", "key": "full_name"},
-                {"label": "role",      "key": "role"},
-                {"label": "status",    "key": "status"},
-                {"label": "actions",   "key": "actions"},
+                {"label": "username",    "key": "username"},
+                {"label": "full_name",   "key": "full_name"},
+                {"label": "role",        "key": "role"},
+                {"label": "office",      "key": "office_name"},
+                {"label": "status",      "key": "status"},
+                {"label": "actions",     "key": "actions"},
             ],
             admin_columns=[
                 {"label": "ID",         "key": "id"},
@@ -142,6 +143,7 @@ class UsersTab(BaseTab):
                 "username": u.get("username", ""),
                 "full_name": u.get("full_name", ""),
                 "role": u.get("role_label", u.get("role", "")),
+                "office_name": u.get("office_name", ""),
                 "status": self._("active") if u.get("is_active") else self._("inactive"),
                 "actions": u,
             }
@@ -232,7 +234,7 @@ class UsersTab(BaseTab):
             self.users_crud.update_user(
                 user.get("id") if isinstance(user, dict) else user.id,
                 update_data,
-                user_id=self._user_id(),
+                admin_user_id=self._user_id(),
             )
             QMessageBox.information(self, self._("updated"), self._("user_updated_success"))
             self.reload_data()

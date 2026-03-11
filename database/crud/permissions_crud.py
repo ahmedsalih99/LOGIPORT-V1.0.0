@@ -106,6 +106,7 @@ class PermissionsCRUD(BaseCRUD):
             "label_tr": p.label_tr,
             "label": getattr(p, label_field, None) or p.code,
             "description": p.description,
+            "category": getattr(p, "category", None) or "OTHER",
         }
 
 
@@ -260,8 +261,10 @@ TAB_PERMISSIONS: Dict[str, str] = {
     "pricing":           "view_pricing",
     "entries":           "view_entries",
     "transactions":      "view_transactions",
+    "container_tracking":"view_transactions",
     "documents":         "view_documents",
     "values":            "view_values",
+    "users":             "view_users",
     "users_permissions": "view_users_roles",
     "audit_trail":       "view_audit_trail",
     "control_panel":     "view_control_panel",
@@ -304,7 +307,7 @@ def all_permissions(language: str = "ar") -> List[Dict[str, Any]]:
     label_field = f"label_{language}"
     SessionLocal = get_session_local()
     with SessionLocal() as session:
-        perms = session.query(Permission).all()
+        perms = session.query(Permission).order_by(Permission.id).all()
         return [
             {
                 "id": p.id,
@@ -314,6 +317,7 @@ def all_permissions(language: str = "ar") -> List[Dict[str, Any]]:
                 "label_en": p.label_en,
                 "label_tr": p.label_tr,
                 "description": p.description,
+                "category": (getattr(p, "category", None) or "OTHER").upper(),
             }
             for p in perms
         ]

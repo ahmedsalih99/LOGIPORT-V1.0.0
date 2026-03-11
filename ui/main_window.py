@@ -37,13 +37,14 @@ _TAB_IMPORT_MAP = {
     "pricing":           ("ui.tabs.pricing_tab",          "PricingTab"),
     "entries":           ("ui.tabs.entries_tab",          "EntriesTab"),
     "transactions":      ("ui.tabs.transactions_tab",     "TransactionsTab"),
+    "container_tracking":("ui.tabs.container_tracking_tab","ContainerTrackingTab"),
     "documents":         ("ui.tabs.documents_tab",        "DocumentsTab"),
     "control_panel":     ("ui.tabs.admin_dashboard_tab",  "AdminDashboardTab"),
     "audit_trail":       ("ui.tabs.audit_trail_tab",      "AuditTrailTab"),
     "offices":           ("ui.tabs.offices_tab",            "OfficesTab"),
 }
 
-_TABS_NEEDING_USER = {"users", "users_permissions", "offices"}
+_TABS_NEEDING_USER = {"users", "users_permissions", "offices", "container_tracking"}
 
 
 class MainWindow(BaseWindow):
@@ -96,6 +97,7 @@ class MainWindow(BaseWindow):
             level="success",
             icon="🎉",
         )
+        self._notif_svc.notify_login(user_name)
 
         # ── التحقق من التحديثات بعد 5 ثوانٍ (في الخلفية) ──────────────────
         from PySide6.QtCore import QTimer
@@ -202,9 +204,6 @@ class MainWindow(BaseWindow):
         except Exception:
             pass
         right_col_layout.addWidget(self.top_bar)
-
-        # ── بدء SyncService التلقائي ──────────────────────────────────────────
-        self._start_sync_service()
 
         # Content Stack
         self.stack = QStackedWidget()
@@ -356,26 +355,7 @@ class MainWindow(BaseWindow):
             dlg = SyncSettingsDialog(self)
             dlg.exec()
         except Exception as e:
-            QMessageBox.warning(self, "خطأ", f"تعذّر فتح إعدادات المزامنة:\n{e}")
-
-    def _start_sync_service(self):
-        """يبدأ SyncService عند فتح الـ MainWindow إذا كان الـ sync مفعّلاً."""
-        try:
-            from core.settings_manager import SettingsManager
-            from services.sync_service import get_sync_service
-            sm  = SettingsManager.get_instance()
-            svc = get_sync_service()
-            if sm.get("sync_enabled", "false").lower() == "true":
-                office_id = sm.get("sync_office_id", "")
-                interval  = int(sm.get("sync_interval_min", "5") or "5")
-                if office_id:
-                    svc.configure(
-                        office_id=int(office_id),
-                        interval_seconds=interval * 60,
-                    )
-                    svc.start_auto_sync()
-        except Exception:
-            pass
+            logger.error(f"Failed to open sync settings: {e}")
 
     def _open_profile(self):
         self.stack.setCurrentWidget(self._get_or_build_profile_tab())
@@ -390,6 +370,17 @@ class MainWindow(BaseWindow):
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QDialog
         from ui.login_window import LoginWindow
+
+        # إشعار تسجيل الخروج قبل إيقاف الخدمة
+        try:
+            user_name = (
+                getattr(self.current_user, "full_name", None)
+                or getattr(self.current_user, "username", None)
+                or ""
+            )
+            self._notif_svc.notify_logout(user_name)
+        except Exception:
+            pass
 
         self._notif_svc.stop()
         SettingsManager.get_instance().set("user", None)
@@ -462,6 +453,7 @@ class MainWindow(BaseWindow):
             level="success",
             icon="🎉",
         )
+        self._notif_svc.notify_login(user_name)
 
         # 6) أظهر النافذة
         self.show()

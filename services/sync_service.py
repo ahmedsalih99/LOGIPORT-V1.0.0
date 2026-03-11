@@ -319,6 +319,24 @@ class SyncService:
             result.finish()
             self._running = False
 
+        # إشعار نتيجة المزامنة
+        try:
+            from services.notification_service import NotificationService
+            svc = NotificationService.get_instance()
+            if result.ok:
+                svc.notify_sync(
+                    success=True,
+                    pushed=result.total_pushed,
+                    pulled=result.total_pulled,
+                )
+            else:
+                svc.notify_sync(
+                    success=False,
+                    error=result.errors[0] if result.errors else "unknown",
+                )
+        except Exception:
+            pass
+
         return result
 
     # ─────────────────────────────────────────────

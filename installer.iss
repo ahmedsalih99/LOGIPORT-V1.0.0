@@ -25,6 +25,7 @@ SetupIconFile=icons\logo.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
+; يسمح للمستخدم العادي بالتثبيت بدون admin — وإذا أراد admin يختار ذلك
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 WizardStyle=modern
@@ -36,6 +37,8 @@ VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}
+; منع تشغيل نسختين من المثبّت في نفس الوقت
+AppMutex=LOGIPORT_Setup_Mutex
 
 [Languages]
 Name: "arabic";  MessagesFile: "compiler:Languages\Arabic.isl"
@@ -45,24 +48,34 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create Desktop Shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
+; ملفات التطبيق الرئيسية
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Dirs]
+; إنشاء مجلد البيانات والسجلات مع صلاحيات كتابة للمستخدم
+Name: "{userappdata}\LOGIPORT\logs"; Permissions: users-full
+Name: "{userappdata}\LOGIPORT\backups"; Permissions: users-full
+Name: "{userappdata}\LOGIPORT\documents"; Permissions: users-full
+
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
-Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{group}\{#AppName}";            Filename: "{app}\{#AppExeName}"
+Name: "{group}\Uninstall {#AppName}";  Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#AppName}";      Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\__pycache__"
+Type: filesandordirs; Name: "{app}\logs"
 
 [Registry]
-Root: HKCU; Subkey: "Software\{#AppName}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\{#AppName}"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
+Root: HKCU; Subkey: "Software\{#AppName}";                          ValueType: string; ValueName: "InstallPath"; ValueData: "{app}";          Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\{#AppName}";                          ValueType: string; ValueName: "Version";     ValueData: "{#AppVersion}"
+Root: HKCU; Subkey: "Software\{#AppName}";                          ValueType: string; ValueName: "DataPath";    ValueData: "{userappdata}\LOGIPORT"
 
 [Code]
+// إذا كانت هناك نسخة قديمة مثبّتة — قم بإلغاء تثبيتها صامتاً قبل التثبيت الجديد
 function InitializeSetup(): Boolean;
 var
   UninstallString: String;

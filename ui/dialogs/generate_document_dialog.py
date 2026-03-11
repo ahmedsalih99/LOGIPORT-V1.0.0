@@ -922,6 +922,15 @@ class GenerateDocumentDialog(_BaseDialog):
         files = result.get("files", [])
         if not files:
             QMessageBox.information(self, _("done"), _("nothing_generated")); return
+
+        # إشعار نجاح توليد المستند
+        try:
+            from services.notification_service import NotificationService
+            doc_name = files[0].get("name", "") if files else ""
+            NotificationService.get_instance().notify_pdf(doc_name)
+        except Exception:
+            pass
+
         _ResultsDialog(files, result.get("html_only", False), self).exec()
 
     def _on_failed(self, err):

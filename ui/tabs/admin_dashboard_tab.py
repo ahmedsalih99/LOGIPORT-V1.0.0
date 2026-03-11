@@ -241,8 +241,6 @@ class AdminDashboardTab(QWidget):
         lay.addWidget(sep)
 
         self._db_info_container = QWidget()
-        self._db_info_container.setAutoFillBackground(False)
-        self._db_info_container.setStyleSheet("QWidget { background: transparent; }")
         self._db_info_layout = QVBoxLayout(self._db_info_container)
         self._db_info_layout.setSpacing(8)
         self._db_info_layout.setContentsMargins(0, 0, 0, 0)
@@ -255,8 +253,6 @@ class AdminDashboardTab(QWidget):
         lay.addWidget(self._sys_title_lbl)
 
         self._health_container = QWidget()
-        self._health_container.setAutoFillBackground(False)
-        self._health_container.setStyleSheet("QWidget { background: transparent; }")
         self._health_layout = QVBoxLayout(self._health_container)
         self._health_layout.setSpacing(6)
         self._health_layout.setContentsMargins(0, 0, 0, 0)
@@ -438,7 +434,6 @@ class AdminDashboardTab(QWidget):
 
         for label, value in items:
             row = QWidget()
-            row.setStyleSheet("QWidget { background: transparent; }")
             rlay = QHBoxLayout(row)
             rlay.setContentsMargins(0, 0, 0, 0)
 
@@ -476,7 +471,6 @@ class AdminDashboardTab(QWidget):
 
         for name, ok in checks:
             row = QWidget()
-            row.setStyleSheet("QWidget { background: transparent; }")
             rlay = QHBoxLayout(row)
             rlay.setContentsMargins(0, 0, 0, 0)
 
@@ -519,8 +513,8 @@ class AdminDashboardTab(QWidget):
             sz = round(path.stat().st_size / 1024, 1)
 
             from services.notification_service import NotificationService
-            NotificationService.get_instance().add_manual(
-                self._("backup_success_msg").format(size=sz), level="success", icon="💾"
+            NotificationService.get_instance().notify_backup(
+                success=True, path=str(path)
             )
 
             QMessageBox.information(self, self._("backup_dialog_title"),
@@ -529,6 +523,13 @@ class AdminDashboardTab(QWidget):
             self._refresh_stats()
 
         except Exception as e:
+            try:
+                from services.notification_service import NotificationService
+                NotificationService.get_instance().notify_backup(
+                    success=False, error=str(e)
+                )
+            except Exception:
+                pass
             QMessageBox.critical(self, self._("error"), self._("backup_failed_msg") + f"\n{e}")
         finally:
             self._backup_btn.setEnabled(True)

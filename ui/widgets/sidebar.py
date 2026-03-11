@@ -29,6 +29,7 @@ ICON_PATHS = {
     "pricing":           "icons/pricing.png",
     "entries":           "icons/entries.png",
     "transactions":      "icons/transactions.png",
+    "container_tracking":"icons/container.png",
     "documents":         "icons/documents.png",
     "values":            "icons/values.png",
     "offices":           "icons/settings.png",      # offices tab — يستخدم settings icon مؤقتاً

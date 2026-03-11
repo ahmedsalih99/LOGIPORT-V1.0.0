@@ -1,4 +1,5 @@
 from core.base_dialog import BaseDialog
+from ui.widgets.searchable_combo import SearchableComboBox
 from core.translator import TranslationManager
 
 from PySide6.QtWidgets import (
@@ -59,10 +60,20 @@ class AddPricingDialog(BaseDialog):
         r = 0
 
         # Combos
-        self.cmb_seller = QComboBox(); self._fill_companies(self.cmb_seller, self.sellers)
+        self.cmb_seller = SearchableComboBox(parent=self)
+        self.cmb_seller.set_loader(
+            loader=self._search_companies,
+            display=self._company_display,
+            value=lambda c: c.id,
+        )
         self._add_row(general, r, "seller_company", self.cmb_seller); r += 1
 
-        self.cmb_buyer  = QComboBox(); self._fill_companies(self.cmb_buyer, self.buyers)
+        self.cmb_buyer = SearchableComboBox(parent=self)
+        self.cmb_buyer.set_loader(
+            loader=self._search_companies,
+            display=self._company_display,
+            value=lambda c: c.id,
+        )
         self._add_row(general, r, "buyer_company", self.cmb_buyer); r += 1
 
         self.cmb_material = QComboBox(); self._fill_materials()
@@ -94,8 +105,8 @@ class AddPricingDialog(BaseDialog):
         # Prefill
         if self.pricing:
             g = self._get
-            self._set_current(self.cmb_seller, g("seller_company_id"))
-            self._set_current(self.cmb_buyer,  g("buyer_company_id"))
+            self._set_searchable(self.cmb_seller, g("seller_company_id"))
+            self._set_searchable(self.cmb_buyer,  g("buyer_company_id"))
             self._set_current(self.cmb_material, g("material_id"))
             self._set_current(self.cmb_ptype, g("pricing_type_id"))
             self._set_current(self.cmb_currency, g("currency_id"))
@@ -131,6 +142,40 @@ class AddPricingDialog(BaseDialog):
         lbl = QLabel(self._(label_key))
         tab_dict["grid"].addWidget(lbl, row_index, 0)
         tab_dict["grid"].addWidget(widget, row_index, 1)
+
+    @staticmethod
+    def _search_companies(q: str = "") -> list:
+        try:
+            from database.models import get_session_local
+            from database.models.company import Company
+            from sqlalchemy import or_
+            with get_session_local()() as s:
+                qs = s.query(Company)
+                if q:
+                    qf = f"%{q}%"
+                    qs = qs.filter(
+                        or_(
+                            Company.name_ar.ilike(qf),
+                            Company.name_en.ilike(qf),
+                            Company.name_tr.ilike(qf),
+                        )
+                    )
+                results = qs.order_by(Company.id).limit(60).all()
+                s.expunge_all()
+                return results
+        except Exception:
+            return []
+
+    def _company_display(self, c, lang: str) -> str:
+        return _name_by_lang(c, self._lang)
+
+    def _set_searchable(self, combo: SearchableComboBox, record_id):
+        if not record_id:
+            return
+        objs = self._search_companies("")
+        obj  = next((o for o in objs if getattr(o, "id", None) == record_id), None)
+        if obj:
+            combo.set_value(record_id, display_text=_name_by_lang(obj, self._lang))
 
     def _fill_companies(self, combo: QComboBox, companies):
         combo.clear()
@@ -265,8 +310,8 @@ class AddPricingDialog(BaseDialog):
     # ---- data & validation ----
     def get_data(self):
         return {
-            "seller_company_id": self.cmb_seller.currentData(),
-            "buyer_company_id":  self.cmb_buyer.currentData(),
+            "seller_company_id": self.cmb_seller.current_value(),
+            "buyer_company_id":  self.cmb_buyer.current_value(),
             "material_id":       self.cmb_material.currentData(),
             "pricing_type_id":   self.cmb_ptype.currentData(),
             "price":             (self.txt_price.text() or "").strip(),

@@ -177,6 +177,13 @@ _ICONS: dict[str, str] = {
         <polyline points="23 20 23 14 17 14"/>
         <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
     </svg>""",
+    "container_tracking": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="7" width="22" height="13" rx="2"/>
+        <path d="M1 10h22"/>
+        <path d="M7 10v10"/>
+        <path d="M17 10v10"/>
+        <path d="M6 4l3-3h6l3 3"/>
+    </svg>""",
 }
 
 # fallback text للـ SVG إذا QtSvg غير متوفر
@@ -205,6 +212,7 @@ _FALLBACK_TEXT: dict[str, str] = {
     "office":            "⊞",
     "offices":           "⊞",
     "sync":              "↻",
+    "container_tracking":"⊡",
 }
 
 

@@ -21,6 +21,7 @@ from .entry_item import EntryItem
 from .transaction import Transaction
 from .transport_details import TransportDetails
 from .office import Office
+from .container_tracking import ContainerTracking, container_entry_links
 
 # ---- Optional/where-available models ------------------------------------
 # TransactionItem قد يكون في ملف مستقل أو ضمن transaction.py

@@ -1,11 +1,15 @@
+from collections import defaultdict
+
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QListWidget, QListWidgetItem,
-    QLabel, QScrollArea, QGridLayout, QCheckBox, QPushButton, QMessageBox
+    QWidget, QHBoxLayout, QVBoxLayout, QGroupBox, QLineEdit, QListWidget,
+    QListWidgetItem, QLabel, QScrollArea, QGridLayout, QCheckBox, QPushButton,
+    QMessageBox, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from core.permissions import has_perm, is_admin
 
 from database.crud.permissions_crud import (
     get_all_permissions, get_role_permissions,
@@ -18,20 +22,48 @@ from ui.widgets.custom_button import CustomButton
 from ui.dialogs.view_details.view_role_dialog import ViewRoleDialog
 
 
+# ترتيب ثابت لعرض المجموعات (الأكثر أهمية أولاً)
+_CATEGORY_ORDER = [
+    "DASHBOARD", "TRANSACTIONS", "ENTRIES", "DOCUMENTS",
+    "CLIENTS", "COMPANIES", "MATERIALS", "PRICING",
+    "CONTAINERS", "VALUES", "OFFICES", "USERS", "AUDIT", "SETTINGS", "ADMIN",
+]
+
+# ترجمة اسم الـ category إلى تسمية بالثلاث لغات
+_CATEGORY_LABELS = {
+    "DASHBOARD":     {"ar": "لوحة التحكم",      "en": "Dashboard",    "tr": "Kontrol Paneli"},
+    "TRANSACTIONS":  {"ar": "المعاملات",          "en": "Transactions", "tr": "İşlemler"},
+    "ENTRIES":       {"ar": "الإدخالات",          "en": "Entries",      "tr": "Girişler"},
+    "DOCUMENTS":     {"ar": "المستندات",          "en": "Documents",    "tr": "Belgeler"},
+    "CLIENTS":       {"ar": "العملاء",            "en": "Clients",      "tr": "Müşteriler"},
+    "COMPANIES":     {"ar": "الشركات",            "en": "Companies",    "tr": "Şirketler"},
+    "MATERIALS":     {"ar": "المواد",             "en": "Materials",    "tr": "Malzemeler"},
+    "PRICING":       {"ar": "التسعير",            "en": "Pricing",      "tr": "Fiyatlandırma"},
+    "VALUES":        {"ar": "القيم والإعدادات",   "en": "Values",       "tr": "Değerler"},
+    "OFFICES":       {"ar": "المكاتب",            "en": "Offices",      "tr": "Ofisler"},
+    "USERS":         {"ar": "المستخدمون والأدوار","en": "Users & Roles","tr": "Kullanıcılar"},
+    "AUDIT":         {"ar": "سجل التدقيق",        "en": "Audit Log",    "tr": "Denetim"},
+    "SETTINGS":      {"ar": "الإعدادات",          "en": "Settings",     "tr": "Ayarlar"},
+    "CONTAINERS":    {"ar": "تتبع الحاويات",      "en": "Containers",   "tr": "Konteynerler"},
+    "ADMIN":         {"ar": "لوحة الإدارة",       "en": "Admin Panel",  "tr": "Yönetim Paneli"},
+}
+
+
 class PermissionsTab(QWidget):
     def __init__(self, parent=None, current_user=None):
         super().__init__(parent)
         self._ = TranslationManager.get_instance().translate
 
-        # موحّد: خذ المستخدم الممرَّر أو من الإعدادات أو من الأب
         settings = SettingsManager.get_instance()
-        self.current_user = current_user or settings.get("user", None) or getattr(parent, "current_user", None)
+        self.current_user = (
+            current_user or settings.get("user", None) or getattr(parent, "current_user", None)
+        )
 
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(10, 6, 10, 10)
         main_layout.setSpacing(10)
 
-        # ---------- يسار: الأدوار ----------
+        # ── يسار: الأدوار ─────────────────────────────────────────────────
         self.roles_box = QGroupBox(self._("roles"))
         self.roles_box.setObjectName("perm-side-card")
         roles_layout = QVBoxLayout(self.roles_box)
@@ -45,14 +77,18 @@ class PermissionsTab(QWidget):
         roles_layout.addWidget(self.role_search)
 
         self.roles_list = QListWidget()
-        self.roles_list.itemDoubleClicked.connect(self._on_role_double_clicked)
         self.roles_list.setObjectName("roles-list")
         self.roles_list.itemSelectionChanged.connect(self.on_role_selected)
+        self.roles_list.itemDoubleClicked.connect(self._on_role_double_clicked)
         roles_layout.addWidget(self.roles_list)
+
+        self.btn_add_role = CustomButton(self._("add_role"))
+        self.btn_add_role.clicked.connect(self.show_add_role_dialog)
+        roles_layout.addWidget(self.btn_add_role)
 
         main_layout.addWidget(self.roles_box, 1)
 
-        # ---------- يمين: صلاحيات الدور ----------
+        # ── يمين: صلاحيات الدور ───────────────────────────────────────────
         self.right_box = QGroupBox(self._("role_permissions"))
         self.right_box.setObjectName("perm-main-card")
         right_layout = QVBoxLayout(self.right_box)
@@ -81,20 +117,19 @@ class PermissionsTab(QWidget):
         check_btns_layout.addWidget(self.btn_select_all)
         right_layout.addLayout(check_btns_layout)
 
-        # شبكة الصلاحيات داخل ScrollArea
+        # ScrollArea تحتوي على مجموعات الصلاحيات
         self.scroll = QScrollArea()
         self.scroll.setObjectName("perm-scroll")
         self.scroll.setWidgetResizable(True)
 
-        perm_widget = QWidget()
-        perm_widget.setObjectName("perm-grid-container")
-        self.perm_grid = QGridLayout(perm_widget)
-        self.perm_grid.setContentsMargins(8, 6, 8, 6)
-        self.perm_grid.setHorizontalSpacing(14)
-        self.perm_grid.setVerticalSpacing(8)
+        self._scroll_content = QWidget()
+        self._scroll_content.setObjectName("perm-grid-container")
+        self._scroll_layout = QVBoxLayout(self._scroll_content)
+        self._scroll_layout.setContentsMargins(8, 6, 8, 6)
+        self._scroll_layout.setSpacing(12)
+        self._scroll_layout.addStretch()
 
-        self.perm_checkboxes = {}  # id: QCheckBox
-        self.scroll.setWidget(perm_widget)
+        self.scroll.setWidget(self._scroll_content)
         right_layout.addWidget(self.scroll)
 
         # أزرار الحفظ/إعادة التعيين
@@ -112,47 +147,50 @@ class PermissionsTab(QWidget):
 
         main_layout.addWidget(self.right_box, 3)
 
-        # زر إضافة دور
-        self.btn_add_role = CustomButton(self._("add_role"))
-        self.btn_add_role.clicked.connect(self.show_add_role_dialog)
-
         self.setLayout(main_layout)
 
-        # حالـة
+        # الحالة
         self.selected_role = None
         self.permissions = []
         self.roles = []
-        self._current_col_count = None  # لتتبّع تغيّر الأعمدة وإعادة توزيع الشبكة
+        self.perm_checkboxes: dict[int, QCheckBox] = {}
 
+        self._apply_permission_visibility()
         self.load_roles()
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
 
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
     # Helpers
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
+    def _apply_permission_visibility(self):
+        u = self.current_user
+        can_add_role  = is_admin(u) or has_perm(u, "add_role")
+        can_save_perm = is_admin(u) or has_perm(u, "edit_permission")
+        self.btn_add_role.setVisible(can_add_role)
+        self.btn_save.setVisible(can_save_perm)
+        self.btn_reset.setVisible(can_save_perm)
+        self.btn_select_all.setVisible(can_save_perm)
+        self.btn_unselect_all.setVisible(can_save_perm)
+
     def _user_id(self):
         u = self.current_user
         if isinstance(u, dict):
             return u.get("id")
         return getattr(u, "id", None)
 
-    def _calc_col_count(self) -> int:
-        # تقسيم بسيط حسب العرض (يمكن تعديل العتبات لاحقًا)
-        w = max(self.width(), 1)
-        if w >= 1100:
-            return 5
-        if w >= 900:
-            return 4
-        if w >= 700:
-            return 3
-        return 2
+    def _current_lang(self) -> str:
+        return TranslationManager.get_instance().get_current_language()
 
-    # ============================
+    def _category_label(self, cat: str) -> str:
+        lang = self._current_lang()
+        labels = _CATEGORY_LABELS.get(cat, {})
+        return labels.get(lang, labels.get("en", cat))
+
+    # ──────────────────────────────────────────────────────────────────────
     # Roles
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
     def load_roles(self):
-        lang = TranslationManager.get_instance().get_current_language()
-        self.roles = RolesCRUD().get_all(language=lang)
+        self.roles = RolesCRUD().get_all(language=self._current_lang())
         self.roles_list.clear()
         for role in self.roles:
             item = QListWidgetItem(role["label"])
@@ -170,79 +208,135 @@ class PermissionsTab(QWidget):
         if not selected_items:
             self.selected_role_label.setText("")
             self.selected_role_desc.setText("")
-            self.clear_permissions()
+            self._clear_scroll_content()
             return
         role = selected_items[0].data(1000)
         self.selected_role = role
         self.selected_role_label.setText(self._("role") + ": " + role["label"])
-        self.selected_role_desc.setText(role.get("description", ""))
-        self.load_permissions(role["id"], from_resize=False)
+        self.selected_role_desc.setText(role.get("description", "") or "")
+        self.load_permissions(role["id"])
 
-    # ============================
-    # Permissions grid
-    # ============================
-    def clear_permissions(self):
-        for cb in self.perm_checkboxes.values():
-            cb.setChecked(False)
+    def _on_role_double_clicked(self, item):
+        role = item.data(1000) if item else None
+        if not role:
+            return
+        dlg = ViewRoleDialog(role, current_user=self.current_user, parent=self)
+        dlg.exec()
 
-    def load_permissions(self, role_id: int, *, from_resize: bool = False):
-        lang = TranslationManager.get_instance().get_current_language()
-        self.permissions = get_all_permissions(language=lang)
+    def show_add_role_dialog(self):
+        dlg = AddRoleDialog(self)
+        if dlg.exec():
+            self.load_roles()
 
-        # ✅ نحفظ التحديد فقط أثناء resize
-        prev_checked = set()
-        if from_resize:
-            prev_checked = {
-                pid for pid, cb in self.perm_checkboxes.items() if cb.isChecked()
-            }
+    # ──────────────────────────────────────────────────────────────────────
+    # Responsive layout — يُعيد توزيع الأعمدة عند تغيير حجم النافذة
+    # ──────────────────────────────────────────────────────────────────────
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.selected_role:
+            self.load_permissions(self.selected_role["id"])
 
-        # تنظيف الشبكة
-        for i in reversed(range(self.perm_grid.count())):
-            w = self.perm_grid.itemAt(i).widget()
+    # ──────────────────────────────────────────────────────────────────────
+    # Permissions — عرض مجمّع بـ categories
+    # ──────────────────────────────────────────────────────────────────────
+    def _clear_scroll_content(self):
+        """يمسح كل widgets داخل الـ scroll content."""
+        layout = self._scroll_layout
+        # احذف كل شيء ما عدا الـ stretch في الآخر
+        while layout.count() > 1:
+            item = layout.takeAt(0)
+            w = item.widget()
             if w:
                 w.deleteLater()
         self.perm_checkboxes.clear()
 
-        col_count = self._calc_col_count()
-        self._current_col_count = col_count
+    def load_permissions(self, role_id: int):
+        lang = self._current_lang()
+        self.permissions = get_all_permissions(language=lang)
 
-        for idx, perm in enumerate(self.permissions):
-            cb = QCheckBox(perm["label"])
-            cb.setToolTip(perm.get("description", perm["code"]))
-            self.perm_checkboxes[perm["id"]] = cb
-            row, col = divmod(idx, col_count)
-            self.perm_grid.addWidget(cb, row, col)
+        # مسح المحتوى القديم
+        self._clear_scroll_content()
 
-        # ✔️ صلاحيات الدور من قاعدة البيانات
-        role_perms = {p["id"] for p in get_role_permissions(role_id, language=lang)}
+        # تجميع الصلاحيات بـ category
+        by_cat: dict[str, list] = defaultdict(list)
+        for perm in self.permissions:
+            cat = (perm.get("category") or "OTHER").upper()
+            by_cat[cat].append(perm)
 
-        for pid, cb in self.perm_checkboxes.items():
-            if from_resize:
-                cb.setChecked(pid in prev_checked)
+        # صلاحيات الدور الحالية من DB
+        role_perm_ids = {p["id"] for p in get_role_permissions(role_id, language=lang)}
+
+        # رتّب المجموعات حسب الترتيب المحدد ثم الباقية أبجدياً
+        ordered_cats = []
+        for cat in _CATEGORY_ORDER:
+            if cat in by_cat:
+                ordered_cats.append(cat)
+        for cat in sorted(by_cat.keys()):
+            if cat not in ordered_cats:
+                ordered_cats.append(cat)
+
+        insert_pos = self._scroll_layout.count() - 1  # قبل الـ stretch
+
+        for cat in ordered_cats:
+            perms_in_cat = by_cat[cat]
+            cat_label = self._category_label(cat)
+
+            # GroupBox لكل category
+            grp = QGroupBox(cat_label)
+            grp.setObjectName("perm-category-group")
+            grp_layout = QGridLayout(grp)
+            grp_layout.setContentsMargins(10, 8, 10, 8)
+            grp_layout.setHorizontalSpacing(14)
+            grp_layout.setVerticalSpacing(6)
+
+            # عدد الأعمدة حسب عرض التطبيق الفعلي
+            # نأخذ عرض النافذة الكلية ونطرح عرض يسار (الأدوار ~220px) + margins
+            main_win = self.window()
+            total_w = main_win.width() if main_win else 1200
+            right_w = int(total_w * 0.75) - 60   # 75% للجهة اليمين تقريباً
+            if right_w >= 1100:
+                col_count = 5
+            elif right_w >= 800:
+                col_count = 4
+            elif right_w >= 550:
+                col_count = 3
             else:
-                cb.setChecked(pid in role_perms)
+                col_count = 2
+            for idx, perm in enumerate(perms_in_cat):
+                cb = QCheckBox(perm["label"])
+                cb.setToolTip(perm.get("description") or perm["code"])
+                cb.setChecked(perm["id"] in role_perm_ids)
+                self.perm_checkboxes[perm["id"]] = cb
+                row, col = divmod(idx, col_count)
+                grp_layout.addWidget(cb, row, col)
 
-    # ============================
+            # stretch في آخر الصف لمنع امتداد العمود الأخير
+            grp_layout.setColumnStretch(col_count, 1)
+
+            self._scroll_layout.insertWidget(insert_pos, grp)
+            insert_pos += 1
+
+    def clear_permissions(self):
+        for cb in self.perm_checkboxes.values():
+            cb.setChecked(False)
+
+    # ──────────────────────────────────────────────────────────────────────
     # Actions
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
     def save_permissions(self):
         if not self.selected_role:
             return
         role_id = self.selected_role["id"]
-
-        checked_perm_ids = [pid for pid, cb in self.perm_checkboxes.items() if cb.isChecked()]
-        current_perm_ids = [p["id"] for p in get_role_permissions(role_id)]
-
-        to_add = set(checked_perm_ids) - set(current_perm_ids)
-        to_remove = set(current_perm_ids) - set(checked_perm_ids)
-
         uid = self._user_id()
-        for perm_id in to_add:
+
+        checked_ids = {pid for pid, cb in self.perm_checkboxes.items() if cb.isChecked()}
+        current_ids = {p["id"] for p in get_role_permissions(role_id)}
+
+        for perm_id in checked_ids - current_ids:
             assign_permission_to_role(role_id, perm_id, user_id=uid)
-        for perm_id in to_remove:
+        for perm_id in current_ids - checked_ids:
             remove_permission_from_role(role_id, perm_id, user_id=uid)
 
-        # امسح الـ cache حتى تنعكس التغييرات فوراً على كل المستخدمين
         try:
             from core.permissions import clear_permission_cache
             clear_permission_cache()
@@ -257,11 +351,10 @@ class PermissionsTab(QWidget):
             return
         role_id = self.selected_role["id"]
         uid = self._user_id()
-        current_perm_ids = [p["id"] for p in get_role_permissions(role_id)]
-        for perm_id in current_perm_ids:
+
+        for perm_id in [p["id"] for p in get_role_permissions(role_id)]:
             remove_permission_from_role(role_id, perm_id, user_id=uid)
 
-        # امسح الـ cache
         try:
             from core.permissions import clear_permission_cache
             clear_permission_cache()
@@ -269,7 +362,9 @@ class PermissionsTab(QWidget):
             pass
 
         self.load_permissions(role_id)
-        QMessageBox.information(self, self._("reset_to_role_defaults"), self._("permissions_reset_successfully"))
+        QMessageBox.information(
+            self, self._("reset_to_role_defaults"), self._("permissions_reset_successfully")
+        )
 
     def select_all_permissions(self):
         for cb in self.perm_checkboxes.values():
@@ -279,11 +374,10 @@ class PermissionsTab(QWidget):
         for cb in self.perm_checkboxes.values():
             cb.setChecked(False)
 
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
     # i18n
-    # ============================
+    # ──────────────────────────────────────────────────────────────────────
     def retranslate_ui(self):
-        # 1) ترجمة عناصر التحكم
         self.role_search.setPlaceholderText(self._("search_role"))
         self.btn_save.setText(self._("save"))
         self.btn_reset.setText(self._("reset_to_role_defaults"))
@@ -296,52 +390,19 @@ class PermissionsTab(QWidget):
         if hasattr(self, "right_box"):
             self.right_box.setTitle(self._("role_permissions"))
 
-        # عناوين القسم يمين تتغير حسب اختيار الدور
         self.selected_role_label.setText("")
         self.selected_role_desc.setText("")
 
-        # 3) الحفاظ على الدور المحدد وإعادة تحميل القوائم والصلاحيات
         selected_id = self.selected_role["id"] if self.selected_role else None
-
-        # أعد تحميل الأدوار حسب اللغة الحالية
         self.load_roles()
 
-        # إذا كان في دور محدد من قبل، أعد اختياره بعد الترجمة
         if selected_id is not None:
-            match_index = -1
             for i in range(self.roles_list.count()):
                 item = self.roles_list.item(i)
-                data = item.data(1000) or {}
-                if data.get("id") == selected_id:
-                    match_index = i
+                if (item.data(1000) or {}).get("id") == selected_id:
+                    self.roles_list.setCurrentRow(i)
                     break
-            if match_index != -1:
-                # هذا سيؤدي لاستدعاء on_role_selected تلقائيًا عبر itemSelectionChanged
-                self.roles_list.setCurrentRow(match_index)
             else:
-                self.clear_permissions()
+                self._clear_scroll_content()
         else:
-            self.clear_permissions()
-
-    # ============================
-    # Layout responsiveness
-    # ============================
-    def resizeEvent(self, e):
-        super().resizeEvent(e)
-        new_cols = self._calc_col_count()
-        if new_cols != self._current_col_count and self.selected_role:
-            # أعد توزيع الشبكة بالحجم الجديد مع الحفاظ على التحديدات
-            self.load_permissions(self.selected_role["id"], from_resize=True)
-
-    def _on_role_double_clicked(self, item):
-        role = item.data(1000) if item else None
-        if not role:
-            return
-        dlg = ViewRoleDialog(role, current_user=self.current_user, parent=self)
-        dlg.exec()
-
-    def show_add_role_dialog(self):
-        dlg = AddRoleDialog(self)
-        if dlg.exec():
-            # أعد تحميل قائمة الأدوار بعد إنشاء دور جديد
-            self.load_roles()
+            self._clear_scroll_content()
