@@ -312,6 +312,13 @@ class BaseTab(QWidget):
 
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
 
+        # حجب ScrollWheel على كل QComboBox و QSpinBox في الـ tab
+        try:
+            from ui.utils.wheel_blocker import block_wheel_in
+            block_wheel_in(self)
+        except Exception:
+            pass
+
     # ─────────────────────────────────────────────────────────────────────
     # UI BUILD
     # ─────────────────────────────────────────────────────────────────────

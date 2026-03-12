@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey, Boolean, Text, DateTime, func, Index, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
-from database.models import Base
+from database.models.base import Base
 
 # Re-export CompanyRole here so imports like
 #   from database.models.company import CompanyRole
@@ -69,7 +69,7 @@ class Company(Base):
     banks = relationship("CompanyBank", back_populates="company", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Company(id={self.id}, name={self.name!r})>"
+        return f"<Company(id={self.id}, name_ar={self.name_ar!r})>"
 
 # Helpful indexes matching the DB
 Index("idx_companies_owner", Company.owner_client_id)

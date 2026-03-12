@@ -382,6 +382,24 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: container_tracking client_id migration skipped: %s", _e)
 
+    # Migration: add ForeignKey constraints to client default fields
+    try:
+        _cl_cols = [r[1] for r in conn.execute("PRAGMA table_info(clients)").fetchall()]
+        if _cl_cols:
+            # SQLite لا يدعم ALTER COLUMN مباشرة — نتحقق فقط من وجود العمود
+            # القيد (ForeignKey) موجود في الـ model الجديد وسيُطبَّق على DBs الجديدة
+            # للـ DBs القديمة: نتأكد أن العمودين موجودان
+            if "default_delivery_method_id" not in _cl_cols:
+                conn.execute("ALTER TABLE clients ADD COLUMN default_delivery_method_id INTEGER REFERENCES delivery_methods(id) ON DELETE SET NULL")
+                conn.commit()
+                logger.info("Bootstrap: added default_delivery_method_id to clients")
+            if "default_packaging_type_id" not in _cl_cols:
+                conn.execute("ALTER TABLE clients ADD COLUMN default_packaging_type_id INTEGER REFERENCES packaging_types(id) ON DELETE SET NULL")
+                conn.commit()
+                logger.info("Bootstrap: added default_packaging_type_id to clients")
+    except Exception as _e:
+        logger.warning("Bootstrap: clients default FK migration skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

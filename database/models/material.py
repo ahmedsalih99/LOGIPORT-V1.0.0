@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey, Numeric, DateTime, func, Index
 )
 from sqlalchemy.orm import relationship
-from database.models import Base  # تأكد من المسار عندك
+from database.models.base import Base  # تأكد من المسار عندك
 
 class Material(Base):
     __tablename__ = "materials"

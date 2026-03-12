@@ -4,7 +4,7 @@ from sqlalchemy import (
     Numeric, func, Index, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
-from database.models import Base
+from database.models.base import Base
 
 class Entry(Base):
     __tablename__ = "entries"
@@ -42,7 +42,7 @@ class Entry(Base):
 
 
     def __repr__(self):
-        return f"<Entry(id={self.id}, entry_number={self.entry_number!r})>"
+        return f"<Entry(id={self.id}, entry_no={self.entry_no!r})>"
 
 Index("idx_entries_date", Entry.entry_date)
 Index("idx_entries_transport", Entry.transport_unit_type, Entry.transport_ref)

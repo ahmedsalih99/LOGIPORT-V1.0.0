@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from database.models import Base
+from database.models.base import Base
 
 
 class Document(Base):
@@ -41,7 +41,7 @@ class Document(Base):
     template = relationship("DocumentTemplate")
 
     def __repr__(self):
-        return f"<Document(id={self.id}, document_number={self.document_number!r})>"
+        return f"<Document(id={self.id}, status={self.status!r})>"
 
 class DocumentTemplate(Base):
     __tablename__ = "document_templates"

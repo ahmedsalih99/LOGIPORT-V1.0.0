@@ -4,7 +4,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from database.models import Base
+from database.models.base import Base
 from sqlalchemy import Index
 
 class EntryItem(Base):

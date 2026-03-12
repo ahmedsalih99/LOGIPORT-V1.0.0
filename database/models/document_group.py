@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from database.models import Base
+from database.models.base import Base
 
 class DocumentGroup(Base):
     __tablename__ = "doc_groups"
@@ -26,4 +26,4 @@ class DocumentGroup(Base):
     )
 
     def __repr__(self):
-        return f"<DocumentGroup(id={self.id}, code={self.code!r})>"
+        return f"<DocumentGroup(id={self.id}, doc_no={self.doc_no!r})>"

@@ -340,6 +340,13 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_generate_docs.clicked.connect(self._open_generate_docs)
 
+        # حجب ScrollWheel على كل ComboBox و SpinBox في النافذة
+        try:
+            from ui.utils.wheel_blocker import block_wheel_in
+            block_wheel_in(root)
+        except Exception:
+            pass
+
     def showEvent(self, event):
         """استعادة حجم النافذة بعد اكتمال بناء الـ UI"""
         super().showEvent(event)

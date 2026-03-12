@@ -454,6 +454,13 @@ class BaseDialog(QDialog):
 
         self._focus_first_input()
 
+        # حجب ScrollWheel على كل QComboBox و QSpinBox لمنع التغيير العرضي
+        try:
+            from ui.utils.wheel_blocker import block_wheel_in
+            block_wheel_in(self)
+        except Exception:
+            pass
+
         self.log_event("Dialog opened")
         self.dialog_opened.emit()
 

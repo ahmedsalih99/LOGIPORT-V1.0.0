@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey, Text, DateTime, func, Index, Boolean
 )
 from sqlalchemy.orm import relationship
-from database.models import Base
+from database.models.base import Base
 
 
 class Client(Base):
@@ -27,8 +27,8 @@ class Client(Base):
 
     # Defaults & meta
     default_currency_id = Column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=True)
-    default_delivery_method_id = Column(Integer, nullable=True)
-    default_packaging_type_id = Column(Integer, nullable=True)
+    default_delivery_method_id = Column(Integer, ForeignKey("delivery_methods.id", ondelete="SET NULL"), nullable=True)
+    default_packaging_type_id = Column(Integer, ForeignKey("packaging_types.id", ondelete="SET NULL"), nullable=True)
 
     # Contacts (quick fields)
     phone = Column(String(64), nullable=True)
@@ -50,6 +50,8 @@ class Client(Base):
     # Relationships
     country = relationship("Country", lazy="joined")
     default_currency = relationship("Currency", lazy="joined")
+    default_delivery_method = relationship("DeliveryMethod", foreign_keys=[default_delivery_method_id], lazy="joined")
+    default_packaging_type = relationship("PackagingType", foreign_keys=[default_packaging_type_id], lazy="joined")
     created_by = relationship("User", foreign_keys=[created_by_id], lazy="joined")
     updated_by = relationship("User", foreign_keys=[updated_by_id], lazy="joined")
     contacts = relationship("ClientContact", back_populates="client", cascade="all, delete-orphan")
@@ -61,7 +63,7 @@ class Client(Base):
     )
 
     def __repr__(self):
-        return f"<Client(id={self.id}, name={self.name!r})>"
+        return f"<Client(id={self.id}, name_ar={self.name_ar!r})>"
 
 Index("idx_clients_country", Client.country_id)
 Index("idx_clients_currency", Client.default_currency_id)
