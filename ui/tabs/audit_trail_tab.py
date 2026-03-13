@@ -93,6 +93,7 @@ class AuditTrailTab(QWidget):
         self._tbl.setSelectionBehavior(QTableWidget.SelectRows)
         self._tbl.setAlternatingRowColors(True)
         self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._tbl.setSortingEnabled(True)
         self._tbl.setFont(QFont("Tajawal", 9))
         main.addWidget(self._tbl, 1)
         main.addLayout(self._build_pagination())

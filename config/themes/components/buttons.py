@@ -297,4 +297,26 @@ def get_styles(theme):
     QPushButton#link-btn:hover {{
         color: {c["primary_hover"]};
     }}
+
+    /* ── شريط فلتر الحالات في تتبع الكونتينرات ── */
+    QPushButton#stats-filter-btn {{
+        background     : {c["bg_secondary"]};
+        color          : {c["text_muted"]};
+        border         : 1px solid {c["border"]};
+        border-radius  : 14px;
+        padding        : 3px 12px;
+        font-size      : 11px;
+        font-weight    : 400;
+    }}
+    QPushButton#stats-filter-btn:hover {{
+        background     : {c["bg_hover"]};
+        color          : {c["text_primary"]};
+        border-color   : {c["primary"]};
+    }}
+    QPushButton#stats-filter-btn:checked {{
+        background     : {c["primary"]};
+        color          : white;
+        border-color   : {c["primary"]};
+        font-weight    : 600;
+    }}
     """

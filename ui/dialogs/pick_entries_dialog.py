@@ -6,9 +6,10 @@ Dialog بسيط لاختيار الإدخالات وإضافتها للمعام�
 """
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit,
+    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QLineEdit,
     QAbstractItemView, QCheckBox, QWidget
 )
 
@@ -83,9 +84,18 @@ class PickEntriesDialog(QDialog):
             self._("status")
         ])
         self.tbl.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+        self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl.setAlternatingRowColors(True)
         self.tbl.verticalHeader().setVisible(False)
+        self.tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.tbl.horizontalHeader().setStretchLastSection(True)
+        self._apply_tbl_style()
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(self._apply_tbl_style)
+        except Exception:
+            pass
         layout.addWidget(self.tbl)
 
         # Buttons
@@ -123,6 +133,35 @@ class PickEntriesDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    def _apply_tbl_style(self, *_):
+        try:
+            from core.theme_manager import ThemeManager
+            tm  = ThemeManager.get_instance()
+            fs  = tm.get_current_font_size()
+            fam = tm.get_current_font_family()
+        except Exception:
+            fs, fam = 12, "Tajawal"
+        row_h = max(32, fs * 3 + 6)
+        hdr_h = max(40, fs * 3 + 8)
+        hdr_f = QFont(fam, fs); hdr_f.setBold(True)
+        self.tbl.verticalHeader().setDefaultSectionSize(row_h)
+        self.tbl.verticalHeader().setMinimumSectionSize(32)
+        self.tbl.horizontalHeader().setMinimumHeight(hdr_h)
+        self.tbl.horizontalHeader().setFont(hdr_f)
+
+    def _make_cell(self, text: str) -> QTableWidgetItem:
+        try:
+            from core.theme_manager import ThemeManager
+            tm = ThemeManager.get_instance()
+            f  = QFont(tm.get_current_font_family(), tm.get_current_font_size())
+        except Exception:
+            f = QFont("Tajawal", 12)
+        f.setBold(True)
+        item = QTableWidgetItem(str(text))
+        item.setFont(f)
+        item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+        return item
+
     def _load_entries(self):
         """تحميل الإدخالات من قاعدة البيانات"""
         if not EntriesCRUD:
@@ -154,16 +193,16 @@ class PickEntriesDialog(QDialog):
 
                 # رقم الإدخال
                 entry_no = str(getattr(entry, "entry_no", "") or "")
-                self.tbl.setItem(row, 1, QTableWidgetItem(entry_no))
+                self.tbl.setItem(row, 1, self._make_cell(entry_no))
 
                 # رقم النقل
                 transport_ref = str(getattr(entry, "transport_ref", "") or "")
-                self.tbl.setItem(row, 2, QTableWidgetItem(transport_ref))
+                self.tbl.setItem(row, 2, self._make_cell(transport_ref))
 
                 # التاريخ
                 entry_date = getattr(entry, "entry_date", None)
                 date_str = str(entry_date) if entry_date else ""
-                self.tbl.setItem(row, 3, QTableWidgetItem(date_str))
+                self.tbl.setItem(row, 3, self._make_cell(date_str))
 
                 # عدد المواد
                 try:
@@ -171,7 +210,7 @@ class PickEntriesDialog(QDialog):
                     items_count = len(list(items))
                 except:
                     items_count = 0
-                self.tbl.setItem(row, 4, QTableWidgetItem(str(items_count)))
+                self.tbl.setItem(row, 4, self._make_cell(str(items_count)))
 
                 # الوزن الإجمالي
                 try:
@@ -181,14 +220,19 @@ class PickEntriesDialog(QDialog):
                     )
                 except:
                     total_weight = 0
-                self.tbl.setItem(row, 5, QTableWidgetItem(f"{total_weight:.2f}"))
+                self.tbl.setItem(row, 5, self._make_cell(f"{total_weight:.2f}"))
 
                 # الحالة
                 status = str(getattr(entry, "status", "") or "active")
-                self.tbl.setItem(row, 6, QTableWidgetItem(self._(status)))
+                self.tbl.setItem(row, 6, self._make_cell(self._(status)))
 
-            # ضبط عرض الأعمدة
-            self.tbl.resizeColumnsToContents()
+            # ضبط عرض الأعمدة حسب المحتوى
+            from PySide6.QtCore import QTimer
+            hdr = self.tbl.horizontalHeader()
+            hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
+            QTimer.singleShot(0, lambda: hdr.setSectionResizeMode(QHeaderView.Interactive)
+                              if not self.tbl.isHidden() else None)
+            self.tbl.horizontalHeader().setStretchLastSection(True)
 
         except Exception as e:
             QMessageBox.critical(self, self._("error"),

@@ -87,13 +87,17 @@ class EntriesPickerDialog(QDialog):
             _("client"),
             _("total_net_weight")
         ])
-
         hh = self.tbl.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Interactive)
         hh.setStretchLastSection(True)
-        for c in range(self.tbl.columnCount()):
-            hh.setSectionResizeMode(c, QHeaderView.Stretch)
-        self.tbl.setColumnWidth(0, 40)   # checkbox
-        self.tbl.setColumnWidth(1, 80)   # id (قد يُخفى)
+        self.tbl.setColumnWidth(0, 40)
+        self.tbl.setColumnWidth(1, 80)
+        self._apply_tbl_style()
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(self._apply_tbl_style)
+        except Exception:
+            pass
 
         v.addWidget(self.tbl)
 
@@ -117,6 +121,23 @@ class EntriesPickerDialog(QDialog):
             self.tbl.setColumnHidden(1, not is_admin(self.current_user))
         except Exception:
             pass
+
+    def _apply_tbl_style(self, *_):
+        try:
+            from core.theme_manager import ThemeManager
+            tm  = ThemeManager.get_instance()
+            fs  = tm.get_current_font_size()
+            fam = tm.get_current_font_family()
+        except Exception:
+            fs, fam = 12, "Tajawal"
+        from PySide6.QtGui import QFont
+        row_h = max(32, fs * 3 + 6)
+        hdr_h = max(40, fs * 3 + 8)
+        hdr_f = QFont(fam, fs); hdr_f.setBold(True)
+        self.tbl.verticalHeader().setDefaultSectionSize(row_h)
+        self.tbl.verticalHeader().setMinimumSectionSize(32)
+        self.tbl.horizontalHeader().setMinimumHeight(hdr_h)
+        self.tbl.horizontalHeader().setFont(hdr_f)
 
     # ---------------------- data loading ----------------------
     def _load(self):
@@ -166,7 +187,16 @@ class EntriesPickerDialog(QDialog):
 
             # helpers
             def setc(c, val, align_center=True):
+                from PySide6.QtGui import QFont
+                try:
+                    from core.theme_manager import ThemeManager
+                    tm = ThemeManager.get_instance()
+                    f  = QFont(tm.get_current_font_family(), tm.get_current_font_size())
+                except Exception:
+                    f  = QFont("Tajawal", 12)
+                f.setBold(True)
                 it = QTableWidgetItem(_safe_str(val))
+                it.setFont(f)
                 it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 if align_center:
                     it.setTextAlignment(Qt.AlignCenter)

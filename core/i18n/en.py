@@ -1345,4 +1345,28 @@ translations ={
 "links_section":                 "Links",
 "print_list":                    "Print List",
 "print_list_tooltip":            "Print the current container list as PDF",
+
+# ── Container Tracking — Phase 1 Enhancements ─────────────────────────────
+"container_stats_total":         "All",
+"container_stats_active":        "Active",
+"container_stats_hold":          "On Hold",
+"container_stats_delivered":     "Delivered",
+"container_filter_all":          "All",
+"container_eta_overdue":         "ETA {days}d late",
+"container_eta_today":           "ETA Today",
+"container_eta_days_left":       "ETA in {days}d",
+"container_timeline_title":      "Container Journey",
+"container_timeline_completed":  "Completed",
+"container_timeline_current":    "Current Status",
+"container_timeline_pending":    "Pending",
+"container_days_ago":            "{n}d ago",
+"container_days_left":           "in {n}d",
+"container_today":               "Today",
+"container_no_date":             "—",
+
+# ── AlertService ──────────────────────────────────────────────────────────────
+"alert_container_overdue":  "🚨 Container {no} is {days} day(s) past its expected arrival",
+"alert_container_today":    "⏰ Container {no} is expected to arrive today",
+"alert_container_tomorrow": "📅 Container {no} is expected to arrive tomorrow",
+"alert_draft_old":          "📋 Transaction {no} has been in draft status for {days} day(s)",
 }

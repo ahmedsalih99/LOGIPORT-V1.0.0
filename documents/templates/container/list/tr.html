@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="tr" dir="ltr">
+<head>
+  <meta charset="utf-8"/>
+  <title>Konteyner Kartı</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    html { color: #000; background: #fff; }
+    body { font: 11pt/1.6 Arial, "Segoe UI", Tahoma, sans-serif; }
+
+    h1  { font-size: 16pt; margin: 0 0 4pt; }
+    h2  { font-size: 12pt; margin: 10pt 0 4pt; border-bottom: 1pt solid #000; padding-bottom: 2pt; }
+    .small   { font-size: 9.5pt; }
+    .mono    { font-family: ui-monospace, "Courier New", monospace; letter-spacing: .5pt; }
+    .bold    { font-weight: 700; }
+    .muted   { color: #555; }
+    .hr      { border: 0; border-top: 2pt solid #000; margin: 8pt 0; }
+
+    .header  { display: flex; justify-content: space-between; align-items: flex-start; }
+    .kv      { display: grid; grid-template-columns: 130pt 1fr; column-gap: 8pt; row-gap: 3pt; }
+    .kv .k   { font-weight: 700; }
+
+    .status-badge {
+      display: inline-block; padding: 3pt 10pt;
+      border-radius: 4pt; font-weight: 700; font-size: 11pt; color: #fff;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+    thead th { font-weight: 700; background: #f5f5f5; border: .5pt solid #999; padding: 4pt 5pt; text-align: left; }
+    tbody td { border: .5pt solid #ccc; padding: 4pt 5pt; vertical-align: top; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .footer { margin-top: 14pt; font-size: 9pt; color: #888; border-top: .5pt solid #ccc; padding-top: 5pt; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>Konteyner Takip Kartı</h1>
+      <div class="small muted">Yazdırma tarihi: {{ print_date }}</div>
+    </div>
+    <div class="small" style="text-align:right;">
+      {% if company_name %}<div class="bold">{{ company_name }}</div>{% endif %}
+    </div>
+  </div>
+
+  <hr class="hr"/>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8pt;">
+    <div>
+      <span class="bold" style="font-size:18pt; font-family:monospace;">{{ container.container_no }}</span>
+      {% if container.shipping_line %}
+      <span class="small muted" style="margin-left:8pt;">{{ container.shipping_line }}</span>
+      {% endif %}
+    </div>
+    <div>
+      <span class="status-badge" style="background:{{ status_color }};">{{ status_label }}</span>
+    </div>
+  </div>
+
+  <h2>Sevkiyat Bilgileri</h2>
+  <div class="grid2">
+    <div class="kv small">
+      {% if container.bl_number %}<div class="k">Konşimento No.</div><div class="v mono">{{ container.bl_number }}</div>{% endif %}
+      {% if container.booking_no %}<div class="k">Rezervasyon No.</div><div class="v mono">{{ container.booking_no }}</div>{% endif %}
+      {% if container.vessel_name %}<div class="k">Gemi Adı</div><div class="v">{{ container.vessel_name }}</div>{% endif %}
+      {% if container.voyage_no %}<div class="k">Sefer No.</div><div class="v mono">{{ container.voyage_no }}</div>{% endif %}
+    </div>
+    <div class="kv small">
+      {% if container.port_of_loading %}<div class="k">Yükleme Limanı</div><div class="v">{{ container.port_of_loading }}</div>{% endif %}
+      {% if container.port_of_discharge %}<div class="k">Boşaltma Limanı</div><div class="v">{{ container.port_of_discharge }}</div>{% endif %}
+      {% if container.final_destination %}<div class="k">Nihai Varış Yeri</div><div class="v">{{ container.final_destination }}</div>{% endif %}
+    </div>
+  </div>
+
+  <h2>Tarihler</h2>
+  <div class="grid2 small">
+    <div class="kv">
+      {% if container.etd %}<div class="k">ETD (Tahmini)</div><div class="v mono">{{ container.etd }}</div>{% endif %}
+      {% if container.atd %}<div class="k">ATD (Gerçekleşen)</div><div class="v mono">{{ container.atd }}</div>{% endif %}
+      {% if container.customs_date %}<div class="k">Gümrük Tarihi</div><div class="v mono">{{ container.customs_date }}</div>{% endif %}
+    </div>
+    <div class="kv">
+      {% if container.eta %}<div class="k">ETA (Tahmini)</div><div class="v mono">{{ container.eta }}</div>{% endif %}
+      {% if container.ata %}<div class="k">ATA (Gerçekleşen)</div><div class="v mono">{{ container.ata }}</div>{% endif %}
+      {% if container.delivery_date %}<div class="k">Teslim Tarihi</div><div class="v mono">{{ container.delivery_date }}</div>{% endif %}
+    </div>
+  </div>
+
+  {% if client_name or transaction_no %}
+  <h2>Bağlantılar</h2>
+  <div class="kv small">
+    {% if client_name %}<div class="k">Müşteri / Sahibi</div><div class="v">{{ client_name }}</div>{% endif %}
+    {% if transaction_no %}<div class="k">İşlem No.</div><div class="v mono">{{ transaction_no }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if entries %}
+  <h2>Bağlı Girişler ({{ entries|length }})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:6%">#</th>
+        <th>Giriş No.</th>
+        <th>Tarih</th>
+        <th>Sahibi</th>
+        <th class="num" style="width:10%">Kalem</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td class="mono">{{ e.entry_no or ('#' ~ e.id) }}</td>
+        <td>{{ e.entry_date or '' }}</td>
+        <td>{{ e.client_name or '' }}</td>
+        <td class="num">{{ e.items_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if container.notes %}
+  <h2>Notlar</h2>
+  <div class="small">{{ container.notes }}</div>
+  {% endif %}
+
+  <div class="footer">
+    LOGIPORT tarafından oluşturuldu &nbsp;|&nbsp; {{ print_date }}
+  </div>
+
+</body>
+</html>

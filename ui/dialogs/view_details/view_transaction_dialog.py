@@ -28,6 +28,10 @@ from core.permissions import is_admin
 from core.settings_manager import SettingsManager
 
 try:
+    from ui.dialogs.view_details._view_helpers import build_dialog_table, make_bold_cell
+except ImportError:
+    build_dialog_table = None
+    make_bold_cell     = None
     from database.models import get_session_local
 except Exception:
     get_session_local = None
@@ -257,8 +261,6 @@ class ViewTransactionDialog(BaseDialog):
 
     def _build_items_tab(self) -> QWidget:
         tab = QWidget(); v = QVBoxLayout(tab)
-        self.tbl_items = QTableWidget(0, 14, tab)
-        self.tbl_items.setObjectName("entries-table")
         headers = [
             self._("source"),        self._("entry_no"),
             self._("material"),      self._("packaging_type"),
@@ -268,13 +270,22 @@ class ViewTransactionDialog(BaseDialog):
             self._("line_total"),    self._("origin_country"),
             self._("notes"),         self._("transport_ref"),
         ]
-        self.tbl_items.setHorizontalHeaderLabels(headers)
-        self.tbl_items.verticalHeader().setVisible(False)
-        self.tbl_items.setAlternatingRowColors(True)
-        self.tbl_items.setSelectionMode(QTableWidget.NoSelection)
-        self.tbl_items.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.tbl_items.horizontalHeader().setStretchLastSection(True)
-        self.tbl_items.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        if build_dialog_table:
+            self.tbl_items = build_dialog_table(
+                headers, tab,
+                object_name="entries-table",
+                select_rows=False,
+            )
+        else:
+            self.tbl_items = QTableWidget(0, len(headers), tab)
+            self.tbl_items.setObjectName("entries-table")
+            self.tbl_items.setHorizontalHeaderLabels(headers)
+            self.tbl_items.verticalHeader().setVisible(False)
+            self.tbl_items.setAlternatingRowColors(True)
+            self.tbl_items.setSelectionMode(QTableWidget.NoSelection)
+            self.tbl_items.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.tbl_items.horizontalHeader().setStretchLastSection(True)
+            self.tbl_items.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         v.addWidget(self.tbl_items, 1)
         self.lbl_totals = QLabel("")
         self.lbl_totals.setObjectName("detail-value-financial")
@@ -541,8 +552,11 @@ class ViewTransactionDialog(BaseDialog):
         return "view_values" in perms or "view_pricing" in perms or is_admin(self.current_user)
 
     def _set_cell(self, row: int, col: int, text, userdata=None):
-        item = QTableWidgetItem(str(text or ""))
-        item.setTextAlignment(Qt.AlignCenter)
+        if make_bold_cell:
+            item = make_bold_cell(str(text or ""))
+        else:
+            item = QTableWidgetItem(str(text or ""))
+            item.setTextAlignment(Qt.AlignCenter)
         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
         if userdata is not None:
             item.setData(Qt.UserRole, userdata)

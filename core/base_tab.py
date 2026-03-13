@@ -32,9 +32,35 @@ from core.permissions import is_admin as _is_admin, has_perm as _has_perm, has_a
 
 logger = logging.getLogger(__name__)
 
-# ── فونت Bold مشترك لخلايا الجداول ──────────────────────────────────────────
-_BOLD_ITEM_FONT = QFont()
-_BOLD_ITEM_FONT.setBold(True)
+# ── ثوابت ارتفاع الصفوف الافتراضية ─────────────────────────────────────────
+# القيمة الافتراضية لارتفاع الصف — يمكن للتابات/الديالوغات تجاوزها
+TABLE_ROW_HEIGHT_DEFAULT = 46   # px
+TABLE_ROW_HEIGHT_MIN     = 32   # px الحد الأدنى
+
+
+def _make_table_item_font(size_px: int | None = None, bold: bool = True) -> QFont:
+    """
+    ينشئ QFont لخلايا الجداول يتناسق مع إعدادات التطبيق الحالية.
+    يقرأ font_family و font_size من ThemeManager إن لم تُحدَّد.
+    bold=True دائماً لنص خلايا الجداول (معيار التطبيق).
+    """
+    try:
+        from core.theme_manager import ThemeManager
+        tm = ThemeManager.get_instance()
+        family = tm.get_current_font_family()
+        if size_px is None:
+            size_px = tm.get_current_font_size()
+    except Exception:
+        family = "Tajawal"
+        if size_px is None:
+            size_px = 12
+    f = QFont(family, size_px)
+    f.setBold(bold)
+    return f
+
+
+# فونت مشترك لخلايا الجداول — يُعاد بناؤه عند تغيير الثيم (انظر _refresh_table_font)
+_BOLD_ITEM_FONT = _make_table_item_font()
 
 
 # ── منع scroll على QComboBox/QSpinBox ────────────────────────────────────────
@@ -303,6 +329,11 @@ class BaseTab(QWidget):
         self._base_columns: list = []
         self._admin_columns: list= []
 
+        # ── ارتفاع صفوف الجدول ───────────────────────────────────────────
+        # التابات الفرعية تقدر تغير هذه القيمة قبل _setup_table
+        # أو بعده باستخدام set_row_height()
+        self.table_row_height: int = TABLE_ROW_HEIGHT_DEFAULT
+
         # ── build ────────────────────────────────────────────────────────
         self._setup_ui()
         self._setup_table()
@@ -438,16 +469,62 @@ class BaseTab(QWidget):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setSectionsMovable(False)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setDefaultSectionSize(46)
-        self.table.verticalHeader().setMinimumSectionSize(42)
-        self.table.horizontalHeader().setMinimumHeight(44)
 
-        hdr_font = self.table.horizontalHeader().font()
-        hdr_font.setBold(True)
-        self.table.horizontalHeader().setFont(hdr_font)
+        # ── ارتفاع الصفوف: قيمة افتراضية + إمكانية تعديل يدوي ──────────
+        self._apply_row_height(self.table_row_height)
 
+        # ── عرض الأعمدة: Interactive (قابل للسحب) ─────────────────────
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+
+        # ── رأس الجدول: ارتفاع + فونت Bold ───────────────────────────
+        self._apply_header_style()
+
+        # ── signals ─────────────────────────────────────────────────────
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
+
+        # ── تحديث الفونت عند تغيير الثيم ──────────────────────────────
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(self._on_theme_changed)
+        except Exception:
+            pass
+
+    def _apply_row_height(self, height: int):
+        """يطبّق ارتفاع الصفوف — يُستدعى من _setup_table وعند تغيير الثيم."""
+        height = max(height, TABLE_ROW_HEIGHT_MIN)
+        self.table.verticalHeader().setDefaultSectionSize(height)
+        self.table.verticalHeader().setMinimumSectionSize(TABLE_ROW_HEIGHT_MIN)
+
+    def _apply_header_style(self):
+        """يطبّق ارتفاع رأس الجدول وفونته Bold — يتناسق مع font_size الحالي."""
+        global _BOLD_ITEM_FONT
+        _BOLD_ITEM_FONT = _make_table_item_font()
+
+        # ارتفاع رأس الجدول: font_size × 3 + padding (بحد أدنى 40)
+        try:
+            from core.theme_manager import ThemeManager
+            fs = ThemeManager.get_instance().get_current_font_size()
+        except Exception:
+            fs = 12
+        hdr_height = max(40, fs * 3 + 8)
+        self.table.horizontalHeader().setMinimumHeight(hdr_height)
+
+        hdr_font = _make_table_item_font(bold=True)
+        self.table.horizontalHeader().setFont(hdr_font)
+
+    def _on_theme_changed(self, *_):
+        """عند تغيير الثيم: يعيد بناء الفونت ويعيد تطبيق الأحجام."""
+        self._apply_header_style()
+        self._apply_row_height(self.table_row_height)
+        # إعادة تطبيق الفونت على الصفوف الموجودة
+        global _BOLD_ITEM_FONT
+        _BOLD_ITEM_FONT = _make_table_item_font()
+        for row in range(self.table.rowCount()):
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                if item:
+                    item.setFont(_BOLD_ITEM_FONT)
 
     def _setup_pagination_controls(self):
         self.cmb_rows_per_page.currentTextChanged.connect(self._on_rows_per_page_changed)
@@ -705,8 +782,24 @@ class BaseTab(QWidget):
             self.table.setCellWidget(row_idx, col_idx, btn)
 
     def _stretch_columns(self):
-        if self.table.columnCount():
-            self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        """يضبط عرض الأعمدة تلقائياً حسب المحتوى ثم يتيح للمستخدم التعديل."""
+        if not self.table.columnCount():
+            return
+        hdr = self.table.horizontalHeader()
+        # أولاً: اضبط كل عمود حسب محتواه (header + cells)
+        hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
+        # ثانياً: حوّل للوضع Interactive حتى يبقى التعديل اليدوي ممكناً
+        # نؤخّر التحويل حتى تنتهي Qt من حساب الأحجام
+        QTimer.singleShot(0, lambda: hdr.setSectionResizeMode(QHeaderView.Interactive)
+                          if not self.table.isHidden() else None)
+
+    def set_row_height(self, height: int):
+        """
+        API عام يسمح للتاب الفرعي أو الديالوغ بتعيين ارتفاع مخصص للصفوف.
+        مثال:  self.set_row_height(52)
+        """
+        self.table_row_height = max(height, TABLE_ROW_HEIGHT_MIN)
+        self._apply_row_height(self.table_row_height)
 
     # ─────────────────────────────────────────────────────────────────────
     # SEARCH / SORT

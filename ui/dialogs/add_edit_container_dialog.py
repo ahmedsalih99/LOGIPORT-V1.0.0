@@ -2,19 +2,18 @@
 add_edit_container_dialog.py — LOGIPORT
 =========================================
 ديالوغ إضافة / تعديل كونتينر.
+- تخطيط Grid قسمين جنب بعض (يسار: بيانات الكونتينر | يمين: التواريخ والربط)
 - يرث BaseDialog
-- client picker محترم (ClientPickerDialog)
-- date widgets مع checkbox تفعيل
-- entries linking
+- SearchableComboBox للزبون والمعاملة
 """
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QScrollArea, QWidget,
-    QFormLayout, QLineEdit, QTextEdit, QComboBox,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QWidget,
+    QLineEdit, QTextEdit, QComboBox,
     QPushButton, QLabel, QListWidget, QListWidgetItem,
     QDateEdit, QCheckBox, QMessageBox, QSizePolicy,
-    QFrame,
+    QFrame, QGroupBox,
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui  import QFont
@@ -40,27 +39,16 @@ _STATUS_META = {
 
 
 class AddEditContainerDialog(BaseDialog):
-    """
-    الاستخدام:
-        # إضافة
-        dlg = AddEditContainerDialog(parent=self, current_user=user)
-
-        # تعديل
-        dlg = AddEditContainerDialog(parent=self, current_user=user, record=container)
-
-        if dlg.exec() == QDialog.Accepted:
-            self._load_data()
-    """
 
     def __init__(self, parent=None, *, current_user=None, record: ContainerTracking | None = None):
         super().__init__(parent, user=current_user)
         self._record = record
-        self._date_widgets: dict = {}   # name → (QCheckBox, QDateEdit)
+        self._date_widgets: dict = {}
 
         is_edit = record is not None
         self.set_translated_title("edit_container" if is_edit else "add_container")
-        self.setMinimumWidth(560)
-        self.setMinimumHeight(600)
+        self.setMinimumWidth(820)
+        self.setMinimumHeight(580)
         self.setSizeGripEnabled(True)
 
         self._build_ui()
@@ -77,18 +65,29 @@ class AddEditContainerDialog(BaseDialog):
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(0)
 
-        # ── scrollable form area ────────────────────────────────────────
+        # ── Scrollable area ─────────────────────────────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         inner = QWidget()
-        form  = QFormLayout(inner)
-        form.setContentsMargins(20, 16, 20, 8)
-        form.setHorizontalSpacing(16)
-        form.setVerticalSpacing(10)
-        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        inner.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         scroll.setWidget(inner)
         root.addWidget(scroll, 1)
+
+        # ── Main horizontal split ────────────────────────────────────────
+        main_h = QHBoxLayout(inner)
+        main_h.setContentsMargins(16, 16, 16, 8)
+        main_h.setSpacing(16)
+
+        # القسم الأيسر: بيانات الكونتينر + المواني + الحالة والربط
+        left = QVBoxLayout()
+        left.setSpacing(10)
+        main_h.addLayout(left, 3)
+
+        # القسم الأيمن: التواريخ + الإدخالات
+        right = QVBoxLayout()
+        right.setSpacing(10)
+        main_h.addLayout(right, 2)
 
         # ── helpers ─────────────────────────────────────────────────────
         def _line(ph=""):
@@ -96,123 +95,170 @@ class AddEditContainerDialog(BaseDialog):
             w.setPlaceholderText(ph)
             return w
 
-        def _section_label(key: str):
-            lbl = QLabel(self._(key))
+        def _group(title_key: str) -> tuple[QGroupBox, QGridLayout]:
+            grp = QGroupBox(self._(title_key))
             f = QFont(); f.setBold(True)
-            lbl.setFont(f)
-            lbl.setObjectName("text-muted")
-            lbl.setContentsMargins(0, 10, 0, 2)
-            return lbl
+            grp.setFont(f)
+            g = QGridLayout(grp)
+            g.setHorizontalSpacing(10)
+            g.setVerticalSpacing(7)
+            g.setContentsMargins(10, 14, 10, 10)
+            return grp, g
+
+        def _lbl(key: str, required=False) -> QLabel:
+            text = self._(key) + (" *" if required else "")
+            l = QLabel(text)
+            l.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            return l
 
         def _date_row(name: str) -> QWidget:
-            """صف يحتوي checkbox + QDateEdit."""
             row = QWidget()
             hl  = QHBoxLayout(row)
             hl.setContentsMargins(0, 0, 0, 0)
-            hl.setSpacing(8)
-
+            hl.setSpacing(6)
             chk = QCheckBox()
-            chk.setFixedWidth(22)
+            chk.setFixedWidth(20)
             chk.setToolTip(self._("enable_date"))
-
             de = QDateEdit()
             de.setCalendarPopup(True)
             de.setDisplayFormat("yyyy-MM-dd")
             de.setDate(QDate.currentDate())
             de.setEnabled(False)
-
             chk.toggled.connect(de.setEnabled)
-
             hl.addWidget(chk)
             hl.addWidget(de, 1)
-
             self._date_widgets[name] = (chk, de)
             return row
 
-        # ── الزبون: SearchableComboBox ───────────────────────────────────
-        self._combo_client = SearchableComboBox(parent=inner)
-        self._combo_client.set_loader(
-            loader=self._load_clients,
-            display=self._client_display,
-            value=lambda c: c.id,
-        )
+        # ════════════════════════════════════════════════════════════════
+        # القسم الأيسر
+        # ════════════════════════════════════════════════════════════════
 
-        # ── المعاملة: SearchableComboBox ─────────────────────────────────
-        self._combo_tx = SearchableComboBox(parent=inner)
-        self._combo_tx.set_loader(
-            loader=self._load_transactions,
-            display=self._tx_display,
-            value=lambda t: t.id,
-        )
-
-        # ── SECTION: معلومات الكونتينر ──────────────────────────────────
-        form.addRow("", _section_label("container_info"))
-
-        self._f_container_no  = _line("MSCU1234567")
-        self._f_bl_number     = _line()
-        self._f_booking_no    = _line()
+        # ── مجموعة 1: معلومات الكونتينر ─────────────────────────────────
+        grp1, g1 = _group("container_info")
+        r = 0
+        self._f_container_no = _line("MSCU1234567")
+        g1.addWidget(_lbl("container_no_label", required=True), r, 0)
+        g1.addWidget(self._f_container_no, r, 1)
+        r += 1
+        self._f_bl_number = _line()
+        g1.addWidget(_lbl("bl_number_label"), r, 0)
+        g1.addWidget(self._f_bl_number, r, 1)
+        r += 1
+        self._f_booking_no = _line()
+        g1.addWidget(_lbl("booking_no_label"), r, 0)
+        g1.addWidget(self._f_booking_no, r, 1)
+        r += 1
         self._f_shipping_line = _line("Maersk, MSC...")
-        self._f_vessel_name   = _line()
-        self._f_voyage_no     = _line()
+        g1.addWidget(_lbl("shipping_line_label"), r, 0)
+        g1.addWidget(self._f_shipping_line, r, 1)
+        r += 1
+        self._f_vessel_name = _line()
+        g1.addWidget(_lbl("vessel_name_label"), r, 0)
+        g1.addWidget(self._f_vessel_name, r, 1)
+        r += 1
+        self._f_voyage_no = _line()
+        g1.addWidget(_lbl("voyage_no_label"), r, 0)
+        g1.addWidget(self._f_voyage_no, r, 1)
+        g1.setColumnMinimumWidth(0, 130)
+        g1.setColumnStretch(1, 1)
+        left.addWidget(grp1)
 
-        form.addRow(self._(  "container_no_label") + " *", self._f_container_no)
-        form.addRow(self._(  "bl_number_label"),           self._f_bl_number)
-        form.addRow(self._(  "booking_no_label"),           self._f_booking_no)
-        form.addRow(self._(  "shipping_line_label"),        self._f_shipping_line)
-        form.addRow(self._(  "vessel_name_label"),          self._f_vessel_name)
-        form.addRow(self._(  "voyage_no_label"),            self._f_voyage_no)
-
-        # ── SECTION: الموانئ ─────────────────────────────────────────────
-        form.addRow("", _section_label("ports_section"))
-
-        self._f_pol         = _line()
-        self._f_pod         = _line()
+        # ── مجموعة 2: المواني ────────────────────────────────────────────
+        grp2, g2 = _group("ports_section")
+        r = 0
+        self._f_pol = _line()
+        g2.addWidget(_lbl("port_of_loading_label"), r, 0)
+        g2.addWidget(self._f_pol, r, 1)
+        r += 1
+        self._f_pod = _line()
+        g2.addWidget(_lbl("port_of_discharge_label"), r, 0)
+        g2.addWidget(self._f_pod, r, 1)
+        r += 1
         self._f_destination = _line()
+        g2.addWidget(_lbl("final_destination_label"), r, 0)
+        g2.addWidget(self._f_destination, r, 1)
+        g2.setColumnMinimumWidth(0, 130)
+        g2.setColumnStretch(1, 1)
+        left.addWidget(grp2)
 
-        form.addRow(self._("port_of_loading_label"),   self._f_pol)
-        form.addRow(self._("port_of_discharge_label"), self._f_pod)
-        form.addRow(self._("final_destination_label"), self._f_destination)
-
-        # ── SECTION: التواريخ ────────────────────────────────────────────
-        form.addRow("", _section_label("dates_section"))
-
-        form.addRow(self._("etd_label"),          _date_row("etd"))
-        form.addRow(self._("eta_label"),           _date_row("eta"))
-        form.addRow(self._("atd_label"),           _date_row("atd"))
-        form.addRow(self._("ata_label"),           _date_row("ata"))
-        form.addRow(self._("customs_date_label"),  _date_row("customs_date"))
-        form.addRow(self._("delivery_date_label"), _date_row("delivery_date"))
-
-        # ── SECTION: الحالة والربط ───────────────────────────────────────
-        form.addRow("", _section_label("links_section"))
+        # ── مجموعة 3: الحالة والربط ─────────────────────────────────────
+        grp3, g3 = _group("links_section")
+        r = 0
 
         # الحالة
         self._f_status = QComboBox()
         for s in ContainerTracking.STATUSES:
             meta = _STATUS_META.get(s, {})
             self._f_status.addItem(f"{meta.get('icon','')} {self._(f'container_status_{s}')}", s)
-        form.addRow(self._("status_label"), self._f_status)
+        g3.addWidget(_lbl("status_label"), r, 0)
+        g3.addWidget(self._f_status, r, 1)
+        r += 1
 
-        form.addRow(self._("client_label"), self._combo_client)
+        # الزبون
+        self._combo_client = SearchableComboBox(parent=inner)
+        self._combo_client.set_loader(
+            loader=self._load_clients,
+            display=self._client_display,
+            value=lambda c: c.id,
+        )
+        g3.addWidget(_lbl("client_label"), r, 0)
+        g3.addWidget(self._combo_client, r, 1)
+        r += 1
 
         # المعاملة
-        form.addRow(self._("transaction_label"), self._combo_tx)
+        self._combo_tx = SearchableComboBox(parent=inner)
+        self._combo_tx.set_loader(
+            loader=self._load_transactions,
+            display=self._tx_display,
+            value=lambda t: t.id,
+        )
+        g3.addWidget(_lbl("transaction_label"), r, 0)
+        g3.addWidget(self._combo_tx, r, 1)
+        r += 1
 
-        # ملاحظات
+        # الملاحظات
         self._f_notes = QTextEdit()
-        self._f_notes.setFixedHeight(72)
+        self._f_notes.setFixedHeight(62)
         self._f_notes.setPlaceholderText(self._("notes_placeholder"))
-        form.addRow(self._("notes"), self._f_notes)
+        g3.addWidget(_lbl("notes"), r, 0, Qt.AlignTop)
+        g3.addWidget(self._f_notes, r, 1)
+        g3.setColumnMinimumWidth(0, 130)
+        g3.setColumnStretch(1, 1)
+        left.addWidget(grp3)
+        left.addStretch()
 
-        # ── entries section (للتعديل فقط) ──────────────────────────────
+        # ════════════════════════════════════════════════════════════════
+        # القسم الأيمن
+        # ════════════════════════════════════════════════════════════════
+
+        # ── مجموعة 4: التواريخ ──────────────────────────────────────────
+        grp4, g4 = _group("dates_section")
+        for i, (key, name) in enumerate([
+            ("etd_label",          "etd"),
+            ("eta_label",          "eta"),
+            ("atd_label",          "atd"),
+            ("ata_label",          "ata"),
+            ("customs_date_label", "customs_date"),
+            ("delivery_date_label","delivery_date"),
+        ]):
+            l = QLabel(self._(key))
+            l.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            g4.addWidget(l, i, 0)
+            g4.addWidget(_date_row(name), i, 1)
+        g4.setColumnMinimumWidth(0, 110)
+        g4.setColumnStretch(1, 1)
+        right.addWidget(grp4)
+
+        # ── مجموعة 5: الإدخالات (في وضع التعديل فقط) ──────────────────
         if self._record:
-            form.addRow("", _section_label("linked_entries"))
+            grp5, g5 = _group("linked_entries")
             self._entries_list = QListWidget()
-            self._entries_list.setFixedHeight(130)
+            self._entries_list.setFixedHeight(110)
             self._entries_list.setObjectName("data-table")
 
             entries_btns = QHBoxLayout()
-            btn_link   = QPushButton(f"+ {self._('link_entry')}")
+            btn_link = QPushButton(f"+ {self._('link_entry')}")
             btn_link.setObjectName("secondary-btn")
             btn_link.clicked.connect(self._link_entry)
             btn_unlink = QPushButton(f"✕ {self._('unlink_entry')}")
@@ -222,18 +268,22 @@ class AddEditContainerDialog(BaseDialog):
             entries_btns.addWidget(btn_unlink)
             entries_btns.addStretch()
 
-            entries_container = QWidget()
-            ev = QVBoxLayout(entries_container)
+            entries_w = QWidget()
+            ev = QVBoxLayout(entries_w)
             ev.setContentsMargins(0, 0, 0, 0)
             ev.setSpacing(4)
             ev.addWidget(self._entries_list)
             ev.addLayout(entries_btns)
-            form.addRow("", entries_container)
+
+            g5.addWidget(entries_w, 0, 0)
+            right.addWidget(grp5)
             self._refresh_entries_list()
 
-        # ── bottom action bar ────────────────────────────────────────────
+        right.addStretch()
+
+        # ── Bottom action bar ────────────────────────────────────────────
         bar = QHBoxLayout()
-        bar.setContentsMargins(20, 8, 20, 0)
+        bar.setContentsMargins(16, 8, 16, 0)
         bar.setSpacing(8)
 
         if self._record:
@@ -250,7 +300,6 @@ class AddEditContainerDialog(BaseDialog):
 
         btn_save = QPushButton(self._("save"))
         btn_save.setObjectName("primary-btn")
-        btn_save.setObjectName("btn_save")        # لـ Ctrl+S في BaseDialog
         btn_save.clicked.connect(self._save)
 
         bar.addWidget(btn_cancel)
@@ -258,7 +307,7 @@ class AddEditContainerDialog(BaseDialog):
         root.addLayout(bar)
 
     # ─────────────────────────────────────────────────────────────────────
-    # POPULATE (تعديل)
+    # POPULATE
     # ─────────────────────────────────────────────────────────────────────
 
     def _populate(self, rec: ContainerTracking):
@@ -304,12 +353,11 @@ class AddEditContainerDialog(BaseDialog):
             self._combo_tx.set_value(rec.transaction_id, display_text=tx_no)
 
     # ─────────────────────────────────────────────────────────────────────
-    # CLIENT COMBO HELPERS
+    # LOADERS
     # ─────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _load_clients(q: str = "") -> list:
-        """loader للـ SearchableComboBox — يقبل نص البحث."""
         try:
             from database.crud.clients_crud import ClientsCRUD
             all_clients = ClientsCRUD().list_clients()
@@ -335,10 +383,6 @@ class AddEditContainerDialog(BaseDialog):
         else:
             name = getattr(c, "name_en", None) or getattr(c, "name_ar", None) or getattr(c, "name_tr", None)
         return (name or "").strip() or f"#{c.id}"
-
-    # ─────────────────────────────────────────────────────────────────────
-    # TRANSACTION COMBO HELPERS
-    # ─────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _load_transactions(q: str = "") -> list:

@@ -96,17 +96,39 @@ class ContainerTrackingCRUD(BaseCRUD):
     # ── إنشاء / تحديث / حذف ──────────────────────────────────────────────────
 
     def create(self, data: dict, current_user=None) -> ContainerTracking:
-        return self.add(data, current_user=current_user)
+        """ينشئ كونتينر جديد من dict — يبني الـ instance أولاً ثم يحفظه."""
+        obj = ContainerTracking(
+            container_no      = data.get("container_no"),
+            bl_number         = data.get("bl_number"),
+            booking_no        = data.get("booking_no"),
+            shipping_line     = data.get("shipping_line"),
+            vessel_name       = data.get("vessel_name"),
+            voyage_no         = data.get("voyage_no"),
+            port_of_loading   = data.get("port_of_loading"),
+            port_of_discharge = data.get("port_of_discharge"),
+            final_destination = data.get("final_destination"),
+            etd               = data.get("etd"),
+            eta               = data.get("eta"),
+            atd               = data.get("atd"),
+            ata               = data.get("ata"),
+            customs_date      = data.get("customs_date"),
+            delivery_date     = data.get("delivery_date"),
+            status            = data.get("status", "booked"),
+            notes             = data.get("notes"),
+            client_id         = data.get("client_id"),
+            transaction_id    = data.get("transaction_id"),
+        )
+        return self.add(obj, current_user=current_user)
 
     def update(self, record_id: int, data: dict, current_user=None) -> Optional[ContainerTracking]:
-        return self.update_by_id(record_id, data, current_user=current_user)
+        return super().update(record_id, data, current_user=current_user)
 
     def delete(self, record_id: int, current_user=None) -> bool:
-        return self.delete_by_id(record_id, current_user=current_user)
+        return super().delete(record_id, current_user=current_user)
 
     def update_status(self, record_id: int, status: str, current_user=None) -> bool:
         """تحديث الحالة فقط — shortcut."""
-        result = self.update_by_id(record_id, {"status": status}, current_user=current_user)
+        result = super().update(record_id, {"status": status}, current_user=current_user)
         return result is not None
 
     # ── ربط الإدخالات ─────────────────────────────────────────────────────────

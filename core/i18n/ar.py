@@ -1346,4 +1346,28 @@ translations ={
 "links_section":                 "الربط",
 "print_list":                    "طباعة القائمة",
 "print_list_tooltip":            "طباعة قائمة الكونتينرات المعروضة كـ PDF",
+
+# ── تتبع الكونتينرات — تحسينات المرحلة 1 ──────────────────────────────────
+"container_stats_total":         "الكل",
+"container_stats_active":        "نشط",
+"container_stats_hold":          "موقوف",
+"container_stats_delivered":     "مُسلَّم",
+"container_filter_all":          "الكل",
+"container_eta_overdue":         "ETA متأخر {days} يوم",
+"container_eta_today":           "ETA اليوم",
+"container_eta_days_left":       "ETA بعد {days} يوم",
+"container_timeline_title":      "مراحل الكونتينر",
+"container_timeline_completed":  "مكتمل",
+"container_timeline_current":    "الحالة الحالية",
+"container_timeline_pending":    "قادم",
+"container_days_ago":            "منذ {n} يوم",
+"container_days_left":           "بعد {n} يوم",
+"container_today":               "اليوم",
+"container_no_date":             "—",
+
+# ── AlertService ──────────────────────────────────────────────────────────────
+"alert_container_overdue":  "🚨 الكونتينر {no} متأخر بـ {days} يوم عن موعد الوصول المتوقع",
+"alert_container_today":    "⏰ الكونتينر {no} من المتوقع وصوله اليوم",
+"alert_container_tomorrow": "📅 الكونتينر {no} من المتوقع وصوله غداً",
+"alert_draft_old":          "📋 المعاملة {no} لا تزال في حالة مسودة منذ {days} يوم",
 }

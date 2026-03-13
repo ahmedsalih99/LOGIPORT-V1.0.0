@@ -1345,4 +1345,28 @@ translations ={
 "links_section":                 "Bağlantılar",
 "print_list":                    "Listeyi Yazdır",
 "print_list_tooltip":            "Mevcut konteyner listesini PDF olarak yazdır",
+
+# ── Konteyner Takip — Aşama 1 Geliştirmeleri ─────────────────────────────
+"container_stats_total":         "Tümü",
+"container_stats_active":        "Aktif",
+"container_stats_hold":          "Beklemede",
+"container_stats_delivered":     "Teslim Edildi",
+"container_filter_all":          "Tümü",
+"container_eta_overdue":         "ETA {days}g gecikti",
+"container_eta_today":           "ETA Bugün",
+"container_eta_days_left":       "ETA {days}g sonra",
+"container_timeline_title":      "Konteyner Yolculuğu",
+"container_timeline_completed":  "Tamamlandı",
+"container_timeline_current":    "Mevcut Durum",
+"container_timeline_pending":    "Bekliyor",
+"container_days_ago":            "{n}g önce",
+"container_days_left":           "{n}g sonra",
+"container_today":               "Bugün",
+"container_no_date":             "—",
+
+# ── AlertService ──────────────────────────────────────────────────────────────
+"alert_container_overdue":  "🚨 {no} konteyneri beklenen varış tarihinden {days} gün gecikmeli",
+"alert_container_today":    "⏰ {no} konteyneri bugün varması bekleniyor",
+"alert_container_tomorrow": "📅 {no} konteyneri yarın varması bekleniyor",
+"alert_draft_old":          "📋 {no} işlemi {days} gündür taslak durumunda",
 }

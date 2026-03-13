@@ -400,6 +400,15 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: clients default FK migration skipped: %s", _e)
 
+    # Migration: حذف triggers العنوان الإجباري من companies (العنوان اختياري)
+    try:
+        conn.execute("DROP TRIGGER IF EXISTS trg_companies_require_any_address")
+        conn.execute("DROP TRIGGER IF EXISTS trg_companies_require_any_address_update")
+        conn.commit()
+        logger.info("Bootstrap: dropped address triggers from companies (address is optional)")
+    except Exception as _e:
+        logger.warning("Bootstrap: address trigger drop skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

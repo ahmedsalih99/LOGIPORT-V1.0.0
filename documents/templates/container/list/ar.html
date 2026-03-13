@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <title>بطاقة الكونتينر</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    html { color: #000; background: #fff; }
+    body { font: 11pt/1.6 "Noto Naskh Arabic", "Amiri", "Segoe UI", Tahoma, Arial, sans-serif; }
+
+    h1  { font-size: 16pt; margin: 0 0 4pt; }
+    h2  { font-size: 12pt; margin: 10pt 0 4pt; border-bottom: 1pt solid #000; padding-bottom: 2pt; }
+    .small   { font-size: 9.5pt; }
+    .mono    { font-family: ui-monospace, "Courier New", monospace; letter-spacing: .5pt; }
+    .bold    { font-weight: 700; }
+    .muted   { color: #555; }
+    .hr      { border: 0; border-top: 2pt solid #000; margin: 8pt 0; }
+    .hr-thin { border: 0; border-top: .5pt solid #ccc; margin: 6pt 0; }
+
+    /* رأس الصفحة */
+    .header   { display: flex; justify-content: space-between; align-items: flex-start; }
+    .header-left  { flex: 1; }
+    .header-right { text-align: left; min-width: 140pt; }
+
+    /* بيانات رئيسية */
+    .kv { display: grid; grid-template-columns: 120pt 1fr; column-gap: 8pt; row-gap: 3pt; }
+    .kv .k { font-weight: 700; }
+    .kv .v { }
+
+    /* حالة */
+    .status-badge {
+      display: inline-block; padding: 3pt 10pt;
+      border-radius: 4pt; font-weight: 700; font-size: 11pt;
+      color: #fff;
+    }
+
+    /* شبكة قسمين */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+    .box   { border: .5pt solid #999; padding: 8pt; }
+
+    /* جدول الإدخالات */
+    table { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+    thead th {
+      font-weight: 700; background: #f5f5f5;
+      border: .5pt solid #999; padding: 4pt 5pt; text-align: right;
+    }
+    tbody td {
+      border: .5pt solid #ccc; padding: 4pt 5pt; vertical-align: top;
+    }
+    .num { text-align: left; font-variant-numeric: tabular-nums; }
+
+    /* تذييل */
+    .footer { margin-top: 14pt; font-size: 9pt; color: #888; border-top: .5pt solid #ccc; padding-top: 5pt; }
+  </style>
+</head>
+<body>
+
+  {# ── رأس ─────────────────────────────────────────────────────────────── #}
+  <div class="header">
+    <div class="header-left">
+      <h1>بطاقة تتبع الكونتينر</h1>
+      <div class="small muted">تاريخ الطباعة: {{ print_date }}</div>
+    </div>
+    <div class="header-right small">
+      {% if company_name %}
+      <div class="bold">{{ company_name }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <hr class="hr"/>
+
+  {# ── رقم الكونتينر والحالة ────────────────────────────────────────────── #}
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8pt;">
+    <div>
+      <span class="bold" style="font-size:18pt; font-family:monospace;">{{ container.container_no }}</span>
+      {% if container.shipping_line %}
+      <span class="small muted" style="margin-right:8pt;">{{ container.shipping_line }}</span>
+      {% endif %}
+    </div>
+    <div>
+      <span class="status-badge" style="background:{{ status_color }};">
+        {{ status_label }}
+      </span>
+    </div>
+  </div>
+
+  {# ── القسم الأول: بيانات الشحنة ──────────────────────────────────────── #}
+  <h2>بيانات الشحنة</h2>
+  <div class="grid2">
+    <div class="kv small">
+      {% if container.bl_number %}
+      <div class="k">رقم B/L</div>        <div class="v mono">{{ container.bl_number }}</div>
+      {% endif %}
+      {% if container.booking_no %}
+      <div class="k">رقم الحجز</div>      <div class="v mono">{{ container.booking_no }}</div>
+      {% endif %}
+      {% if container.vessel_name %}
+      <div class="k">اسم الباخرة</div>    <div class="v">{{ container.vessel_name }}</div>
+      {% endif %}
+      {% if container.voyage_no %}
+      <div class="k">رقم الرحلة</div>     <div class="v mono">{{ container.voyage_no }}</div>
+      {% endif %}
+    </div>
+    <div class="kv small">
+      {% if container.port_of_loading %}
+      <div class="k">ميناء التحميل</div>  <div class="v">{{ container.port_of_loading }}</div>
+      {% endif %}
+      {% if container.port_of_discharge %}
+      <div class="k">ميناء التفريغ</div>  <div class="v">{{ container.port_of_discharge }}</div>
+      {% endif %}
+      {% if container.final_destination %}
+      <div class="k">الوجهة النهائية</div><div class="v">{{ container.final_destination }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── القسم الثاني: التواريخ ───────────────────────────────────────────── #}
+  <h2>التواريخ</h2>
+  <div class="grid2 small">
+    <div class="kv">
+      {% if container.etd %}
+      <div class="k">تاريخ المغادرة المتوقع (ETD)</div>  <div class="v mono">{{ container.etd }}</div>
+      {% endif %}
+      {% if container.atd %}
+      <div class="k">تاريخ المغادرة الفعلي (ATD)</div>   <div class="v mono">{{ container.atd }}</div>
+      {% endif %}
+      {% if container.customs_date %}
+      <div class="k">تاريخ الإفراج الجمركي</div>         <div class="v mono">{{ container.customs_date }}</div>
+      {% endif %}
+    </div>
+    <div class="kv">
+      {% if container.eta %}
+      <div class="k">تاريخ الوصول المتوقع (ETA)</div>    <div class="v mono">{{ container.eta }}</div>
+      {% endif %}
+      {% if container.ata %}
+      <div class="k">تاريخ الوصول الفعلي (ATA)</div>     <div class="v mono">{{ container.ata }}</div>
+      {% endif %}
+      {% if container.delivery_date %}
+      <div class="k">تاريخ التسليم</div>                 <div class="v mono">{{ container.delivery_date }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── القسم الثالث: الربط ──────────────────────────────────────────────── #}
+  {% if client_name or transaction_no %}
+  <h2>المرتبط بـ</h2>
+  <div class="kv small">
+    {% if client_name %}
+    <div class="k">صاحب البضاعة</div>   <div class="v">{{ client_name }}</div>
+    {% endif %}
+    {% if transaction_no %}
+    <div class="k">رقم المعاملة</div>   <div class="v mono">{{ transaction_no }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── القسم الرابع: الإدخالات المرتبطة ───────────────────────────────── #}
+  {% if entries %}
+  <h2>الإدخالات المرتبطة ({{ entries|length }})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:8%">#</th>
+        <th>رقم الإدخال</th>
+        <th>التاريخ</th>
+        <th>صاحب البضاعة</th>
+        <th class="num">عدد البنود</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td class="mono">{{ e.entry_no or ('#' ~ e.id) }}</td>
+        <td>{{ e.entry_date or '' }}</td>
+        <td>{{ e.client_name or '' }}</td>
+        <td class="num">{{ e.items_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {# ── ملاحظات ──────────────────────────────────────────────────────────── #}
+  {% if container.notes %}
+  <h2>ملاحظات</h2>
+  <div class="small">{{ container.notes }}</div>
+  {% endif %}
+
+  <div class="footer">
+    تم إنشاء هذا التقرير بواسطة LOGIPORT &nbsp;|&nbsp; {{ print_date }}
+  </div>
+
+</body>
+</html>

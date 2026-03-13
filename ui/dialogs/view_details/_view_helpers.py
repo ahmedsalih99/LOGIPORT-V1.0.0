@@ -9,6 +9,114 @@ from __future__ import annotations
 from typing import Any, Optional
 
 
+def build_dialog_table(cols: list[str], parent=None, *,
+                       object_name: str = "entries-table",
+                       select_rows: bool = False) -> "QTableWidget":
+    """
+    ينشئ QTableWidget موحّد للديالوغات:
+    - فونت Bold بحجم التطبيق الحالي (من ThemeManager)
+    - ارتفاع صفوف متناسب مع الخط
+    - عرض أعمدة تلقائي حسب المحتوى ثم Interactive
+    - رأس جدول Bold ومرتفع بما يناسب الخط
+    - يتحدث تلقائياً عند تغيير الثيم
+
+    الاستخدام:
+        tbl = build_dialog_table([_("col_a"), _("col_b")], self)
+    """
+    from PySide6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QFont
+
+    def _get_theme():
+        try:
+            from core.theme_manager import ThemeManager
+            tm = ThemeManager.get_instance()
+            return tm.get_current_font_family(), tm.get_current_font_size()
+        except Exception:
+            return "Tajawal", 12
+
+    tbl = QTableWidget(0, len(cols), parent)
+    tbl.setObjectName(object_name)
+    tbl.setHorizontalHeaderLabels(cols)
+    tbl.setAlternatingRowColors(True)
+    tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    tbl.verticalHeader().setVisible(False)
+
+    if select_rows:
+        tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+    else:
+        tbl.setSelectionMode(QAbstractItemView.NoSelection)
+
+    def _apply_style(*_):
+        fam, fs = _get_theme()
+        row_h = max(32, fs * 3 + 6)
+        hdr_h = max(40, fs * 3 + 8)
+        hdr_f = QFont(fam, fs); hdr_f.setBold(True)
+        tbl.verticalHeader().setDefaultSectionSize(row_h)
+        tbl.verticalHeader().setMinimumSectionSize(32)
+        tbl.horizontalHeader().setMinimumHeight(hdr_h)
+        tbl.horizontalHeader().setFont(hdr_f)
+        # تحديث خلايا موجودة
+        cell_f = QFont(fam, fs); cell_f.setBold(True)
+        for r in range(tbl.rowCount()):
+            for c in range(tbl.columnCount()):
+                item = tbl.item(r, c)
+                if item:
+                    item.setFont(cell_f)
+
+    def _fit_columns():
+        hdr = tbl.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
+        QTimer.singleShot(
+            0,
+            lambda: hdr.setSectionResizeMode(QHeaderView.Interactive)
+            if not tbl.isHidden() else None
+        )
+        tbl.horizontalHeader().setStretchLastSection(True)
+
+    _apply_style()
+    _fit_columns()
+
+    # ربط بتغيير الثيم
+    try:
+        from core.theme_manager import ThemeManager
+        ThemeManager.get_instance().theme_changed.connect(_apply_style)
+    except Exception:
+        pass
+
+    # حفظ الدالتين للاستخدام لاحقاً
+    tbl._apply_style  = _apply_style
+    tbl._fit_columns  = _fit_columns
+
+    return tbl
+
+
+def make_bold_cell(text: str, align=None) -> "QTableWidgetItem":
+    """
+    ينشئ QTableWidgetItem بفونت Bold بحجم التطبيق الحالي.
+    استخدام:
+        tbl.setItem(r, c, make_bold_cell("some text"))
+    """
+    from PySide6.QtWidgets import QTableWidgetItem
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QFont
+    try:
+        from core.theme_manager import ThemeManager
+        tm = ThemeManager.get_instance()
+        f  = QFont(tm.get_current_font_family(), tm.get_current_font_size())
+    except Exception:
+        f = QFont("Tajawal", 12)
+    f.setBold(True)
+    item = QTableWidgetItem(str(text) if text is not None else "")
+    item.setFont(f)
+    if align is not None:
+        item.setTextAlignment(align)
+    else:
+        from PySide6.QtCore import Qt
+        item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+    return item
+
+
 def _get(obj: Any, key: str, default=None):
     """يقرأ من dict أو ORM object."""
     if isinstance(obj, dict):

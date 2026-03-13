@@ -18,7 +18,7 @@ from core.base_dialog import BaseDialog
 from core.base_details_view import BaseDetailsView
 from core.translator import TranslationManager
 from core.permissions import is_admin
-from ._view_helpers import _get, _name_by_lang, _fmt_dt, _user_to_text, _add_audit_section
+from ._view_helpers import _get, _name_by_lang, _fmt_dt, _user_to_text, _add_audit_section, build_dialog_table, make_bold_cell
 
 
 class ViewEntryDialog(BaseDialog):
@@ -99,15 +99,7 @@ class ViewEntryDialog(BaseDialog):
             _("gross_weight_kg"), _("net_weight_kg"),
             _("mfg_date"), _("exp_date"), _("origin_country"),
         ]
-        tbl = QTableWidget(0, len(cols))
-        tbl.setObjectName("entries-table")
-        tbl.setHorizontalHeaderLabels(cols)
-        tbl.verticalHeader().setVisible(False)
-        tbl.setAlternatingRowColors(True)
-        tbl.setSelectionMode(QTableWidget.NoSelection)
-        tbl.setEditTriggers(QTableWidget.NoEditTriggers)
-        tbl.horizontalHeader().setStretchLastSection(True)
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        tbl = build_dialog_table(cols, self, object_name="entries-table")
 
         items = getattr(self.entry, "items", []) or []
         total_count = total_gross = total_net = 0.0
@@ -132,18 +124,12 @@ class ViewEntryDialog(BaseDialog):
             exp = str(_get(it, "exp_date") or _get(it, "expiry_date") or "")
 
             row_data = [
-                mat,
-                pack,
-                f"{count:,.0f}",
-                f"{gross:,.3f}",
-                f"{net:,.3f}",
-                mfg,
-                exp,
-                orig,
+                mat, pack,
+                f"{count:,.0f}", f"{gross:,.3f}", f"{net:,.3f}",
+                mfg, exp, orig,
             ]
             for cidx, val in enumerate(row_data):
-                cell = QTableWidgetItem(val)
-                cell.setTextAlignment(Qt.AlignCenter)
+                cell = make_bold_cell(val)
                 cell.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 tbl.setItem(r, cidx, cell)
 
@@ -157,13 +143,13 @@ class ViewEntryDialog(BaseDialog):
                 "", "", "",
             ]
             for cidx, val in enumerate(totals_data):
-                cell = QTableWidgetItem(val)
-                cell.setTextAlignment(Qt.AlignCenter)
-                fnt = cell.font()
-                fnt.setBold(True)
-                cell.setFont(fnt)
+                cell = make_bold_cell(val)
                 cell.setFlags(Qt.ItemIsEnabled)
                 tbl.setItem(r, cidx, cell)
+
+        # ضبط عرض الأعمدة بعد ملء البيانات
+        if hasattr(tbl, "_fit_columns"):
+            tbl._fit_columns()
 
         return tbl
 

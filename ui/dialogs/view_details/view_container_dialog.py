@@ -21,7 +21,7 @@ from core.base_dialog import BaseDialog
 from core.base_details_view import BaseDetailsView
 from core.translator import TranslationManager
 from core.permissions import is_admin
-from ._view_helpers import _get, _name_by_lang, _fmt_dt, _add_audit_section
+from ._view_helpers import _get, _name_by_lang, _fmt_dt, _add_audit_section, build_dialog_table, make_bold_cell
 
 
 # ── ألوان الحالة ──────────────────────────────────────────────────────────────
@@ -146,6 +146,14 @@ class ViewContainerDialog(BaseDialog):
 
         layout.addWidget(view)
 
+        # ── Timeline مرئي لمراحل الكونتينر ───────────────────────────────────
+        try:
+            from ui.widgets.container_timeline import ContainerTimeline
+            timeline = ContainerTimeline(c, parent=self)
+            layout.addWidget(timeline)
+        except Exception:
+            pass
+
         # ── جدول الإدخالات المرتبطة ───────────────────────────────────────────
         entries = getattr(c, "entries", None) or []
         if entries:
@@ -192,37 +200,28 @@ class ViewContainerDialog(BaseDialog):
         lang = self._lang
 
         cols = [_("entry_no"), _("entry_date"), _("owner_client"), _("items_count")]
-        tbl = QTableWidget(0, len(cols))
-        tbl.setObjectName("data-table")
-        tbl.setHorizontalHeaderLabels(cols)
-        tbl.verticalHeader().setVisible(False)
-        tbl.setAlternatingRowColors(True)
-        tbl.setSelectionMode(QTableWidget.NoSelection)
-        tbl.setEditTriggers(QTableWidget.NoEditTriggers)
-        tbl.horizontalHeader().setStretchLastSection(True)
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        tbl = build_dialog_table(cols, self, object_name="data-table")
         tbl.setMaximumHeight(180)
 
         for entry in entries:
             r = tbl.rowCount()
             tbl.insertRow(r)
 
-            entry_no = _get(entry, "entry_no") or f"#{_get(entry, 'id', '')}"
+            entry_no   = _get(entry, "entry_no") or f"#{_get(entry, 'id', '')}"
             entry_date = str(_get(entry, "entry_date") or "")
-
-            owner = _get(entry, "owner_client")
+            owner      = _get(entry, "owner_client")
             owner_name = (_name_by_lang(owner, lang)
                           if owner else _get(entry, "owner_client_name") or "")
-
-            items = getattr(entry, "items", None) or []
+            items      = getattr(entry, "items", None) or []
             items_count = str(len(items))
 
             for cidx, val in enumerate([entry_no, entry_date, owner_name, items_count]):
-                cell = QTableWidgetItem(str(val))
-                cell.setTextAlignment(Qt.AlignCenter)
+                cell = make_bold_cell(val)
                 cell.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 tbl.setItem(r, cidx, cell)
 
+        if hasattr(tbl, "_fit_columns"):
+            tbl._fit_columns()
         return tbl
 
     # ── فتح ديالوج التعديل ────────────────────────────────────────────────────

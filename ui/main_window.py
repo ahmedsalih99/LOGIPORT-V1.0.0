@@ -20,6 +20,7 @@ from ui.tabs.dashboard_tab import DashboardTab        # أول تبويب — ي
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from services.notification_service import NotificationService
+from services.alert_service import AlertService
 from services.backup_service import backup
 import logging
 
@@ -83,6 +84,9 @@ class MainWindow(BaseWindow):
 
         self._notif_svc = NotificationService.get_instance()
         self._notif_svc.start()
+
+        self._alert_svc = AlertService.get_instance()
+        self._alert_svc.start()
 
         user_name = ""
         if current_user:
@@ -383,6 +387,7 @@ class MainWindow(BaseWindow):
             pass
 
         self._notif_svc.stop()
+        if hasattr(self, '_alert_svc'): self._alert_svc.stop()
         SettingsManager.get_instance().set("user", None)
 
         # مسح سياق المكتب
@@ -417,6 +422,7 @@ class MainWindow(BaseWindow):
         if hasattr(self, "_notif_svc") and self._notif_svc:
             try:
                 self._notif_svc.stop()
+                if hasattr(self, '_alert_svc'): self._alert_svc.stop()
             except Exception:
                 pass
 
@@ -442,6 +448,9 @@ class MainWindow(BaseWindow):
         self._notif_svc = NotificationService.get_instance()
         self._notif_svc.start()
 
+        self._alert_svc = AlertService.get_instance()
+        self._alert_svc.start()
+
         user_name = (
             getattr(new_user, "full_name", None)
             or getattr(new_user, "username", None)
@@ -462,6 +471,7 @@ class MainWindow(BaseWindow):
 
     def _do_close(self):
         self._notif_svc.stop()
+        if hasattr(self, '_alert_svc'): self._alert_svc.stop()
         QApplication.instance().quit()
 
     def closeEvent(self, event):
@@ -481,6 +491,7 @@ class MainWindow(BaseWindow):
 
         if hasattr(self, "_notif_svc") and self._notif_svc:
             self._notif_svc.stop()
+        if hasattr(self, '_alert_svc'): self._alert_svc.stop()
         event.accept()
 
     # ─── language ────────────────────────────────────────────────────────────

@@ -504,10 +504,18 @@ class DashboardTab(QWidget):
             "archived": "#7F8C8D",
         }
 
+        try:
+            from core.theme_manager import ThemeManager
+            tm  = ThemeManager.get_instance()
+            _cell_font = QFont(tm.get_current_font_family(), tm.get_current_font_size())
+        except Exception:
+            _cell_font = QFont("Tajawal", 12)
+
         def _cell(txt, right=False):
             item = QTableWidgetItem(str(txt))
             align = (Qt.AlignRight if right else Qt.AlignCenter) | Qt.AlignVCenter
             item.setTextAlignment(align)
+            item.setFont(_cell_font)
             return item
 
         try:
