@@ -78,6 +78,8 @@ class PackagingTypesTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('packaging', self.reload_data)
         from PySide6.QtGui import QKeySequence, QShortcut
 
         # ── Keyboard shortcuts ─────────────────────────────
@@ -191,6 +193,8 @@ class PackagingTypesTab(BaseTab):
             )
             QMessageBox.information(self, self._("added"), self._("packaging_type_added_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('packaging')
 
     def edit_selected_item(self, row=None):
         if row is None:
@@ -213,6 +217,8 @@ class PackagingTypesTab(BaseTab):
             self.packaging_types_crud.update_packaging_type(pt.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("packaging_type_updated_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('packaging')
 
     def delete_selected_items(self, rows=None):
         if rows is None:
@@ -229,6 +235,8 @@ class PackagingTypesTab(BaseTab):
                 self._delete_single(pt, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("packaging_type_deleted_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('packaging')
 
     def _delete_single(self, pt, confirm=True):
         if confirm:

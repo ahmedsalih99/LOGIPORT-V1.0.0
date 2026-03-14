@@ -155,14 +155,7 @@ class ViewContainerDialog(BaseDialog):
             pass
 
         # ── جدول الإدخالات المرتبطة ───────────────────────────────────────────
-        entries = getattr(c, "entries", None) or []
-        if entries:
-            lbl = QLabel(_("linked_entries"))
-            lbl.setObjectName("section-title")
-            layout.addWidget(lbl)
-            layout.addWidget(self._build_entries_table(entries))
 
-        # ── أزرار ─────────────────────────────────────────────────────────────
         btns = QHBoxLayout()
         btns.addStretch()
 
@@ -195,36 +188,6 @@ class ViewContainerDialog(BaseDialog):
 
     # ── جدول الإدخالات ────────────────────────────────────────────────────────
 
-    def _build_entries_table(self, entries: list) -> QTableWidget:
-        _ = self._
-        lang = self._lang
-
-        cols = [_("entry_no"), _("entry_date"), _("owner_client"), _("items_count")]
-        tbl = build_dialog_table(cols, self, object_name="data-table")
-        tbl.setMaximumHeight(180)
-
-        for entry in entries:
-            r = tbl.rowCount()
-            tbl.insertRow(r)
-
-            entry_no   = _get(entry, "entry_no") or f"#{_get(entry, 'id', '')}"
-            entry_date = str(_get(entry, "entry_date") or "")
-            owner      = _get(entry, "owner_client")
-            owner_name = (_name_by_lang(owner, lang)
-                          if owner else _get(entry, "owner_client_name") or "")
-            items      = getattr(entry, "items", None) or []
-            items_count = str(len(items))
-
-            for cidx, val in enumerate([entry_no, entry_date, owner_name, items_count]):
-                cell = make_bold_cell(val)
-                cell.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-                tbl.setItem(r, cidx, cell)
-
-        if hasattr(tbl, "_fit_columns"):
-            tbl._fit_columns()
-        return tbl
-
-    # ── فتح ديالوج التعديل ────────────────────────────────────────────────────
 
     def _open_edit(self):
         from ui.dialogs.add_edit_container_dialog import AddEditContainerDialog

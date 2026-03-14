@@ -59,7 +59,6 @@
         <th>ETD</th>
         <th>ETA</th>
         <th>ATA</th>
-        <th style="text-align:center;">Entries</th>
         <th style="text-align:center;">Status</th>
       </tr>
     </thead>
@@ -76,7 +75,6 @@
         <td>{{ container.etd or '—' }}</td>
         <td class="{% if container.eta_state == 'overdue' %}eta-overdue{% elif container.eta_state == 'today' %}eta-today{% endif %}">{{ container.eta or '—' }}</td>
         <td>{{ container.ata or '—' }}</td>
-        <td style="text-align:center;">{{ container.entries_count }}</td>
         <td style="text-align:center;"><span class="status-badge" style="background: {{ container.status_color }};">{{ container.status_label }}</span></td>
       </tr>
       {% else %}

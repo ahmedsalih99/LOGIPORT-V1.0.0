@@ -151,7 +151,7 @@ class ContainerTrackingTab(QWidget):
     _COLUMNS = [
         "container_no", "bl_number", "client_name", "shipping_line",
         "vessel_name", "port_of_loading", "port_of_discharge",
-        "eta", "ata", "status", "entries_count",
+        "eta", "ata", "status",
     ]
 
     def __init__(self, current_user=None, parent=None):
@@ -298,7 +298,7 @@ class ContainerTrackingTab(QWidget):
         if rec.client:
             client_name = (getattr(rec.client, "name_ar", None)
                            or getattr(rec.client, "name_en", None) or "")
-        entries_count = str(len(rec.entries)) if rec.entries is not None else "0"
+        entries_count = "0"  # entries relation removed
         return [
             (rec.container_no or "",        "#2563EB", True),
             (rec.bl_number or "—",          None,      False),
@@ -310,7 +310,7 @@ class ContainerTrackingTab(QWidget):
             (_date(rec.eta),                None,      False),
             (_date(rec.ata),                None,      False),
             (status_txt, meta.get("color"), False),
-            (entries_count,                 None,      False),
+
         ]
 
     def _on_double_click(self, index):
@@ -332,12 +332,17 @@ class ContainerTrackingTab(QWidget):
             if dlg.exec():
                 self._load_data()
 
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('containers')
+
     def _on_add(self):
         from ui.dialogs.add_edit_container_dialog import AddEditContainerDialog
         from PySide6.QtWidgets import QDialog
         dlg = AddEditContainerDialog(parent=self, current_user=self.current_user)
         if dlg.exec() == QDialog.Accepted:
             self._load_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('containers')
 
     def _col_label(self, col: str) -> str:
         _map = {
@@ -351,7 +356,7 @@ class ContainerTrackingTab(QWidget):
             "eta":               "eta_label",
             "ata":               "ata_label",
             "status":            "col_status",
-            "entries_count":     "linked_entries_count",
+
         }
         return self._(_map.get(col, col))
 
@@ -405,63 +410,80 @@ class ContainerTrackingTab(QWidget):
         self._load_data()
 
     def _print_list(self):
-        import os, subprocess, sys
+        """طباعة القائمة — يعمل في Thread منفصل لمنع تجميد الواجهة."""
         if not self._rows:
             QMessageBox.information(self, self._("info"), self._("no_data"))
             return
-        try:
-            from services.container_report_service import ContainerReportService
-            lang = TranslationManager.get_instance().get_current_language()
-            filters_parts = []
-            search = self._search.text().strip() if hasattr(self, "_search") else ""
-            active_filter = self._stats_bar.current_filter if hasattr(self, "_stats_bar") else ""
-            if search:
-                filters_parts.append(f"{self._('search')}: {search}")
-            if active_filter:
-                filters_parts.append(self._(f"container_status_{active_filter}"))
-            filters_str = " | ".join(filters_parts)
-            svc = ContainerReportService()
-            ok, path, err = svc.render_list(self._rows, lang=lang, filters=filters_str)
+
+        from PySide6.QtCore import QThread, Signal, QObject
+        from PySide6.QtWidgets import QApplication
+
+        rows_snapshot = list(self._rows)   # نسخة ثابتة للـ thread
+        lang         = TranslationManager.get_instance().get_current_language()
+        filters_parts = []
+        search = self._search.text().strip() if hasattr(self, "_search") else ""
+        active_filter = self._stats_bar.current_filter if hasattr(self, "_stats_bar") else ""
+        if search:
+            filters_parts.append(f"{self._('search')}: {search}")
+        if active_filter:
+            filters_parts.append(self._(f"container_status_{active_filter}"))
+        filters_str = " | ".join(filters_parts)
+
+        # ── Worker ─────────────────────────────────────────────────────────────
+        class _PrintWorker(QObject):
+            finished = Signal(bool, str, str)   # ok, path, err
+
+            def __init__(self, rows, lang, filters):
+                super().__init__()
+                self._rows    = rows
+                self._lang    = lang
+                self._filters = filters
+
+            def run(self):
+                try:
+                    from services.container_report_service import ContainerReportService
+                    svc = ContainerReportService()
+                    ok, path, err = svc.render_list(
+                        self._rows, lang=self._lang, filters=self._filters
+                    )
+                    self.finished.emit(ok, path, err)
+                except Exception as e:
+                    self.finished.emit(False, "", str(e))
+
+        # ── Thread setup ───────────────────────────────────────────────────────
+        self._print_thread  = QThread(self)
+        self._print_worker  = _PrintWorker(rows_snapshot, lang, filters_str)
+        self._print_worker.moveToThread(self._print_thread)
+
+        def _on_done(ok, path, err):
+            # أوقف مؤشر الانتظار
+            QApplication.restoreOverrideCursor()
+            self._btn_print.setEnabled(True)
+            self._btn_print.setText(f"🖨  {self._('print_list')}")
+            self._print_thread.quit()
+
             if not ok:
-                QMessageBox.critical(self, self._("error"), f"{self._('pdf_error')}\n{err}")
+                QMessageBox.critical(self, self._("error"),
+                                     f"{self._('pdf_error')}\n{err}")
                 return
-            if sys.platform == "win32":
-                os.startfile(path)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", path])
-            else:
-                subprocess.Popen(["xdg-open", path])
-        except Exception as e:
-            QMessageBox.critical(self, self._("error"), str(e))
-
-
-class ContainerBadge(QLabel):
-    def __init__(self, entry_id: int, parent=None):
-        super().__init__(parent)
-        self._entry_id = entry_id
-        self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(TranslationManager.get_instance().translate("view_container"))
-        self.refresh()
-
-    def refresh(self):
-        containers = _crud.get_containers_for_entry(self._entry_id)
-        if containers:
-            nos = ", ".join(c.container_no for c in containers[:2])
-            if len(containers) > 2:
-                nos += f" +{len(containers)-2}"
-            self.setText(f"🚢 {nos}")
-            self.setStyleSheet("color: #2563EB; font-size: 11px;")
-        else:
-            self.setText("")
-
-    def mousePressEvent(self, event):
-        containers = _crud.get_containers_for_entry(self._entry_id)
-        if containers:
+            import os, subprocess, sys
             try:
-                full = _crud.get_by_id(containers[0].id)
-            except Exception:
-                full = containers[0]
-            from ui.dialogs.view_details.view_container_dialog import ViewContainerDialog
-            dlg = ViewContainerDialog(full, parent=self)
-            dlg.exec()
-            self.refresh()
+                if sys.platform == "win32":
+                    os.startfile(path)
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", path])
+                else:
+                    subprocess.Popen(["xdg-open", path])
+            except Exception as e:
+                QMessageBox.warning(self, self._("info"), path)
+
+        self._print_thread.started.connect(self._print_worker.run)
+        self._print_worker.finished.connect(_on_done)
+        self._print_worker.finished.connect(self._print_worker.deleteLater)
+        self._print_thread.finished.connect(self._print_thread.deleteLater)
+
+        # ── Start ──────────────────────────────────────────────────────────────
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self._btn_print.setEnabled(False)
+        self._btn_print.setText(f"⏳  {self._('generating')}")
+        self._print_thread.start()

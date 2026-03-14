@@ -361,13 +361,6 @@ def _run_migrations(conn) -> None:
                 updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS container_entry_links (
-                container_id INTEGER NOT NULL REFERENCES container_tracking(id) ON DELETE CASCADE,
-                entry_id     INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-                PRIMARY KEY (container_id, entry_id)
-            )
-        """)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_transaction_id ON container_tracking(transaction_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id      ON container_tracking(client_id)")
         # Migration: office_id for multi-office filtering
@@ -377,11 +370,16 @@ def _run_migrations(conn) -> None:
             conn.commit()
         except Exception:
             pass  # Column already exists
+        # Migration: حذف جدول ربط الإدخالات (تم إلغاؤه في v1.1)
+        try:
+            conn.execute("DROP TABLE IF EXISTS container_entry_links")
+            conn.commit()
+        except Exception:
+            pass
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_container_no   ON container_tracking(container_no)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_status         ON container_tracking(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_cel_entry_id      ON container_entry_links(entry_id)")
         conn.commit()
-        logger.info("Bootstrap: container_tracking + container_entry_links جاهزين")
+        logger.info("Bootstrap: container_tracking جاهز")
     except Exception as _e:
         logger.warning("Bootstrap: container_tracking migration skipped: %s", _e)
 

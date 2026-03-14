@@ -71,38 +71,59 @@ class ContainerReportService:
     # ── بناء HTML للبطاقة ─────────────────────────────────────────────────────
 
     def _build_card_html(self, container, lang: str) -> str:
-        """يحاول Jinja2 أولاً، ويبني HTML مدمجاً كاحتياط."""
+        """يبني HTML بطاقة كونتينر واحد — يستخدم template Jinja2 أو inline HTML."""
         template_path = _TEMPLATES_DIR / "card"
         tpl_file = template_path / f"{lang}.html"
 
-        status = _get(container, "status") or "booked"
-        client = _get(container, "client")
-        tx     = _get(container, "transaction")
+        status       = _get(container, "status") or "booked"
+        status_color = _STATUS_COLOR.get(status, "#888")
+        status_label = self._status_label(status, lang)
+        eta_state    = _calc_eta_state(_get(container, "eta"), status)
 
-        client_name = _extract_name(client, lang)
+        # اسم العميل
+        client_name = ""
+        if hasattr(container, "_client_name_ar"):
+            if lang == "ar":
+                client_name = getattr(container, "_client_name_ar", "") or getattr(container, "_client_name_en", "")
+            elif lang == "tr":
+                client_name = getattr(container, "_client_name_tr", "") or getattr(container, "_client_name_ar", "")
+            else:
+                client_name = getattr(container, "_client_name_en", "") or getattr(container, "_client_name_ar", "")
+        else:
+            client = _get(container, "client")
+            client_name = _extract_name(client, lang)
+
+        # رقم المعاملة
         transaction_no = ""
-        if tx:
-            transaction_no = getattr(tx, "transaction_no", None) or str(_get(container, "transaction_id") or "")
+        if hasattr(container, "_transaction_no"):
+            transaction_no = getattr(container, "_transaction_no", "")
+        else:
+            tx = _get(container, "transaction")
+            if tx:
+                transaction_no = getattr(tx, "transaction_no", None) or str(_get(container, "transaction_id") or "")
 
-        entries = getattr(container, "entries", None) or []
-        entries_data = []
-        for e in entries:
-            e_client = getattr(e, "owner_client", None)
-            entries_data.append({
-                "id":          _get(e, "id"),
-                "entry_no":    _get(e, "entry_no") or "",
-                "entry_date":  str(_get(e, "entry_date") or ""),
-                "client_name": _extract_name(e_client, lang),
-                "items_count": len(getattr(e, "items", None) or []),
-            })
-
-        ctx = {
-            "container":      _container_to_dict(container),
-            "status_color":   _STATUS_COLOR.get(status, "#888"),
-            "status_label":   self._status_label(status, lang),
+        # بناء dict الكونتينر مع كل البيانات التي يحتاجها الـ template
+        raw = _container_to_dict(container)
+        container_ctx = {
+            **raw,
             "client_name":    client_name,
             "transaction_no": transaction_no,
-            "entries":        entries_data,
+            "status_color":   status_color,
+            "status_label":   status_label,
+            "eta_state":      eta_state,
+            "entries_count":  0,   # removed
+        }
+
+        ctx = {
+            # single card: يمرر كـ قائمة بعنصر واحد ليتوافق مع template القائمة
+            "containers":     [container_ctx],
+            "container":      container_ctx,   # للـ templates التي تستخدم المفرد
+            "status_summary": [{
+                "label": status_label,
+                "color": status_color,
+                "count": 1,
+            }],
+            "filters":        "",
             "print_date":     date.today().strftime("%Y-%m-%d"),
             "company_name":   self._company_name(),
             "lang":           lang,
@@ -133,20 +154,32 @@ class ContainerReportService:
         for c in containers:
             status = _get(c, "status") or "booked"
             status_counts[status] = status_counts.get(status, 0) + 1
-            client = _get(c, "client")
-            client_name = _extract_name(client, lang)
-            entries = getattr(c, "entries", None) or []
+            # اسم العميل — من الـ pre-loaded أو من العلاقة
+            if hasattr(c, "_client_name_ar"):
+                if lang == "ar":
+                    client_name = getattr(c, "_client_name_ar", "") or getattr(c, "_client_name_en", "")
+                elif lang == "tr":
+                    client_name = getattr(c, "_client_name_tr", "") or getattr(c, "_client_name_ar", "")
+                else:
+                    client_name = getattr(c, "_client_name_en", "") or getattr(c, "_client_name_ar", "")
+            else:
+                client = _get(c, "client")
+                client_name = _extract_name(client, lang)
             raw = _container_to_dict(c)
             eta_state = _calc_eta_state(_get(c, "eta"), status)
             row = {
                 **raw,
                 "client_name":   client_name,
-                "entries_count": len(entries),
+                "entries_count": 0,  # removed
                 "status_color":  _STATUS_COLOR.get(status, "#888"),
                 "status_label":  self._status_label(status, lang),
                 "eta_state":     eta_state,
+                "entries_count": 0,   # removed
                 # nested للـ templates التي تستخدم {{ container.xxx }}
-                "container":     {**raw, "client_name": client_name, "eta_state": eta_state},
+                "container":     {**raw, "client_name": client_name,
+                                  "eta_state": eta_state, "entries_count": 0,
+                                  "status_color": _STATUS_COLOR.get(status, "#888"),
+                                  "status_label": self._status_label(status, lang)},
             }
             rows.append(row)
 
@@ -209,9 +242,9 @@ class ContainerReportService:
         footer    = {"ar": "LOGIPORT — تقرير آلي", "en": "LOGIPORT — Auto Report", "tr": "LOGIPORT — Otomatik Rapor"}.get(lang, "LOGIPORT")
 
         headers = {
-            "ar": ["رقم الكونتينر","رقم BL","الزبون","شركة الشحن","الباخرة","م.التحميل","م.التفريغ","ETD","ETA","ATA","إدخالات","الحالة"],
-            "en": ["Container No","BL No","Client","Shipping Line","Vessel","POL","POD","ETD","ETA","ATA","Entries","Status"],
-            "tr": ["Konteyner No","Konşimento No","Müşteri","Nakliye Şirketi","Gemi","Yükleme Limanı","Tahliye Limanı","ETD","ETA","ATA","Girişler","Durum"],
+            "ar": ["رقم الكونتينر","رقم BL","الزبون","شركة الشحن","الباخرة","م.التحميل","م.التفريغ","ETD","ETA","ATA","الحالة"],
+            "en": ["Container No","BL No","Client","Shipping Line","Vessel","POL","POD","ETD","ETA","ATA","Status"],
+            "tr": ["Konteyner No","Konşimento No","Müşteri","Nakliye Şirketi","Gemi","Yükleme Limanı","Tahliye Limanı","ETD","ETA","ATA","Durum"],
         }.get(lang, ["Container No","BL No","Client","Shipping Line","Vessel","POL","POD","ETD","ETA","ATA","Entries","Status"])
 
         # badges الحالات
@@ -245,7 +278,6 @@ class ContainerReportService:
 <td>{r.get('etd') or '—'}</td>
 <td {eta_cls}>{r.get('eta') or '—'}</td>
 <td>{r.get('ata') or '—'}</td>
-<td style="text-align:center">{r.get('entries_count', 0)}</td>
 <td style="text-align:center">
   <span style="background:{r['status_color']};color:#fff;padding:2pt 7pt;border-radius:10pt;font-size:8pt;font-weight:600">
     {r['status_label']}
@@ -254,7 +286,7 @@ class ContainerReportService:
 </tr>"""
 
         if not td_rows:
-            td_rows = f'<tr><td colspan="12" style="text-align:center;color:#888;padding:14pt">{no_data}</td></tr>'
+            td_rows = f'<tr><td colspan="11" style="text-align:center;color:#888;padding:14pt">{no_data}</td></tr>'
 
         filter_section = f'<div class="filters">{filter_lbl}: {filters}</div>' if filters else ""
         company_section = f'<div class="company-name">{company_name}</div>' if company_name else ""
@@ -301,7 +333,7 @@ tfoot td{{padding:5pt;font-weight:700;border-top:1.5pt solid #1e3a5f;background:
 <thead><tr>{th_html}</tr></thead>
 <tbody>{td_rows}</tbody>
 <tfoot><tr>
-  <td colspan="10">{total_lbl}</td>
+  <td colspan="9">{total_lbl}</td>
   <td style="text-align:center">{len(rows)}</td>
   <td></td>
 </tr></tfoot>

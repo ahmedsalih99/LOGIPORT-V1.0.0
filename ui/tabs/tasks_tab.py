@@ -282,6 +282,8 @@ class TasksTab(QWidget):
                 data.setdefault("created_by_id", self._user_id())
                 TasksCRUD().create(**data)
                 self._load()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit('tasks')
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
 
@@ -300,6 +302,8 @@ class TasksTab(QWidget):
                 data["updated_by_id"] = self._user_id()
                 TasksCRUD().update(task.id, **data)
                 self._load()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit('tasks')
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
 
@@ -311,6 +315,8 @@ class TasksTab(QWidget):
             from database.crud.tasks_crud import TasksCRUD
             TasksCRUD().mark_done(task.id, updated_by_id=self._user_id())
             self._load()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('tasks')
         except Exception as e:
             QMessageBox.critical(self, self._("error"), str(e))
 
@@ -329,6 +335,8 @@ class TasksTab(QWidget):
                 from database.crud.tasks_crud import TasksCRUD
                 TasksCRUD().delete(task.id)
                 self._load()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit('tasks')
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
 

@@ -81,6 +81,8 @@ class UsersTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('users', self.reload_data)
         self._init_done = True
 
     # -----------------------------
@@ -191,6 +193,8 @@ class UsersTab(BaseTab):
             )
             QMessageBox.information(self, self._("added"), self._("user_added_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('users')
 
     def edit_selected_item(self, row=None):
         if row is None:
@@ -216,6 +220,8 @@ class UsersTab(BaseTab):
                 self.users_crud.delete(user_obj["id"] if isinstance(user_obj, dict) else user_obj.id)
             QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('users')
 
     def view_selected_item(self, row=None):
         # لم تعد تُستخدم مباشرة؛ نبقيها للتوافق
@@ -242,6 +248,8 @@ class UsersTab(BaseTab):
             )
             QMessageBox.information(self, self._("updated"), self._("user_updated_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('users')
 
     def _open_edit_dialog(self, user):
         """Hook مطلوب من _display_with_actions."""

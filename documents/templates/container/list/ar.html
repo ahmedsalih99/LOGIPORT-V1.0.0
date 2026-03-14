@@ -1,195 +1,164 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8"/>
-  <title>بطاقة الكونتينر</title>
+  <meta charset="utf-8" />
+  <title>قائمة الكونتينرات</title>
   <style>
-    @page { size: A4; margin: 16mm; }
+    @page { size: A4 landscape; margin: 12mm 14mm; }
     html { color: #000; background: #fff; }
-    body { font: 11pt/1.6 "Noto Naskh Arabic", "Amiri", "Segoe UI", Tahoma, Arial, sans-serif; }
+    body { font: 10pt/1.5 "Noto Naskh Arabic", "Amiri", "Segoe UI", Tahoma, Arial, sans-serif; }
 
-    h1  { font-size: 16pt; margin: 0 0 4pt; }
-    h2  { font-size: 12pt; margin: 10pt 0 4pt; border-bottom: 1pt solid #000; padding-bottom: 2pt; }
-    .small   { font-size: 9.5pt; }
-    .mono    { font-family: ui-monospace, "Courier New", monospace; letter-spacing: .5pt; }
-    .bold    { font-weight: 700; }
-    .muted   { color: #555; }
-    .hr      { border: 0; border-top: 2pt solid #000; margin: 8pt 0; }
-    .hr-thin { border: 0; border-top: .5pt solid #ccc; margin: 6pt 0; }
+    /* ── Header ── */
+    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10pt; border-bottom: 2pt solid #1e3a5f; padding-bottom: 8pt; }
+    .page-title  { font-size: 16pt; font-weight: 700; color: #1e3a5f; margin: 0; }
+    .page-meta   { font-size: 9pt; color: #555; text-align: left; }
+    .company-name{ font-size: 12pt; font-weight: 700; color: #1e3a5f; }
 
-    /* رأس الصفحة */
-    .header   { display: flex; justify-content: space-between; align-items: flex-start; }
-    .header-left  { flex: 1; }
-    .header-right { text-align: left; min-width: 140pt; }
+    /* ── Summary badges ── */
+    .summary { display: flex; gap: 8pt; margin-bottom: 8pt; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4pt;
+      padding: 3pt 9pt; border-radius: 20pt;
+      font-size: 9pt; font-weight: 600;
+      border: 1pt solid currentColor;
+    }
 
-    /* بيانات رئيسية */
-    .kv { display: grid; grid-template-columns: 120pt 1fr; column-gap: 8pt; row-gap: 3pt; }
-    .kv .k { font-weight: 700; }
-    .kv .v { }
+    /* ── Filters ── */
+    .filters { font-size: 9pt; color: #666; margin-bottom: 6pt; }
 
-    /* حالة */
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    thead th {
+      background: #1e3a5f; color: #fff;
+      padding: 5pt 5pt; text-align: right;
+      font-weight: 600; font-size: 8.5pt;
+      border-left: 0.5pt solid rgba(255,255,255,0.2);
+    }
+    tbody tr:nth-child(even) { background: #f5f7fa; }
+    tbody tr:hover           { background: #eaf0fb; }
+    tbody td {
+      padding: 4pt 5pt; vertical-align: middle;
+      border-bottom: 0.5pt solid #ddd;
+      border-left: 0.5pt solid #eee;
+    }
+    tfoot td {
+      padding: 5pt; font-weight: 700;
+      border-top: 1.5pt solid #1e3a5f;
+      background: #f0f4fa;
+    }
+
+    /* ── Columns ── */
+    .col-no      { width: 5%;  font-family: monospace; font-weight: 700; color: #1a56db; }
+    .col-bl      { width: 9%;  font-family: monospace; color: #374151; }
+    .col-client  { width: 10%; }
+    .col-line    { width: 9%;  }
+    .col-vessel  { width: 9%;  }
+    .col-pol     { width: 7%;  }
+    .col-pod     { width: 7%;  }
+    .col-etd     { width: 7%;  font-variant-numeric: tabular-nums; }
+    .col-eta     { width: 7%;  font-variant-numeric: tabular-nums; }
+    .col-ata     { width: 7%;  font-variant-numeric: tabular-nums; }
+    .col-status  { width: 9%;  text-align: center; }
+
+    /* ── Status badge ── */
     .status-badge {
-      display: inline-block; padding: 3pt 10pt;
-      border-radius: 4pt; font-weight: 700; font-size: 11pt;
+      display: inline-block;
+      padding: 2pt 6pt; border-radius: 10pt;
+      font-size: 8pt; font-weight: 600;
       color: #fff;
     }
 
-    /* شبكة قسمين */
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
-    .box   { border: .5pt solid #999; padding: 8pt; }
+    /* ── ETA alerts ── */
+    .eta-overdue { color: #dc2626; font-weight: 700; }
+    .eta-today   { color: #d97706; font-weight: 700; }
 
-    /* جدول الإدخالات */
-    table { width: 100%; border-collapse: collapse; margin-top: 6pt; }
-    thead th {
-      font-weight: 700; background: #f5f5f5;
-      border: .5pt solid #999; padding: 4pt 5pt; text-align: right;
-    }
-    tbody td {
-      border: .5pt solid #ccc; padding: 4pt 5pt; vertical-align: top;
-    }
-    .num { text-align: left; font-variant-numeric: tabular-nums; }
-
-    /* تذييل */
-    .footer { margin-top: 14pt; font-size: 9pt; color: #888; border-top: .5pt solid #ccc; padding-top: 5pt; }
+    /* ── Footer ── */
+    .page-footer { margin-top: 10pt; font-size: 8pt; color: #888; display: flex; justify-content: space-between; border-top: 0.5pt solid #ccc; padding-top: 5pt; }
   </style>
 </head>
 <body>
 
-  {# ── رأس ─────────────────────────────────────────────────────────────── #}
-  <div class="header">
-    <div class="header-left">
-      <h1>بطاقة تتبع الكونتينر</h1>
-      <div class="small muted">تاريخ الطباعة: {{ print_date }}</div>
-    </div>
-    <div class="header-right small">
-      {% if company_name %}
-      <div class="bold">{{ company_name }}</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <hr class="hr"/>
-
-  {# ── رقم الكونتينر والحالة ────────────────────────────────────────────── #}
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8pt;">
+  <!-- Header -->
+  <div class="page-header">
     <div>
-      <span class="bold" style="font-size:18pt; font-family:monospace;">{{ container.container_no }}</span>
-      {% if container.shipping_line %}
-      <span class="small muted" style="margin-right:8pt;">{{ container.shipping_line }}</span>
-      {% endif %}
+      {% if company_name %}<div class="company-name">{{ company_name }}</div>{% endif %}
+      <h1 class="page-title">قائمة الكونتينرات</h1>
+      {% if filters %}<div class="filters">الفلتر: {{ filters }}</div>{% endif %}
     </div>
-    <div>
-      <span class="status-badge" style="background:{{ status_color }};">
-        {{ status_label }}
-      </span>
+    <div class="page-meta">
+      <div>تاريخ الطباعة: {{ print_date }}</div>
+      <div>الإجمالي: {{ containers | length }} كونتينر</div>
     </div>
   </div>
 
-  {# ── القسم الأول: بيانات الشحنة ──────────────────────────────────────── #}
-  <h2>بيانات الشحنة</h2>
-  <div class="grid2">
-    <div class="kv small">
-      {% if container.bl_number %}
-      <div class="k">رقم B/L</div>        <div class="v mono">{{ container.bl_number }}</div>
-      {% endif %}
-      {% if container.booking_no %}
-      <div class="k">رقم الحجز</div>      <div class="v mono">{{ container.booking_no }}</div>
-      {% endif %}
-      {% if container.vessel_name %}
-      <div class="k">اسم الباخرة</div>    <div class="v">{{ container.vessel_name }}</div>
-      {% endif %}
-      {% if container.voyage_no %}
-      <div class="k">رقم الرحلة</div>     <div class="v mono">{{ container.voyage_no }}</div>
-      {% endif %}
-    </div>
-    <div class="kv small">
-      {% if container.port_of_loading %}
-      <div class="k">ميناء التحميل</div>  <div class="v">{{ container.port_of_loading }}</div>
-      {% endif %}
-      {% if container.port_of_discharge %}
-      <div class="k">ميناء التفريغ</div>  <div class="v">{{ container.port_of_discharge }}</div>
-      {% endif %}
-      {% if container.final_destination %}
-      <div class="k">الوجهة النهائية</div><div class="v">{{ container.final_destination }}</div>
-      {% endif %}
-    </div>
-  </div>
-
-  {# ── القسم الثاني: التواريخ ───────────────────────────────────────────── #}
-  <h2>التواريخ</h2>
-  <div class="grid2 small">
-    <div class="kv">
-      {% if container.etd %}
-      <div class="k">تاريخ المغادرة المتوقع (ETD)</div>  <div class="v mono">{{ container.etd }}</div>
-      {% endif %}
-      {% if container.atd %}
-      <div class="k">تاريخ المغادرة الفعلي (ATD)</div>   <div class="v mono">{{ container.atd }}</div>
-      {% endif %}
-      {% if container.customs_date %}
-      <div class="k">تاريخ الإفراج الجمركي</div>         <div class="v mono">{{ container.customs_date }}</div>
-      {% endif %}
-    </div>
-    <div class="kv">
-      {% if container.eta %}
-      <div class="k">تاريخ الوصول المتوقع (ETA)</div>    <div class="v mono">{{ container.eta }}</div>
-      {% endif %}
-      {% if container.ata %}
-      <div class="k">تاريخ الوصول الفعلي (ATA)</div>     <div class="v mono">{{ container.ata }}</div>
-      {% endif %}
-      {% if container.delivery_date %}
-      <div class="k">تاريخ التسليم</div>                 <div class="v mono">{{ container.delivery_date }}</div>
-      {% endif %}
-    </div>
-  </div>
-
-  {# ── القسم الثالث: الربط ──────────────────────────────────────────────── #}
-  {% if client_name or transaction_no %}
-  <h2>المرتبط بـ</h2>
-  <div class="kv small">
-    {% if client_name %}
-    <div class="k">صاحب البضاعة</div>   <div class="v">{{ client_name }}</div>
-    {% endif %}
-    {% if transaction_no %}
-    <div class="k">رقم المعاملة</div>   <div class="v mono">{{ transaction_no }}</div>
-    {% endif %}
+  <!-- Status Summary -->
+  {% if status_summary %}
+  <div class="summary">
+    {% for s in status_summary %}
+    <span class="badge" style="color: {{ s.color }}; border-color: {{ s.color }};">
+      {{ s.label }}: {{ s.count }}
+    </span>
+    {% endfor %}
   </div>
   {% endif %}
 
-  {# ── القسم الرابع: الإدخالات المرتبطة ───────────────────────────────── #}
-  {% if entries %}
-  <h2>الإدخالات المرتبطة ({{ entries|length }})</h2>
+  <!-- Table -->
   <table>
     <thead>
       <tr>
-        <th style="width:8%">#</th>
-        <th>رقم الإدخال</th>
-        <th>التاريخ</th>
-        <th>صاحب البضاعة</th>
-        <th class="num">عدد البنود</th>
+        <th class="col-no">رقم الكونتينر</th>
+        <th class="col-bl">رقم BL</th>
+        <th class="col-client">الزبون</th>
+        <th class="col-line">شركة الشحن</th>
+        <th class="col-vessel">اسم الباخرة</th>
+        <th class="col-pol">ميناء التحميل</th>
+        <th class="col-pod">ميناء التفريغ</th>
+        <th class="col-etd">ETD</th>
+        <th class="col-eta">ETA</th>
+        <th class="col-ata">ATA</th>
+        <th class="col-status">الحالة</th>
       </tr>
     </thead>
     <tbody>
-      {% for e in entries %}
+      {% for container in containers %}
       <tr>
-        <td class="num">{{ loop.index }}</td>
-        <td class="mono">{{ e.entry_no or ('#' ~ e.id) }}</td>
-        <td>{{ e.entry_date or '' }}</td>
-        <td>{{ e.client_name or '' }}</td>
-        <td class="num">{{ e.items_count }}</td>
+        <td class="col-no">{{ container.container_no or '—' }}</td>
+        <td class="col-bl">{{ container.bl_number or '—' }}</td>
+        <td class="col-client">{{ container.client_name or '—' }}</td>
+        <td class="col-line">{{ container.shipping_line or '—' }}</td>
+        <td class="col-vessel">{{ container.vessel_name or '—' }}</td>
+        <td class="col-pol">{{ container.port_of_loading or '—' }}</td>
+        <td class="col-pod">{{ container.port_of_discharge or '—' }}</td>
+        <td class="col-etd">{{ container.etd or '—' }}</td>
+        <td class="col-eta {% if container.eta_state == 'overdue' %}eta-overdue{% elif container.eta_state == 'today' %}eta-today{% endif %}">
+          {{ container.eta or '—' }}
+        </td>
+        <td class="col-ata">{{ container.ata or '—' }}</td>
+        <td class="col-status">
+          <span class="status-badge" style="background: {{ container.status_color }};">
+            {{ container.status_label }}
+          </span>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="12" style="text-align:center; color:#888; padding:14pt;">لا توجد بيانات</td>
       </tr>
       {% endfor %}
     </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="10">الإجمالي</td>
+        <td style="text-align:center;">{{ containers | length }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
   </table>
-  {% endif %}
 
-  {# ── ملاحظات ──────────────────────────────────────────────────────────── #}
-  {% if container.notes %}
-  <h2>ملاحظات</h2>
-  <div class="small">{{ container.notes }}</div>
-  {% endif %}
-
-  <div class="footer">
-    تم إنشاء هذا التقرير بواسطة LOGIPORT &nbsp;|&nbsp; {{ print_date }}
+  <!-- Footer -->
+  <div class="page-footer">
+    <span>LOGIPORT — تقرير آلي</span>
+    <span>{{ print_date }}</span>
   </div>
 
 </body>

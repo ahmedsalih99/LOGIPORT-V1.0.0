@@ -251,34 +251,6 @@ class AddEditContainerDialog(BaseDialog):
         g4.setColumnStretch(1, 1)
         right.addWidget(grp4)
 
-        # ── مجموعة 5: الإدخالات (في وضع التعديل فقط) ──────────────────
-        if self._record:
-            grp5, g5 = _group("linked_entries")
-            self._entries_list = QListWidget()
-            self._entries_list.setFixedHeight(110)
-            self._entries_list.setObjectName("data-table")
-
-            entries_btns = QHBoxLayout()
-            btn_link = QPushButton(f"+ {self._('link_entry')}")
-            btn_link.setObjectName("secondary-btn")
-            btn_link.clicked.connect(self._link_entry)
-            btn_unlink = QPushButton(f"✕ {self._('unlink_entry')}")
-            btn_unlink.setObjectName("danger-btn")
-            btn_unlink.clicked.connect(self._unlink_entry)
-            entries_btns.addWidget(btn_link)
-            entries_btns.addWidget(btn_unlink)
-            entries_btns.addStretch()
-
-            entries_w = QWidget()
-            ev = QVBoxLayout(entries_w)
-            ev.setContentsMargins(0, 0, 0, 0)
-            ev.setSpacing(4)
-            ev.addWidget(self._entries_list)
-            ev.addLayout(entries_btns)
-
-            g5.addWidget(entries_w, 0, 0)
-            right.addWidget(grp5)
-            self._refresh_entries_list()
 
         right.addStretch()
 
@@ -429,74 +401,8 @@ class AddEditContainerDialog(BaseDialog):
     # ENTRIES LINKING
     # ─────────────────────────────────────────────────────────────────────
 
-    def _refresh_entries_list(self):
-        if not hasattr(self, "_entries_list") or not self._record:
-            return
-        self._entries_list.clear()
-        try:
-            for e in _crud.get_entries(self._record.id):
-                label = e.entry_no or f"#{e.id}"
-                client = ""
-                if hasattr(e, "owner_client") and e.owner_client:
-                    client = (
-                        getattr(e.owner_client, "name_ar", None)
-                        or getattr(e.owner_client, "name_en", None) or ""
-                    )
-                text = f"{label}  —  {client}" if client else label
-                item = QListWidgetItem(text)
-                item.setData(Qt.UserRole, e.id)
-                self._entries_list.addItem(item)
-        except Exception:
-            pass
 
-    def _link_entry(self):
-        from PySide6.QtWidgets import QInputDialog
-        entry_no, ok = QInputDialog.getText(
-            self, self._("link_entry"), self._("enter_entry_no")
-        )
-        if not (ok and entry_no.strip()):
-            return
-        try:
-            from database.crud.entries_crud import EntriesCRUD
-            q = entry_no.strip().casefold()
-            all_entries = EntriesCRUD().get_all(limit=500)
-            results = [
-                e for e in all_entries
-                if q in str(getattr(e, "entry_no", "") or "").casefold()
-            ][:5]
-            if not results:
-                QMessageBox.warning(self, self._("not_found"), self._("entry_not_found"))
-                return
-            if len(results) == 1:
-                chosen_id = results[0].id
-            else:
-                items = [r.entry_no or f"#{r.id}" for r in results]
-                choice, ok2 = QInputDialog.getItem(
-                    self, self._("link_entry"), self._("select_from_list"), items, 0, False
-                )
-                if not ok2:
-                    return
-                chosen_id = results[items.index(choice)].id
-            if _crud.link_entries(self._record.id, [chosen_id], current_user=self.current_user):
-                self._refresh_entries_list()
-            else:
-                QMessageBox.warning(self, self._("error"), self._("link_failed"))
-        except Exception as e:
-            QMessageBox.critical(self, self._("error"), str(e))
 
-    def _unlink_entry(self):
-        if not hasattr(self, "_entries_list"):
-            return
-        item = self._entries_list.currentItem()
-        if not item:
-            QMessageBox.information(self, self._("info"), self._("select_entry_first"))
-            return
-        _crud.unlink_entry(self._record.id, item.data(Qt.UserRole))
-        self._refresh_entries_list()
-
-    # ─────────────────────────────────────────────────────────────────────
-    # DATE HELPERS
-    # ─────────────────────────────────────────────────────────────────────
 
     def _get_date(self, name: str):
         pair = self._date_widgets.get(name)

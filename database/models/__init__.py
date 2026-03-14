@@ -21,7 +21,7 @@ from .entry_item import EntryItem
 from .transaction import Transaction
 from .transport_details import TransportDetails
 from .office import Office
-from .container_tracking import ContainerTracking, container_entry_links
+from .container_tracking import ContainerTracking
 from .task import Task
 
 # ---- Optional/where-available models ------------------------------------

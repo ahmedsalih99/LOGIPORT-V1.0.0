@@ -363,6 +363,8 @@ class DocumentsTab(BaseTab):
             self._selected_transaction_id = tid
             self.current_page = 1
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('documents')
 
     def _on_clear_transaction(self):
         self._selected_transaction_id = None

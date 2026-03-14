@@ -11,18 +11,11 @@ container_tracking.py — LOGIPORT
 """
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, String, Date, Text, DateTime, ForeignKey, Table, func
+from sqlalchemy import Column, Integer, String, Date, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from database.models.base import Base
 
 
-# ── جدول الربط الوسيط (many-to-many) ─────────────────────────────────────────
-container_entry_links = Table(
-    "container_entry_links",
-    Base.metadata,
-    Column("container_id", Integer, ForeignKey("container_tracking.id", ondelete="CASCADE"),  primary_key=True),
-    Column("entry_id",     Integer, ForeignKey("entries.id",            ondelete="CASCADE"),  primary_key=True),
-)
 
 
 class ContainerTracking(Base):
@@ -111,12 +104,6 @@ class ContainerTracking(Base):
         lazy="joined",
     )
 
-    entries = relationship(
-        "Entry",
-        secondary=container_entry_links,
-        backref="containers",
-        lazy="selectin",
-    )
 
     def __repr__(self):
         return f"<ContainerTracking(no={self.container_no!r}, status={self.status!r})>"

@@ -70,6 +70,8 @@ class OfficesTab(BaseTab):
         self.row_double_clicked.connect(self.on_row_double_clicked)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('offices', self.reload_data)
         from PySide6.QtGui import QKeySequence, QShortcut
 
         # ── Keyboard shortcuts ─────────────────────────────
@@ -151,6 +153,8 @@ class OfficesTab(BaseTab):
                 )
                 QMessageBox.information(self, self._("added"), self._("office_added_success"))
                 self.reload_data()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit('offices')
             except Exception as exc:
                 QMessageBox.critical(self, self._("error"), str(exc))
 
@@ -175,6 +179,8 @@ class OfficesTab(BaseTab):
                 self.crud.update(office_dict["id"], data, user_id=user_id)
                 QMessageBox.information(self, self._("updated"), self._("office_updated_success"))
                 self.reload_data()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit('offices')
             except Exception as exc:
                 QMessageBox.critical(self, self._("error"), str(exc))
 

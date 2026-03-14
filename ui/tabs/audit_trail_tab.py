@@ -72,6 +72,15 @@ class AuditTrailTab(QWidget):
         self._reload()
         self._tm.language_changed.connect(self.retranslate_ui)
 
+        # DataBus — يتجدد عند أي عملية write في أي تاب
+        try:
+            from core.data_bus import DataBus
+            DataBus.get_instance().data_changed.connect(
+                lambda _entity: self._refresh()
+            )
+        except Exception:
+            pass
+
     def _build_ui(self):
         main = QVBoxLayout(self)
         main.setContentsMargins(24, 20, 24, 20)

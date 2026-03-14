@@ -194,6 +194,7 @@ a = Analysis(
         'core.permissions',
         'core.settings_manager',
         'core.singleton',
+        'core.data_bus',
         'core.theme_manager',
         'core.translator',
 

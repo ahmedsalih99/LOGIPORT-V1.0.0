@@ -1447,4 +1447,11 @@ translations ={
 "hide_key":              "Gizle",
 "show_key":              "Göster",
 "office_placeholder_city":   "İstanbul / Şam",
+    "enable_date": "Tarihi etkinleştir",
+    "no_data": "Veri yok",
+    "not_found": "Bulunamadı",
+    "notes_placeholder": "Notları buraya girin...",
+    "pdf_error": "PDF işleme hatası",
+    "validation_error": "Doğrulama hatası",
+    "generating": "Oluşturuluyor...",
 }

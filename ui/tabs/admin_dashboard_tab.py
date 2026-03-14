@@ -49,6 +49,14 @@ class _MiniStat(QFrame):
         self._label_lbl.setObjectName("text-muted")
         lay.addWidget(self._label_lbl)
 
+        # DataBus subscriptions
+        try:
+            from core.data_bus import DataBus
+            for entity in ("transactions", "entries", "tasks", "clients"):
+                DataBus.get_instance().subscribe(entity, self._refresh_stats)
+        except Exception:
+            pass
+
     def update_value(self, v):
         self._val_lbl.setText(str(v))
 

@@ -1447,4 +1447,11 @@ translations ={
 "setup_wizard_title":    "LOGIPORT — Initial Setup",
 "download_failed":       "Download failed",
 "office_placeholder_city":   "Istanbul / Damascus",
+    "enable_date": "Enable date",
+    "no_data": "No data",
+    "not_found": "Not found",
+    "notes_placeholder": "Enter notes here...",
+    "pdf_error": "PDF processing error",
+    "validation_error": "Validation error",
+    "generating": "Generating...",
 }

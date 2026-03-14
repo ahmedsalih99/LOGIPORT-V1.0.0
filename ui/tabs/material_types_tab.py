@@ -77,6 +77,8 @@ class MaterialTypesTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('materials', self.reload_data)
         from PySide6.QtGui import QKeySequence, QShortcut
 
         # ── Keyboard shortcuts ─────────────────────────────
@@ -190,6 +192,8 @@ class MaterialTypesTab(BaseTab):
             )
             QMessageBox.information(self, self._("added"), self._("material_type_added_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('materials')
 
     def edit_selected_item(self, row=None):
         if row is None:
@@ -212,6 +216,8 @@ class MaterialTypesTab(BaseTab):
             self.material_types_crud.update_material_type(mt.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("material_type_updated_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('materials')
 
     def delete_selected_items(self, rows=None):
         if rows is None:
@@ -228,6 +234,8 @@ class MaterialTypesTab(BaseTab):
                 self._delete_single(mt, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("material_type_deleted_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('materials')
 
     def _delete_single(self, mt, confirm=True):
         if confirm:

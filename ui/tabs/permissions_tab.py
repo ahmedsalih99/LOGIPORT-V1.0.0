@@ -162,6 +162,12 @@ class PermissionsTab(QWidget):
     # ──────────────────────────────────────────────────────────────────────
     # Helpers
     # ──────────────────────────────────────────────────────────────────────
+        try:
+            from core.data_bus import DataBus
+            DataBus.get_instance().subscribe('users', self._load_data)
+        except Exception:
+            pass
+
     def _apply_permission_visibility(self):
         u = self.current_user
         can_add_role  = is_admin(u) or has_perm(u, "add_role")

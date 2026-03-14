@@ -1448,4 +1448,11 @@ translations ={
 "setup_wizard_title":    "LOGIPORT — الإعداد الأولي",
 "office_placeholder_name":   "مكتب تركيا",
 "office_placeholder_city":   "Istanbul / دمشق",
+    "enable_date": "تفعيل التاريخ",
+    "no_data": "لا توجد بيانات",
+    "not_found": "غير موجود",
+    "notes_placeholder": "أدخل الملاحظات هنا...",
+    "pdf_error": "خطأ في معالجة PDF",
+    "validation_error": "خطأ في التحقق من البيانات",
+    "generating": "جارٍ التوليد...",
 }

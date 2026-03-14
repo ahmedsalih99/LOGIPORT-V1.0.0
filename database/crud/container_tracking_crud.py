@@ -42,7 +42,6 @@ class ContainerTrackingCRUD(BaseCRUD):
             q = session.query(ContainerTracking).options(
                 joinedload(ContainerTracking.transaction),
                 joinedload(ContainerTracking.client),
-                joinedload(ContainerTracking.entries),
             )
             if status:
                 q = q.filter(ContainerTracking.status == status)
@@ -59,11 +58,23 @@ class ContainerTrackingCRUD(BaseCRUD):
                     ContainerTracking.vessel_name.ilike(like),
                     ContainerTracking.shipping_line.ilike(like),
                 ))
-            return (
+            from sqlalchemy.orm import make_transient
+            results = (
                 q.order_by(desc(ContainerTracking.updated_at))
                  .limit(limit).offset(offset)
                  .all()
             )
+            for obj in results:
+                # pre-load relationship data before session closes
+                if obj.client:
+                    obj._client_name_ar = getattr(obj.client, "name_ar", "") or ""
+                    obj._client_name_en = getattr(obj.client, "name_en", "") or ""
+                    obj._client_name_tr = getattr(obj.client, "name_tr", "") or ""
+                if obj.transaction:
+                    obj._transaction_no = getattr(obj.transaction, "transaction_no", "") or ""
+                session.expunge(obj)
+                make_transient(obj)
+            return results
 
     def count(self, search: str = "", status: Optional[str] = None, office_id: Optional[int] = None) -> int:
         with self.get_session() as session:
@@ -82,12 +93,28 @@ class ContainerTrackingCRUD(BaseCRUD):
             return q.count()
 
     def get_by_id(self, record_id: int) -> Optional[ContainerTracking]:
+        """يُرجع ContainerTracking مع تحميل العلاقات داخل الـ session."""
+        from sqlalchemy.orm import make_transient
         with self.get_session() as session:
-            return session.query(ContainerTracking).options(
+            obj = session.query(ContainerTracking).options(
                 joinedload(ContainerTracking.transaction),
                 joinedload(ContainerTracking.client),
-                joinedload(ContainerTracking.entries),
             ).filter(ContainerTracking.id == record_id).first()
+            if obj is None:
+                return None
+            # تحميل العلاقات بشكل صريح داخل الـ session
+            _ = obj.client       # force-load
+            _ = obj.transaction  # force-load
+            # حفظ بيانات العلاقات كـ plain attributes قبل إغلاق الـ session
+            if obj.client:
+                obj._client_name_ar = getattr(obj.client, "name_ar", "") or ""
+                obj._client_name_en = getattr(obj.client, "name_en", "") or ""
+                obj._client_name_tr = getattr(obj.client, "name_tr", "") or ""
+            if obj.transaction:
+                obj._transaction_no = getattr(obj.transaction, "transaction_no", "") or ""
+            session.expunge(obj)
+            make_transient(obj)
+            return obj
 
     def get_by_transaction(self, transaction_id: int) -> List[ContainerTracking]:
         with self.get_session() as session:
@@ -136,84 +163,3 @@ class ContainerTrackingCRUD(BaseCRUD):
         """تحديث الحالة فقط — shortcut."""
         result = super().update(record_id, {"status": status}, current_user=current_user)
         return result is not None
-
-    # ── ربط الإدخالات ─────────────────────────────────────────────────────────
-
-    def link_entries(self, container_id: int, entry_ids: list[int], current_user=None) -> bool:
-        """إضافة إدخالات للكونتينر (يُضيف بدون تكرار)."""
-        try:
-            from database.models.entry import Entry
-            with self.get_session() as session:
-                container = session.query(ContainerTracking).filter(
-                    ContainerTracking.id == container_id
-                ).first()
-                if not container:
-                    return False
-                existing_ids = {e.id for e in container.entries}
-                new_entries = session.query(Entry).filter(
-                    Entry.id.in_([eid for eid in entry_ids if eid not in existing_ids])
-                ).all()
-                container.entries.extend(new_entries)
-                session.commit()
-                return True
-        except Exception as e:
-            logger.error("link_entries error: %s", e)
-            return False
-
-    def unlink_entry(self, container_id: int, entry_id: int) -> bool:
-        """إزالة إدخال واحد من الكونتينر."""
-        try:
-            from database.models.entry import Entry
-            with self.get_session() as session:
-                container = session.query(ContainerTracking).filter(
-                    ContainerTracking.id == container_id
-                ).first()
-                if not container:
-                    return False
-                container.entries = [e for e in container.entries if e.id != entry_id]
-                session.commit()
-                return True
-        except Exception as e:
-            logger.error("unlink_entry error: %s", e)
-            return False
-
-    def get_entries(self, container_id: int) -> list:
-        """إرجاع كل الإدخالات المرتبطة بكونتينر."""
-        with self.get_session() as session:
-            container = session.query(ContainerTracking).filter(
-                ContainerTracking.id == container_id
-            ).first()
-            return list(container.entries) if container else []
-
-    def get_containers_for_entries(self, entry_ids: list) -> dict:
-        """
-        Batch: يرجع dict {entry_id: [ContainerTracking, ...]}
-        استدعاء واحد بدل N استدعاء — يحل مشكلة N+1 في EntriesTab.
-        """
-        if not entry_ids:
-            return {}
-        with self.get_session() as session:
-            from database.models.container_tracking import container_entry_links
-            rows = (
-                session.query(ContainerTracking, container_entry_links.c.entry_id)
-                .join(container_entry_links,
-                      ContainerTracking.id == container_entry_links.c.container_id)
-                .filter(container_entry_links.c.entry_id.in_(entry_ids))
-                .all()
-            )
-            result: dict = {eid: [] for eid in entry_ids}
-            for ct, eid in rows:
-                result.setdefault(eid, []).append(ct)
-            return result
-
-    def get_containers_for_entry(self, entry_id: int) -> list[ContainerTracking]:
-        """إرجاع كل الكونتينرات المرتبطة بإدخال معين."""
-        with self.get_session() as session:
-            from database.models.container_tracking import container_entry_links
-            return (
-                session.query(ContainerTracking)
-                .join(container_entry_links,
-                      ContainerTracking.id == container_entry_links.c.container_id)
-                .filter(container_entry_links.c.entry_id == entry_id)
-                .all()
-            )

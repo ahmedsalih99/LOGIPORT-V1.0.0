@@ -88,6 +88,14 @@ class StatCard(QFrame):
         self._sub_lbl.setStyleSheet("color: rgba(255,255,255,0.70);")
         lay.addWidget(self._sub_lbl)
 
+        # DataBus — يتجدد فوراً عند أي تغيير في البيانات
+        try:
+            from core.data_bus import DataBus
+            for entity in ("transactions", "entries", "tasks", "clients", "containers"):
+                DataBus.get_instance().subscribe(entity, self.refresh_all_data)
+        except Exception:
+            pass
+
     def update_value(self, v):    self.value_lbl.setText(str(v))
     def update_title(self, t):    self._title_lbl.setText(t)
     def update_subtitle(self, s): self._sub_lbl.setText(s)

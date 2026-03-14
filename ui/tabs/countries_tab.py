@@ -81,6 +81,8 @@ class CountriesTab(BaseTab):
         self.row_double_clicked.connect(self.on_row_double_clicked)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('countries', self.reload_data)
         from PySide6.QtGui import QKeySequence, QShortcut
 
         # ── Keyboard shortcuts ─────────────────────────────
@@ -178,6 +180,8 @@ class CountriesTab(BaseTab):
             )
             QMessageBox.information(self, self._("added"), self._("country_added_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('countries')
 
     def edit_selected_item(self, row=None):
         if row is None:
@@ -201,6 +205,8 @@ class CountriesTab(BaseTab):
             self.countries_crud.update_country(country.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("country_updated_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('countries')
 
     def delete_selected_items(self, rows=None):
         if rows is None:
@@ -217,6 +223,8 @@ class CountriesTab(BaseTab):
                 self._delete_single(country, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("country_deleted_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('countries')
 
     def _delete_single(self, country, confirm=True):
         if confirm:

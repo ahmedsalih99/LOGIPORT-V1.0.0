@@ -78,6 +78,8 @@ class DeliveryMethodsTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        from core.data_bus import DataBus
+        DataBus.get_instance().subscribe('delivery_methods', self.reload_data)
         from PySide6.QtGui import QKeySequence, QShortcut
 
         # ── Keyboard shortcuts ─────────────────────────────
@@ -191,6 +193,8 @@ class DeliveryMethodsTab(BaseTab):
             )
             QMessageBox.information(self, self._("added"), self._("delivery_method_added_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('delivery_methods')
 
     def edit_selected_item(self, row=None):
         if row is None:
@@ -213,6 +217,8 @@ class DeliveryMethodsTab(BaseTab):
             self.delivery_methods_crud.update_delivery_method(dm.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("delivery_method_updated_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('delivery_methods')
 
     def delete_selected_items(self, rows=None):
         if rows is None:
@@ -229,6 +235,8 @@ class DeliveryMethodsTab(BaseTab):
                 self._delete_single(dm, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("delivery_method_deleted_success"))
             self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit('delivery_methods')
 
     def _delete_single(self, dm, confirm=True):
         if confirm:
