@@ -22,6 +22,7 @@ from core.base_details_view import BaseDetailsView
 from core.translator import TranslationManager
 from core.permissions import is_admin
 from ._view_helpers import _get, _name_by_lang, _fmt_dt, _add_audit_section, build_dialog_table, make_bold_cell
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 # ── ألوان الحالة ──────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ class ViewContainerDialog(BaseDialog):
         self.setMinimumWidth(780)
         self.resize(820, 600)
         self._init_ui()
+        block_wheel_in(self)
 
     # ── بناء الواجهة ──────────────────────────────────────────────────────────
 

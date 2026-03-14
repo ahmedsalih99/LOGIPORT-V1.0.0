@@ -19,6 +19,7 @@ from core.base_details_view import BaseDetailsView
 from core.translator import TranslationManager
 from core.permissions import is_admin
 from ._view_helpers import _get, _name_by_lang, _fmt_dt, _user_to_text, _add_audit_section, build_dialog_table, make_bold_cell
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 class ViewEntryDialog(BaseDialog):
@@ -34,6 +35,7 @@ class ViewEntryDialog(BaseDialog):
         self.setMinimumWidth(840)
         self.resize(880, 580)
         self._init_ui()
+        block_wheel_in(self)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)

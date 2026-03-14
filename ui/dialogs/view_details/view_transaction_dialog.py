@@ -26,6 +26,7 @@ from core.base_details_view import BaseDetailsView
 from core.translator import TranslationManager
 from core.permissions import is_admin
 from core.settings_manager import SettingsManager
+from ui.utils.wheel_blocker import block_wheel_in
 
 try:
     from ui.dialogs.view_details._view_helpers import build_dialog_table, make_bold_cell
@@ -105,6 +106,7 @@ class ViewTransactionDialog(BaseDialog):
             self.resize(980, 680)
 
         self._build_ui()
+        block_wheel_in(self)
         self._fill_all()
 
     # ──────────────────────────────────────────── جلب العلاقات من DB

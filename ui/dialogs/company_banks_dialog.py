@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from core.translator import TranslationManager
 from database.crud.companies_crud import CompanyBanksCRUD
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 class _BankCard(QFrame):
@@ -28,6 +29,7 @@ class _BankCard(QFrame):
         self._refresh = on_refresh
         self._        = TranslationManager.get_instance().translate
         self._build()
+        block_wheel_in(self)
 
     def _build(self):
         self.setFrameShape(QFrame.StyledPanel)

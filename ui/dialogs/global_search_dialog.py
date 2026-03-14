@@ -48,6 +48,7 @@ class _SearchWorker(QObject):
 # ─── نافذة البحث ──────────────────────────────────────────────────────────
 
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 class GlobalSearchDialog(BaseDialog):
     """
     Spotlight-style search dialog.
@@ -71,6 +72,7 @@ class GlobalSearchDialog(BaseDialog):
 
         self._setup_window()
         self._build_ui()
+        block_wheel_in(self)
         self._apply_style()
 
     # ─── Window setup ────────────────────────────────────────────────────────

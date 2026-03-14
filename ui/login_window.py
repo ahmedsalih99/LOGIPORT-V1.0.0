@@ -17,6 +17,7 @@ from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
 from database.crud.users_crud import UsersCRUD
 import os
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 class LoginWindow(BaseDialog):
@@ -42,6 +43,7 @@ class LoginWindow(BaseDialog):
 
         self._ui_built = False
         self.init_ui()
+        block_wheel_in(self)
         self._ui_built = True
         self.retranslate_ui()
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
@@ -143,7 +145,7 @@ class LoginWindow(BaseDialog):
         self.label_user.setObjectName("subtitle")
 
         self.edit_user = QLineEdit()
-        self.edit_user.setObjectName("edit_user")
+        self.edit_user.setObjectName("username")
         self.edit_user.setPlaceholderText(self._("username"))
         self.edit_user.setClearButtonEnabled(True)
 
@@ -157,7 +159,7 @@ class LoginWindow(BaseDialog):
         self.label_pass.setObjectName("subtitle")
 
         self.edit_pass = QLineEdit()
-        self.edit_pass.setObjectName("edit_pass")
+        self.edit_pass.setObjectName("password")
         self.edit_pass.setPlaceholderText(self._("password"))
         self.edit_pass.setEchoMode(QLineEdit.Password)
         self.edit_pass.setClearButtonEnabled(True)

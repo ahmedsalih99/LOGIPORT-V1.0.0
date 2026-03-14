@@ -44,6 +44,7 @@ class AddPricingDialog(BaseDialog):
         self.set_translated_title("add_pricing" if pricing is None else "edit_pricing")
         self.init_ui()
         block_wheel_in(self)
+        self.set_responsive_size(500, 420)
 
     def init_ui(self):
         self.setSizeGripEnabled(True)

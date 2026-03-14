@@ -112,11 +112,6 @@ class EntriesTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         # زر "ربط بكونتينر" في toolbar
-        self._btn_link_container = QPushButton(f"🚢  {self._('link_container')}")
-        self._btn_link_container.setObjectName("secondary-btn")
-        self._btn_link_container.setToolTip(self._("link_container_tooltip"))
-        self._btn_link_container.clicked.connect(self._link_container)
-        self.top_bar.addWidget(self._btn_link_container)
 
         self._build_filter_bar()
         self.reload_data()

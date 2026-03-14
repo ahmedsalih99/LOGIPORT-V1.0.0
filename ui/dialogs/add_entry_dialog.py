@@ -524,4 +524,5 @@ class AddEntryDialog(BaseDialog):
 
     def _warn(self, msg):
         block_wheel_in(self)
+        self.set_responsive_size(800, 650)
         self.show_warning("warning", msg)

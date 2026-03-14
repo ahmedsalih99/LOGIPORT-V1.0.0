@@ -29,6 +29,7 @@ APP_YEAR = "2025 – 2026"
 
 
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 
 class AboutDialog(BaseDialog):
 
@@ -41,6 +42,7 @@ class AboutDialog(BaseDialog):
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setWindowModality(Qt.ApplicationModal)
         self._build_ui()
+        block_wheel_in(self)
 
     def _build_ui(self):
         main = QVBoxLayout(self)

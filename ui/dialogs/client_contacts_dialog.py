@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from core.translator import TranslationManager
 from database.crud.clients_crud import ClientContactsCRUD
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 # ── small single-contact form card ───────────────────────────────────────────
@@ -32,6 +33,7 @@ class _ContactCard(QFrame):
         self._lang    = lang
         self._ = TranslationManager.get_instance().translate
         self._build()
+        block_wheel_in(self)
 
     def _build(self):
         self.setFrameShape(QFrame.StyledPanel)

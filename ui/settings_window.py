@@ -9,6 +9,7 @@ from core.base_dialog import BaseDialog
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
 from database.db_utils import get_db_path
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 def get_combo_index(value, code_map, fallback_map=None, default_code=None):
@@ -38,6 +39,7 @@ class SettingsWindow(BaseDialog):
         self._set_responsive_size()
 
         self.init_ui()
+        block_wheel_in(self)
         self.retranslate_ui()
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
 

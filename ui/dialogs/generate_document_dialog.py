@@ -124,7 +124,7 @@ class _Worker(QObject):
 # =============================================================================
 # Results Dialog (محسّن بسيط)
 # =============================================================================
-class _ResultsDialog(BaseDialog):
+class _ResultsDialog(_BaseDialog):
     def __init__(self, files, html_only, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_("generated_files"))

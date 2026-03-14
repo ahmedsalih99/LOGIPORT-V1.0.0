@@ -178,3 +178,4 @@ class AddMaterialDialog(BaseDialog):
 
         super().accept()
         block_wheel_in(self)
+        self.set_responsive_size(560, 480)

@@ -35,6 +35,7 @@ class AddClientDialog(BaseDialog):
         self.set_translated_title("add_client" if client is None else "edit_client")
         self.init_ui()
         block_wheel_in(self)
+        self.set_responsive_size(680, 580)
 
     def init_ui(self):
         self.setSizeGripEnabled(True)

@@ -51,6 +51,7 @@ def _pick(row: dict, *keys, default=None):
 
 
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 class EntriesPickerDialog(BaseDialog):
     """
     - عمود واحد لرقم الإدخال (يُعرض من transport_ref/entry_no).
@@ -122,6 +123,7 @@ class EntriesPickerDialog(BaseDialog):
             self.tbl.setColumnHidden(1, not is_admin(self.current_user))
         except Exception:
             pass
+        block_wheel_in(self)
 
     def _apply_tbl_style(self, *_):
         try:
