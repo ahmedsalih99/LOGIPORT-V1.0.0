@@ -100,10 +100,16 @@ _PERMISSIONS = [
     (72, "edit_container",           "Edit container",               "تعديل حاوية",       "Edit Container",     "Konteyneri Düzenle",         "CONTAINERS"),
     (73, "delete_container",         "Delete container",             "حذف حاوية",         "Delete Container",   "Konteyneri Sil",             "CONTAINERS"),
     (74, "export_container_report",  "Export container report",      "تصدير تقرير الحاويات","Export Container Report","Konteyner Raporu",       "CONTAINERS"),
+    # ── Tasks (المرحلة 5) ──────────────────────────────────────────────────────
+    (75, "view_tasks",    "View tasks list",    "عرض المهام",    "View Tasks",    "Görevleri Görüntüle", "TASKS"),
+    (76, "add_task",      "Create new task",    "إضافة مهمة",    "Add Task",      "Görev Ekle",          "TASKS"),
+    (77, "edit_task",     "Edit task",          "تعديل مهمة",    "Edit Task",     "Görevi Düzenle",      "TASKS"),
+    (78, "delete_task",   "Delete task",        "حذف مهمة",      "Delete Task",   "Görevi Sil",          "TASKS"),
+    (79, "close_task",    "Mark task as done",  "إغلاق مهمة",    "Close Task",    "Görevi Kapat",        "TASKS"),
 ]
 
 _ROLE_PERMISSIONS = {
-    1: list(range(1, 75)),  # Admin → كل الصلاحيات (1-74)
+    1: list(range(1, 80)),  # Admin → كل الصلاحيات (1-79)
     3: [  # Manager
         1,2,3,4,6,7,8,10,11,12,14,
         16,17,18,19,          # materials
@@ -123,11 +129,12 @@ _ROLE_PERMISSIONS = {
         46,47,48,49,          # view lookups
         66,                   # view offices
         70, 71, 72,           # containers (view+add+edit) بدون delete/export
+        75, 76, 77, 79,       # tasks (view+add+edit+close) بدون delete
     ],
-    4: [16, 25, 49, 66],     # User: view materials/transactions/currencies + offices
+    4: [16, 25, 49, 66, 75, 76, 77, 79],  # User: + view/add/edit/close tasks
     5: [],                   # Accountant — محذوف (غير مستخدم)
-    6: [1, 16, 17, 18],      # Operator: view+add+edit materials
-    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49, 66, 70],  # Viewer
+    6: [1, 16, 17, 18, 75, 76, 77, 79],   # Operator: + tasks
+    7: [1, 6, 10, 16, 22, 27, 46, 47, 48, 49, 66, 70, 75],  # Viewer: view tasks only
     8: [1, 16],              # Client
     9: [1, 25, 26],          # Customs: dashboard + view transactions + view documents
 }
@@ -409,9 +416,37 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: address trigger drop skipped: %s", _e)
 
+    # Migration: جدول المهام (tasks) — المرحلة 5
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                title           VARCHAR(255) NOT NULL,
+                description     TEXT,
+                priority        VARCHAR(16)  NOT NULL DEFAULT 'medium',
+                status          VARCHAR(16)  NOT NULL DEFAULT 'pending',
+                due_date        DATE,
+                created_at      DATETIME     NOT NULL DEFAULT (datetime('now')),
+                updated_at      DATETIME,
+                completed_at    DATETIME,
+                assigned_to_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_by_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                transaction_id  INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+                container_id    INTEGER REFERENCES container_tracking(id) ON DELETE SET NULL,
+                client_id       INTEGER REFERENCES clients(id) ON DELETE SET NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_status     ON tasks(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_due_date   ON tasks(due_date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_assigned   ON tasks(assigned_to_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_status_due ON tasks(status, due_date)")
+        conn.commit()
+        logger.info("Bootstrap: tasks table created/verified")
+    except Exception as _e:
+        logger.warning("Bootstrap: tasks migration skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
-
 
 
 def run_bootstrap() -> bool:

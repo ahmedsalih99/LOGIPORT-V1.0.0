@@ -39,13 +39,14 @@ _TAB_IMPORT_MAP = {
     "entries":           ("ui.tabs.entries_tab",          "EntriesTab"),
     "transactions":      ("ui.tabs.transactions_tab",     "TransactionsTab"),
     "container_tracking":("ui.tabs.container_tracking_tab","ContainerTrackingTab"),
+    "tasks":             ("ui.tabs.tasks_tab",             "TasksTab"),
     "documents":         ("ui.tabs.documents_tab",        "DocumentsTab"),
     "control_panel":     ("ui.tabs.admin_dashboard_tab",  "AdminDashboardTab"),
     "audit_trail":       ("ui.tabs.audit_trail_tab",      "AuditTrailTab"),
     "offices":           ("ui.tabs.offices_tab",            "OfficesTab"),
 }
 
-_TABS_NEEDING_USER = {"users", "users_permissions", "offices", "container_tracking"}
+_TABS_NEEDING_USER = {"users", "users_permissions", "offices", "container_tracking", "tasks"}
 
 
 class MainWindow(BaseWindow):
@@ -221,9 +222,11 @@ class MainWindow(BaseWindow):
         else:
             root_layout.addWidget(self.sidebar)    # Sidebar أولاً (يسار فيزيائياً)
             root_layout.addWidget(right_col, 1)    # المحتوى ثانياً (يمين فيزيائياً)
-        # Ctrl+F
+        # Ctrl+F و Ctrl+K — كلاهما يفتح البحث العام
         self._search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self._search_shortcut.activated.connect(self._open_global_search)
+        self._search_shortcut_k = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._search_shortcut_k.activated.connect(self._open_global_search)
 
         # بناء التبويبات
         dashboard = DashboardTab()

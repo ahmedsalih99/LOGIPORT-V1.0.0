@@ -258,8 +258,6 @@ class ViewContainerDialog(BaseDialog):
 
     def _print_card(self):
         from PySide6.QtWidgets import QMessageBox
-        import os, subprocess, sys
-
         _ = self._
         try:
             from services.container_report_service import ContainerReportService
@@ -268,12 +266,24 @@ class ViewContainerDialog(BaseDialog):
             if not ok:
                 QMessageBox.critical(self, _("error"), f"{_('pdf_error')}\n{err}")
                 return
-            # فتح الـ PDF
-            if sys.platform == "win32":
-                os.startfile(path)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", path])
-            else:
-                subprocess.Popen(["xdg-open", path])
+            # فتح المعاينة الداخلية
+            try:
+                from ui.widgets.pdf_preview_dialog import PdfPreviewDialog
+                import os
+                ext = os.path.splitext(path)[1].lower()
+                if ext == ".pdf":
+                    dlg = PdfPreviewDialog(pdf_path=path, title=_("container_card"), parent=self)
+                else:
+                    dlg = PdfPreviewDialog(html_path=path, title=_("container_card"), parent=self)
+                dlg.exec()
+            except Exception:
+                # fallback: فتح خارجي
+                import os, subprocess, sys
+                if sys.platform == "win32":
+                    os.startfile(path)
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", path])
+                else:
+                    subprocess.Popen(["xdg-open", path])
         except Exception as e:
             QMessageBox.critical(self, _("error"), str(e))

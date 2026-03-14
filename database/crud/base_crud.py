@@ -270,12 +270,20 @@ class BaseCRUD:
         with self.get_session() as session:
             return session.get(self.model, id)
 
-    def get_all(self, order_by=None) -> List[Any]:
+    def get_all(self, order_by=None, limit: int = 5000) -> List[Any]:
         with self.get_session() as session:
             q = session.query(self.model)
             if order_by is not None:
                 q = q.order_by(order_by)
-            return q.all()
+            if limit:
+                q = q.limit(limit)
+            results = q.all()
+            if len(results) >= limit:
+                logger.warning(
+                    "get_all(%s) returned %d rows — limit=%d hit. Consider pagination.",
+                    self.model.__name__, len(results), limit
+                )
+            return results
 
     def filter_by(self, **kwargs) -> List[Any]:
         with self.get_session() as session:

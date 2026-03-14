@@ -22,6 +22,7 @@ from .transaction import Transaction
 from .transport_details import TransportDetails
 from .office import Office
 from .container_tracking import ContainerTracking, container_entry_links
+from .task import Task
 
 # ---- Optional/where-available models ------------------------------------
 # TransactionItem قد يكون في ملف مستقل أو ضمن transaction.py
@@ -68,6 +69,7 @@ __all__ = [
     # optional
     "Office",
     "TransactionItem", "TransactionItems", "DocumentGroup", "DocumentType", "Document", "DocumentTemplate",
+    "Task",
 ]
 
 import sqlite3 as _sqlite3

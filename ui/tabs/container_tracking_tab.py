@@ -366,6 +366,28 @@ class ContainerTrackingTab(QWidget):
         self._apply_permissions()
         self._load_data()
 
+    def select_record_by_id(self, record_id: int):
+        """ينتقل للكونتينر المطلوب من البحث العام."""
+        # تأكد من تحميل البيانات
+        if not self._all_rows:
+            self._load_data()
+        # ابحث في الصفوف الحالية أولاً
+        for row_idx, rec in enumerate(self._rows):
+            if getattr(rec, "id", None) == record_id:
+                self._table.setCurrentCell(row_idx, 0)
+                self._table.selectRow(row_idx)
+                self._table.scrollToItem(self._table.item(row_idx, 0))
+                return
+        # إذا لم يُوجد (ربما فلتر مفعّل) — أزل الفلتر وأعد
+        self._stats_bar._set_active("")
+        self._on_status_filter_change("")
+        for row_idx, rec in enumerate(self._rows):
+            if getattr(rec, "id", None) == record_id:
+                self._table.setCurrentCell(row_idx, 0)
+                self._table.selectRow(row_idx)
+                self._table.scrollToItem(self._table.item(row_idx, 0))
+                return
+
     def retranslate_ui(self):
         self._ = TranslationManager.get_instance().translate
         self._btn_add.setText(f"+ {self._('add_container')}")

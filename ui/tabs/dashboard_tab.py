@@ -36,6 +36,7 @@ class StatCard(QFrame):
         "export":       ("#1ABC9C", "#0E8C6F"),
         "transit":      ("#F39C12", "#B7770D"),
         "documents":    ("#64748B", "#475569"),
+        "tasks":        ("#7C3AED", "#5B21B6"),
     }
 
     def __init__(self, title, value, subtitle, card_key="transactions", icon="📊", parent=None):
@@ -162,6 +163,7 @@ class _DashboardWorker(QThread):
                 "total_clients", "total_materials",
                 "import_count", "import_value", "export_count", "export_value",
                 "transit_count", "transit_value", "total_documents",
+                "tasks_overdue", "tasks_pending",
             ]}
             try:
                 with get_session_local()() as session:
@@ -176,6 +178,14 @@ class _DashboardWorker(QThread):
                     s["total_materials"] = session.query(Material).count()
                     s["total_documents"] = session.query(Document).count()
             except Exception as e:
+                pass
+            # Tasks stats
+            try:
+                from database.crud.tasks_crud import TasksCRUD
+                _crud = TasksCRUD()
+                s["tasks_overdue"] = _crud.count_overdue()
+                s["tasks_pending"] = _crud.count_pending()
+            except Exception:
                 pass
             self.stats_ready.emit(s)
 
@@ -226,6 +236,7 @@ class DashboardTab(QWidget):
         ("export_count",    "transaction_type.export", "export_value_fmt",  "export",    "📤"),
         ("transit_count",   "transit_type",            "transit_value_fmt", "transit",   "🚚"),
         ("total_documents", "documents",               "stat_documents",    "documents", "📄"),
+        ("tasks_overdue",   "tasks_overdue",           "tasks_pending_sub", "tasks",     "✅"),
     ]
 
     def __init__(self, parent=None):

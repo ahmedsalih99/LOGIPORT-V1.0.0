@@ -161,21 +161,46 @@ class _ResultsDialog(QDialog):
         v.addWidget(self.listw)
 
         btns = QHBoxLayout()
+        btn_preview = QPushButton("👁  " + _("preview"))
         btn_open   = QPushButton("📂  " + _("open_file"))
         btn_folder = QPushButton("🗂  " + _("open_folder"))
         btn_close  = QPushButton(_("close"))
-        btn_open.setObjectName("primary-btn")
+        btn_preview.setObjectName("primary-btn")
+        btn_open.setObjectName("secondary-btn")
         btn_folder.setObjectName("secondary-btn")
-        btn_open.setMinimumHeight(36); btn_folder.setMinimumHeight(36)
-        btn_close.setMinimumHeight(36)
-        btns.addWidget(btn_open); btns.addWidget(btn_folder)
+        btn_preview.setMinimumHeight(36); btn_open.setMinimumHeight(36)
+        btn_folder.setMinimumHeight(36); btn_close.setMinimumHeight(36)
+        btns.addWidget(btn_preview); btns.addWidget(btn_open)
+        btns.addWidget(btn_folder)
         btns.addStretch(); btns.addWidget(btn_close)
         v.addLayout(btns)
 
+        btn_preview.clicked.connect(lambda: self._preview(self.listw.currentItem()))
         btn_open.clicked.connect(lambda: self._open(self.listw.currentItem()))
         btn_folder.clicked.connect(self._open_folder)
         btn_close.clicked.connect(self.accept)
-        self.listw.itemDoubleClicked.connect(self._open)
+        self.listw.itemDoubleClicked.connect(self._preview)
+
+    def _preview(self, it):
+        if not it:
+            return
+        path = it.data(Qt.UserRole)
+        if not path or not os.path.exists(path):
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, _("warning"), _("file_missing"))
+            return
+        try:
+            from ui.widgets.pdf_preview_dialog import PdfPreviewDialog
+            fname = os.path.basename(path)
+            ext   = os.path.splitext(path)[1].lower()
+            if ext == ".pdf":
+                dlg = PdfPreviewDialog(pdf_path=path, title=fname, parent=self)
+            else:
+                dlg = PdfPreviewDialog(html_path=path, title=fname, parent=self)
+            dlg.exec()
+        except Exception as e:
+            logger.warning(f"Preview failed: {e}")
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def _open(self, it):
         if it:

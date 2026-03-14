@@ -460,7 +460,7 @@ class EntriesCRUD:
             return s.execute(q).scalar_one()
 
 
-    def get_all(limit: int = 500) -> List[Entry]:
+    def get_all(limit: int = 5000) -> List[Entry]:
         """جلب جميع الإدخالات"""
         return EntriesCRUD.list(limit=limit, offset=0)
 

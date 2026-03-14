@@ -278,7 +278,7 @@ class TopBar(QWidget):
         self.lang_btn.setText(labels.get(lang, lang.upper()))
 
     def _refresh_search_text(self):
-        self.search_btn.setText(f"  {self._('search')}...        Ctrl+F")
+        self.search_btn.setText(f"  {self._('search')}...        Ctrl+K")
 
     def _refresh_user(self):
         user        = self.settings.get("user")
