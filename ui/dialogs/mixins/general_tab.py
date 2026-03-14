@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QFrame, QFormLayout, QLineEdit, QDateEdit, QComboBox, QTextEdit, QVBoxLayout
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import QSizePolicy
+from ui.utils.wheel_blocker import block_wheel_in
 
 class GeneralTabMixin:
     """

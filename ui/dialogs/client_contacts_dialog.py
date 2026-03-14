@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 from core.translator import TranslationManager
 from database.crud.clients_crud import ClientContactsCRUD
+from core.base_dialog import BaseDialog
 
 
 # ── small single-contact form card ───────────────────────────────────────────
@@ -226,7 +227,7 @@ class _AddContactForm(QFrame):
 
 # ── main dialog ───────────────────────────────────────────────────────────────
 
-class ClientContactsDialog(QDialog):
+class ClientContactsDialog(BaseDialog):
     """Full-featured dialog for managing contacts of one client."""
 
     def __init__(self, client, parent=None):

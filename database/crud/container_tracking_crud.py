@@ -33,6 +33,7 @@ class ContainerTrackingCRUD(BaseCRUD):
         search: str = "",
         status: Optional[str] = None,
         transaction_id: Optional[int] = None,
+        office_id: Optional[int] = None,
         limit: int = 200,
         offset: int = 0,
     ) -> List[ContainerTracking]:
@@ -47,6 +48,8 @@ class ContainerTrackingCRUD(BaseCRUD):
                 q = q.filter(ContainerTracking.status == status)
             if transaction_id:
                 q = q.filter(ContainerTracking.transaction_id == transaction_id)
+            if office_id:
+                q = q.filter(ContainerTracking.office_id == office_id)
             if search:
                 like = f"%{search}%"
                 q = q.filter(or_(
@@ -62,11 +65,13 @@ class ContainerTrackingCRUD(BaseCRUD):
                  .all()
             )
 
-    def count(self, search: str = "", status: Optional[str] = None) -> int:
+    def count(self, search: str = "", status: Optional[str] = None, office_id: Optional[int] = None) -> int:
         with self.get_session() as session:
             q = session.query(ContainerTracking)
             if status:
                 q = q.filter(ContainerTracking.status == status)
+            if office_id:
+                q = q.filter(ContainerTracking.office_id == office_id)
             if search:
                 like = f"%{search}%"
                 q = q.filter(or_(
@@ -117,6 +122,7 @@ class ContainerTrackingCRUD(BaseCRUD):
             notes             = data.get("notes"),
             client_id         = data.get("client_id"),
             transaction_id    = data.get("transaction_id"),
+            office_id         = data.get("office_id") or _get_current_office_id(),
         )
         return self.add(obj, current_user=current_user)
 
@@ -178,6 +184,27 @@ class ContainerTrackingCRUD(BaseCRUD):
                 ContainerTracking.id == container_id
             ).first()
             return list(container.entries) if container else []
+
+    def get_containers_for_entries(self, entry_ids: list) -> dict:
+        """
+        Batch: يرجع dict {entry_id: [ContainerTracking, ...]}
+        استدعاء واحد بدل N استدعاء — يحل مشكلة N+1 في EntriesTab.
+        """
+        if not entry_ids:
+            return {}
+        with self.get_session() as session:
+            from database.models.container_tracking import container_entry_links
+            rows = (
+                session.query(ContainerTracking, container_entry_links.c.entry_id)
+                .join(container_entry_links,
+                      ContainerTracking.id == container_entry_links.c.container_id)
+                .filter(container_entry_links.c.entry_id.in_(entry_ids))
+                .all()
+            )
+            result: dict = {eid: [] for eid in entry_ids}
+            for ct, eid in rows:
+                result.setdefault(eid, []).append(ct)
+            return result
 
     def get_containers_for_entry(self, entry_id: int) -> list[ContainerTracking]:
         """إرجاع كل الكونتينرات المرتبطة بإدخال معين."""

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.translator import TranslationManager
+from core.data_bus import DataBus
 
 _PRIORITY_COLORS = {
     "urgent": ("#FEF2F2", "#DC2626"),  # bg, badge
@@ -66,6 +67,12 @@ class TasksTab(QWidget):
         self._load()
 
     # ─── Permissions ─────────────────────────────────────────────────────────
+
+    def _user_id(self) -> int | None:
+        """يرجع ID المستخدم الحالي."""
+        if isinstance(self._user, dict):
+            return self._user.get("id")
+        return getattr(self._user, "id", None)
 
     def _can(self, action: str) -> bool:
         try:
@@ -271,7 +278,9 @@ class TasksTab(QWidget):
         if dlg.exec() and dlg.result_data:
             try:
                 from database.crud.tasks_crud import TasksCRUD
-                TasksCRUD().create(**dlg.result_data)
+                data = dict(dlg.result_data)
+                data.setdefault("created_by_id", self._user_id())
+                TasksCRUD().create(**data)
                 self._load()
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
@@ -287,7 +296,9 @@ class TasksTab(QWidget):
         if dlg.exec() and dlg.result_data:
             try:
                 from database.crud.tasks_crud import TasksCRUD
-                TasksCRUD().update(task.id, **dlg.result_data)
+                data = dict(dlg.result_data)
+                data["updated_by_id"] = self._user_id()
+                TasksCRUD().update(task.id, **data)
                 self._load()
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
@@ -298,7 +309,7 @@ class TasksTab(QWidget):
             return
         try:
             from database.crud.tasks_crud import TasksCRUD
-            TasksCRUD().mark_done(task.id)
+            TasksCRUD().mark_done(task.id, updated_by_id=self._user_id())
             self._load()
         except Exception as e:
             QMessageBox.critical(self, self._("error"), str(e))

@@ -5,6 +5,7 @@ ui/dialogs/add_office_dialog.py
 """
 from core.form_dialog import FormDialog
 from PySide6.QtWidgets import QLineEdit, QComboBox, QTextEdit, QSpinBox
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 _COUNTRIES = [
@@ -29,6 +30,7 @@ class AddOfficeDialog(FormDialog):
         self._build_form()
         if office:
             self._populate(office)
+        block_wheel_in(self)
 
     def _build_form(self):
         # الكود — مثل TR-01 / SY-01
@@ -39,7 +41,7 @@ class AddOfficeDialog(FormDialog):
 
         # الاسم بالعربي
         self.name_ar_edit = QLineEdit()
-        self.name_ar_edit.setPlaceholderText("مكتب تركيا")
+        self.name_ar_edit.setPlaceholderText(self._("office_name_ar_hint"))
         self.add_row(self._("arabic_name"), self.name_ar_edit)
 
         # الاسم بالإنجليزي
@@ -60,7 +62,7 @@ class AddOfficeDialog(FormDialog):
 
         # المدينة
         self.city_edit = QLineEdit()
-        self.city_edit.setPlaceholderText("Istanbul / دمشق")
+        self.city_edit.setPlaceholderText(self._("office_city_hint"))
         self.add_row(self._("city"), self.city_edit)
 
         # الترتيب

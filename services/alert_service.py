@@ -46,6 +46,7 @@ class AlertService(QObject, QObjectSingletonMixin):
         # حتى لا نكرر التنبيه عند كل فحص
         self._alerted_containers: Set[int] = set()
         self._alerted_drafts:     Set[int] = set()
+        self._alerted_tasks:      Set[int] = set()
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.check_now)
@@ -70,6 +71,11 @@ class AlertService(QObject, QObjectSingletonMixin):
             self._check_draft_transactions()
         except Exception as e:
             logger.warning("AlertService._check_draft_transactions: %s", e)
+
+        try:
+            self._check_overdue_tasks()
+        except Exception as e:
+            logger.warning("AlertService._check_overdue_tasks: %s", e)
 
     # ── فحص الكونتينرات ───────────────────────────────────────────────────────
 
@@ -160,6 +166,43 @@ class AlertService(QObject, QObjectSingletonMixin):
                     icon="📋",
                 )
                 self._alerted_drafts.add(tx.id)
+
+
+    # ── فحص المهام المتأخرة ───────────────────────────────────────────────────
+
+    def _check_overdue_tasks(self):
+        from database.models import get_session_local
+        from database.models.task import Task
+        from datetime import date
+
+        today = date.today()
+
+        with get_session_local()() as session:
+            tasks = (
+                session.query(Task)
+                .filter(
+                    Task.due_date < today,
+                    Task.status.notin_(["done", "cancelled"]),
+                )
+                .all()
+            )
+
+            for task in tasks:
+                if task.id in getattr(self, "_alerted_tasks", set()):
+                    continue
+                if not hasattr(self, "_alerted_tasks"):
+                    self._alerted_tasks = set()
+
+                days_late = (today - task.due_date).days
+                title = (task.title or "")[:40]
+
+                self._send(
+                    key="alert_task_overdue",
+                    kwargs={"title": title, "days": days_late},
+                    level="warning",
+                    icon="✅",
+                )
+                self._alerted_tasks.add(task.id)
 
     # ── مساعد ────────────────────────────────────────────────────────────────
 

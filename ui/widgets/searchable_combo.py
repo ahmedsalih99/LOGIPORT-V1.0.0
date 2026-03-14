@@ -1,6 +1,6 @@
 """
 searchable_combo.py — LOGIPORT
-QComboBox قابل للبحث — الـ loader هو المسؤول عن البحث بكل اللغات.
+QComboBox قابل للبحث مع debounce — الـ loader هو المسؤول عن البحث بكل اللغات.
 الـ completer يعرض النتائج فقط بدون فلترة إضافية.
 """
 from __future__ import annotations
@@ -9,10 +9,13 @@ import inspect
 from typing import Any, Callable, List, Optional
 
 from PySide6.QtWidgets import QComboBox, QCompleter
-from PySide6.QtCore    import Qt, QStringListModel, QEvent
+from PySide6.QtCore    import Qt, QStringListModel, QEvent, QTimer
 from PySide6.QtGui     import QWheelEvent
 
 from core.translator import TranslationManager
+
+# مدة الـ debounce بالملي ثانية — تمنع استدعاء loader عند كل ضغطة مفتاح
+_DEBOUNCE_MS = 250
 
 
 class SearchableComboBox(QComboBox):
@@ -41,6 +44,13 @@ class SearchableComboBox(QComboBox):
         self._completer.setMaxVisibleItems(10)
         self.setCompleter(self._completer)
 
+        # Debounce timer — ينتظر قبل استدعاء loader
+        self._debounce = QTimer(self)
+        self._debounce.setSingleShot(True)
+        self._debounce.setInterval(_DEBOUNCE_MS)
+        self._debounce.timeout.connect(self._do_fetch)
+        self._pending_query: str = ""
+
         self._completer.activated[str].connect(self._on_activated)
         self.lineEdit().textEdited.connect(self._on_text_edited)
         self.lineEdit().installEventFilter(self)
@@ -68,7 +78,7 @@ class SearchableComboBox(QComboBox):
                 self.lineEdit().setText(display_text or self.itemText(i))
                 self._loading = False
                 return
-        # غير موجود - أضفه مؤقتاً
+        # غير موجود — أضفه مؤقتاً
         self._loading = True
         self._items.insert(0, _Placeholder(value))
         self.insertItem(0, display_text)
@@ -89,7 +99,13 @@ class SearchableComboBox(QComboBox):
     def _on_text_edited(self, text: str):
         if self._loading:
             return
-        self._fetch_and_fill(text.strip())
+        # Debounce: انتظر _DEBOUNCE_MS قبل الاستدعاء
+        self._pending_query = text.strip()
+        self._debounce.start()
+
+    def _do_fetch(self):
+        """يُستدعى بعد انقضاء الـ debounce."""
+        self._fetch_and_fill(self._pending_query)
 
     def _on_activated(self, text: str):
         self._loading = True

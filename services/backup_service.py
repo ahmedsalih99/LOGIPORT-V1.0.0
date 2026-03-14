@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 # اسم مجلد النسخ الاحتياطية
 BACKUP_DIR_NAME = "backups"
+MAX_BACKUPS     = 30   # الحد الأقصى للنسخ الاحتياطية المحفوظة
 
 
 # --------------------------------------------------
@@ -42,6 +43,26 @@ def _backup_dir() -> Path:
 
 
 # --------------------------------------------------
+# Internal helpers
+# --------------------------------------------------
+
+def _cleanup_old_backups(db_stem: str) -> None:
+    """يحذف النسخ الاحتياطية القديمة إذا تجاوز عددها MAX_BACKUPS. يحتفظ بالأحدث دائماً."""
+    backup_dir = _backup_dir()
+    files = sorted(
+        backup_dir.glob(f"{db_stem}_backup_*.db"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old_file in files[MAX_BACKUPS:]:
+        try:
+            old_file.unlink()
+            logger.info("Old backup removed: %s", old_file.name)
+        except Exception as e:
+            logger.warning("Could not remove old backup %s: %s", old_file, e)
+
+
+# --------------------------------------------------
 # Public API
 # --------------------------------------------------
 
@@ -71,6 +92,13 @@ def backup(dest: Optional[Path] = None) -> Path:
     shutil.copy2(src, dest)
 
     logger.info(f"Backup created: {dest} ({dest.stat().st_size / 1024:.1f} KB)")
+
+    # حذف النسخ القديمة إذا تجاوزنا الحد الأقصى
+    try:
+        _cleanup_old_backups(src.stem)
+    except Exception as _ce:
+        logger.warning("Backup cleanup failed (non-critical): %s", _ce)
+
     return dest
 
 

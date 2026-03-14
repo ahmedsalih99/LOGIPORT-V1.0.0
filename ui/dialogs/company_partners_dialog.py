@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt
+from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QDoubleSpinBox, QCheckBox, QComboBox,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
 from core.translator import TranslationManager
 from database.crud.companies_crud import CompanyPartnersCRUD
 from database.crud.clients_crud import ClientsCRUD
+from core.base_dialog import BaseDialog
 
 
 class _PartnerCard(QFrame):
@@ -131,6 +133,7 @@ class _PartnerCard(QFrame):
         ) == QMessageBox.Yes:
             self._crud.delete_partner(self._link.id)
             self._refresh()
+        block_wheel_in(self)
 
 
 class _AddPartnerForm(QFrame):
@@ -208,7 +211,7 @@ class _AddPartnerForm(QFrame):
         self._refresh()
 
 
-class CompanyPartnersDialog(QDialog):
+class CompanyPartnersDialog(BaseDialog):
     """Dialog for managing company shareholders/partners."""
 
     def __init__(self, company, parent=None):

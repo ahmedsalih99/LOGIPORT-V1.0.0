@@ -370,6 +370,13 @@ def _run_migrations(conn) -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_transaction_id ON container_tracking(transaction_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id      ON container_tracking(client_id)")
+        # Migration: office_id for multi-office filtering
+        try:
+            conn.execute("ALTER TABLE container_tracking ADD COLUMN office_id INTEGER REFERENCES offices(id) ON DELETE SET NULL")
+            conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_office_id ON container_tracking(office_id)")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_container_no   ON container_tracking(container_no)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_status         ON container_tracking(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_cel_entry_id      ON container_entry_links(entry_id)")
@@ -431,11 +438,18 @@ def _run_migrations(conn) -> None:
                 completed_at    DATETIME,
                 assigned_to_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_by_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                updated_by_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 transaction_id  INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
                 container_id    INTEGER REFERENCES container_tracking(id) ON DELETE SET NULL,
                 client_id       INTEGER REFERENCES clients(id) ON DELETE SET NULL
             )
         """)
+        # Migration: add updated_by_id if missing (existing DBs)
+        try:
+            conn.execute("ALTER TABLE tasks ADD COLUMN updated_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
         conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_status     ON tasks(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_due_date   ON tasks(due_date)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_assigned   ON tasks(assigned_to_id)")

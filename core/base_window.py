@@ -347,10 +347,37 @@ class BaseWindow(QMainWindow):
         """Handle window show event"""
         self.log_event("Window opened", level="debug")
         super().showEvent(event)
+        # Install Enter navigation + keyboard switch on first show
+        if not getattr(self, "_field_ux_installed", False):
+            try:
+                from ui.utils.field_navigation import setup_field_ux
+                setup_field_ux(self)
+                self._field_ux_installed = True
+            except Exception as _e:
+                logger.debug("field_ux install: %s", _e)
 
     # ==============================
     # GEOMETRY — حفظ واستعادة حجم النافذة
     # ==============================
+
+    def keyPressEvent(self, event) -> None:
+        """Enter → next field, Shift+Enter → previous."""
+        from PySide6.QtCore import Qt
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            focused = self.focusWidget()
+            from PySide6.QtWidgets import QLineEdit, QAbstractSpinBox, QDateEdit, QPlainTextEdit
+            if isinstance(focused, QPlainTextEdit):
+                super().keyPressEvent(event)
+                return
+            if isinstance(focused, (QLineEdit, QAbstractSpinBox, QDateEdit)):
+                mods = event.modifiers()
+                if mods & Qt.KeyboardModifier.ShiftModifier:
+                    self.focusPreviousChild()
+                else:
+                    self.focusNextChild()
+                return
+        super().keyPressEvent(event)
 
     def _geometry_key(self) -> str:
         return f"window_geometry_{self.__class__.__name__}"

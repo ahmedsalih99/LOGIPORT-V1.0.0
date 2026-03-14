@@ -10,6 +10,8 @@ from database.models import get_session_local
 from database.models.entry import Entry
 from database.models.entry_item import EntryItem
 from database.models.client import Client
+from database.models.user   import User
+from sqlalchemy.orm          import aliased
 from typing import List, Optional, Dict, Any, Iterable, Tuple
 
 
@@ -351,6 +353,10 @@ class EntriesCRUD:
         """
         SessionLocal = get_session_local()
         with SessionLocal() as s:
+            # Aliases للمستخدمين
+            CreatedByUser = aliased(User, name="cbu")
+            UpdatedByUser = aliased(User, name="ubu")
+
             # Subquery لإجماليات البنود لكل إدخال
             totals_sq = (
                 select(
@@ -379,9 +385,13 @@ class EntriesCRUD:
                     totals_sq.c.total_pcs,
                     totals_sq.c.total_net,
                     totals_sq.c.total_gross,
+                    CreatedByUser.full_name.label("created_by_name"),
+                    UpdatedByUser.full_name.label("updated_by_name"),
                 )
                 .outerjoin(Client, Client.id == Entry.owner_client_id)
                 .outerjoin(totals_sq, totals_sq.c.eid == Entry.id)
+                .outerjoin(CreatedByUser, CreatedByUser.id == Entry.created_by_id)
+                .outerjoin(UpdatedByUser, UpdatedByUser.id == Entry.updated_by_id)
             )
 
             # تطبيق الفلاتر حسب التاريخ
@@ -408,7 +418,8 @@ class EntriesCRUD:
                     eid, entry_no, entry_date, tut, tref,
                     cby, cat, uby, uat,
                     cid, cn_ar, cn_en, cn_tr,
-                    items_count, total_pcs, total_net, total_gross
+                    items_count, total_pcs, total_net, total_gross,
+                    created_by_name, updated_by_name
             ) in rows:
                 client_obj = {
                     "id": cid,
@@ -432,10 +443,11 @@ class EntriesCRUD:
                     "created_at": cat,
                     "updated_by_id": uby,
                     "updated_at": uat,
+                    "created_by_name": created_by_name or "",
+                    "updated_by_name": updated_by_name or "",
                 })
             return out
 
-    @staticmethod
     def count_with_totals(
             self,
             date_from=None,
@@ -460,6 +472,7 @@ class EntriesCRUD:
             return s.execute(q).scalar_one()
 
 
+    @staticmethod
     def get_all(limit: int = 5000) -> List[Entry]:
         """جلب جميع الإدخالات"""
         return EntriesCRUD.list(limit=limit, offset=0)
@@ -512,14 +525,11 @@ class EntriesCRUD:
                 # أضف حقول العلاقات الضرورية
                 d["material_id"]       = getattr(it, "material_id", None)
                 d["packaging_type_id"] = getattr(it, "packaging_type_id", None)
-                d["currency_id"]       = getattr(it, "currency_id", None)
-                d["pricing_type_id"]   = getattr(it, "pricing_type_id", None)
-                d["unit_price"]        = getattr(it, "unit_price", None)
                 d["count"]             = getattr(it, "count", None)
                 d["gross_weight_kg"]   = getattr(it, "gross_weight_kg", None)
                 d["net_weight_kg"]     = getattr(it, "net_weight_kg", None)
-                d["production_date"]   = getattr(it, "production_date", None)
-                d["expiry_date"]       = getattr(it, "expiry_date", None)
+                d["mfg_date"]          = getattr(it, "mfg_date", None)
+                d["exp_date"]          = getattr(it, "exp_date", None)
                 d["id"]                = it.id
                 items_dicts.append(d)
 

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 from core.translator import TranslationManager
 from database.crud.companies_crud import CompanyBanksCRUD
+from core.base_dialog import BaseDialog
 
 
 class _BankCard(QFrame):
@@ -213,7 +214,7 @@ class _AddBankForm(QFrame):
         self._refresh()
 
 
-class CompanyBanksDialog(QDialog):
+class CompanyBanksDialog(BaseDialog):
     """Full dialog for managing company bank accounts."""
 
     def __init__(self, company, parent=None):

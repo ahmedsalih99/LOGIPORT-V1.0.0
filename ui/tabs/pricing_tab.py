@@ -1,4 +1,5 @@
 from core.base_tab import BaseTab
+from core.data_bus import DataBus
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from core.permissions import has_perm, is_admin
@@ -80,10 +81,30 @@ class PricingTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        DataBus.get_instance().subscribe('pricing', self.reload_data)
+        DataBus.get_instance().subscribe('materials', self.reload_data)
+        from PySide6.QtGui import QKeySequence, QShortcut
+
+        # ── Keyboard shortcuts ─────────────────────────────
+        _sc_del = QShortcut(QKeySequence.StandardKey.Delete, self)
+        _sc_del.activated.connect(self._kb_delete)
+        _sc_f5 = QShortcut(QKeySequence("F5"), self)
+        _sc_f5.activated.connect(self.reload_data)
         self._init_done = True
 
     # ---------- data loading ----------
+    def _kb_delete(self):
+        """Delete key handler."""
+        try:
+            if hasattr(self, "delete_selected_items"):
+                self.delete_selected_items()
+        except Exception:
+            pass
+
     def reload_data(self):
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.WaitCursor)
         admin = is_admin(self.current_user)
         items = self.pricing_crud.list() or []
 
@@ -197,6 +218,7 @@ class PricingTab(BaseTab):
 
             self.data.append(row)
 
+        QApplication.restoreOverrideCursor()
         self.display_data()
 
     def display_data(self):
@@ -226,6 +248,7 @@ class PricingTab(BaseTab):
             user_id = self._user_id()
             self.pricing_crud.add_pricing(data, user_id=user_id)
             QMessageBox.information(self, self._("added"), self._("pricing_added_success"))
+            DataBus.get_instance().emit('pricing')
             self.reload_data()
 
     def edit_selected_item(self, row=None):
@@ -259,6 +282,7 @@ class PricingTab(BaseTab):
             user_id = self._user_id()
             self.pricing_crud.update_pricing(pricing.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("pricing_updated_success"))
+            DataBus.get_instance().emit('pricing')
             self.reload_data()
 
     def delete_selected_items(self, rows=None):
@@ -275,6 +299,7 @@ class PricingTab(BaseTab):
                 p = self.data[row]["actions"]
                 self._delete_single(p, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("pricing_deleted_success"))
+            DataBus.get_instance().emit('pricing')
             self.reload_data()
 
     def _delete_single(self, pricing, confirm=True):

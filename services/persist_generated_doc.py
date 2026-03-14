@@ -100,8 +100,7 @@ def persist_document(
     → نفس النوع + نفس اللغة + نفس المعاملة = update الصف الموجود
     """
     SessionLocal = get_session_local()
-    s = SessionLocal()
-    try:
+    with SessionLocal() as s:
         # 1) نوع المستند
         dtype_code = _resolve_document_type_code(doc_code)
         row = s.execute(text("SELECT id FROM document_types WHERE code=:c"), {"c": dtype_code}).first()
@@ -182,8 +181,7 @@ def persist_document(
             "document_type_code": dtype_code,
             "seq":                int(seq),
         }
-    finally:
-        s.close()
+
 
 
 def allocate_group_doc_no(transaction_id: int, prefix: str = "INVPL") -> str:
@@ -193,8 +191,7 @@ def allocate_group_doc_no(transaction_id: int, prefix: str = "INVPL") -> str:
     """
     import re as _re
     SessionLocal = get_session_local()
-    s = SessionLocal()
-    try:
+    with SessionLocal() as s:
         # جلب رقم المعاملة الفعلي
         tx_row = s.execute(
             text("SELECT COALESCE(transaction_no, CAST(id AS TEXT)) FROM transactions WHERE id=:i"),
@@ -229,5 +226,3 @@ def allocate_group_doc_no(transaction_id: int, prefix: str = "INVPL") -> str:
                 seq += 1
                 continue
         raise RuntimeError("Failed to allocate doc_no after several attempts.")
-    finally:
-        s.close()

@@ -1,11 +1,13 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDoubleValidator
+from core.base_dialog import BaseDialog
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
     QDialogButtonBox, QLabel
 )
 
 from core.translator import TranslationManager
+from ui.utils.wheel_blocker import block_wheel_in
 
 # -------- Guarded CRUD imports --------------------------------------------
 try:
@@ -30,7 +32,7 @@ except Exception:  # pragma: no cover
     CountriesCRUD = None  # type: ignore
 
 
-class ManualItemDialog(QDialog):
+class ManualItemDialog(BaseDialog):
     """Dialog for adding a manual item (not sourced from entries)."""
 
     def __init__(self, parent=None):
@@ -240,3 +242,4 @@ class ManualItemDialog(QDialog):
 
     def _attr(self, obj, key, default=None):
         return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
+        block_wheel_in(self)

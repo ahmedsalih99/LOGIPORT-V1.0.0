@@ -5,7 +5,7 @@ from .base import Base
 class AuditLog(Base):
     __tablename__ = "audit_log"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     action = Column(String(50), nullable=False)  # create | update | delete | import | export | print
     table_name = Column(String(50), nullable=False, index=True)
     record_id = Column(Integer, nullable=True)

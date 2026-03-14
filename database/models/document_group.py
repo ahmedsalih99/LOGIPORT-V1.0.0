@@ -14,7 +14,7 @@ class DocumentGroup(Base):
     month = Column(Integer, nullable=False)   # <-- جديد ومتوافق مع DB
     seq = Column(Integer, nullable=False)
 
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     transaction = relationship("Transaction")

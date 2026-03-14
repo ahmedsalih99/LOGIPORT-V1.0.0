@@ -78,12 +78,30 @@ class PackagingTypesTab(BaseTab):
             self.request_refresh.connect(self.reload_data)
 
         self.reload_data()
+        from PySide6.QtGui import QKeySequence, QShortcut
+
+        # ── Keyboard shortcuts ─────────────────────────────
+        _sc_del = QShortcut(QKeySequence.StandardKey.Delete, self)
+        _sc_del.activated.connect(self._kb_delete)
+        _sc_f5 = QShortcut(QKeySequence("F5"), self)
+        _sc_f5.activated.connect(self.reload_data)
         self._init_done = True
 
     # -----------------------------
     # Data loading
     # -----------------------------
+    def _kb_delete(self):
+        """Delete key handler."""
+        try:
+            if hasattr(self, "delete_selected_items"):
+                self.delete_selected_items()
+        except Exception:
+            pass
+
     def reload_data(self):
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.WaitCursor)
         admin = is_admin(self.current_user)
 
         items = self.packaging_types_crud.get_all() or []
@@ -151,6 +169,7 @@ class PackagingTypesTab(BaseTab):
 
             self.data.append(row)
 
+        QApplication.restoreOverrideCursor()
         self.display_data()
 
     # -----------------------------

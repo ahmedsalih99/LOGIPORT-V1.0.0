@@ -15,6 +15,7 @@ from __future__ import annotations
 import threading
 
 from PySide6.QtCore import Qt, QTimer
+from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QCheckBox,
@@ -26,12 +27,13 @@ from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 
 
-class SyncSettingsDialog(QDialog):
+from core.base_dialog import BaseDialog
+class SyncSettingsDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._  = TranslationManager.get_instance().translate
         self.sm = SettingsManager.get_instance()
-        self.setWindowTitle("إعدادات المزامنة")
+        self.setWindowTitle(self._("sync_settings_title"))
         self.setMinimumWidth(520)
         self.setModal(True)
         self._build()
@@ -45,7 +47,7 @@ class SyncSettingsDialog(QDialog):
         lay.setContentsMargins(24, 24, 24, 24)
 
         # ── Header ──────────────────────────────────────
-        title = QLabel("إعدادات مزامنة Supabase")
+        title = QLabel(self._("sync_supabase_title"))
         title.setObjectName("dialog-title")
         title.setStyleSheet("font-size:16px; font-weight:600;")
         lay.addWidget(title)
@@ -76,7 +78,7 @@ class SyncSettingsDialog(QDialog):
         # زر إظهار/إخفاء
         key_row = QHBoxLayout()
         key_row.addWidget(self._key_edit)
-        self._show_key_btn = QPushButton("إظهار")
+        self._show_key_btn = QPushButton(self._("show_key"))
         self._show_key_btn.setObjectName("secondary-btn")
         self._show_key_btn.setFixedWidth(70)
         self._show_key_btn.clicked.connect(self._toggle_key_visibility)
@@ -220,7 +222,7 @@ class SyncSettingsDialog(QDialog):
 
     def _load_offices(self):
         self._office_combo.clear()
-        self._office_combo.addItem("— اختر المكتب —", None)
+        self._office_combo.addItem(self._("sync_select_office"), None)
         try:
             from database.models import get_session_local
             from sqlalchemy import text
@@ -242,13 +244,14 @@ class SyncSettingsDialog(QDialog):
     def _toggle_key_visibility(self):
         if self._key_edit.echoMode() == QLineEdit.Password:
             self._key_edit.setEchoMode(QLineEdit.Normal)
-            self._show_key_btn.setText("إخفاء")
+            self._show_key_btn.setText(self._("sync_hide_key"))
         else:
             self._key_edit.setEchoMode(QLineEdit.Password)
-            self._show_key_btn.setText("إظهار")
+            self._show_key_btn.setText(self._("show_key"))
 
     def _separator(self) -> QFrame:
         f = QFrame()
         f.setFrameShape(QFrame.HLine)
         f.setObjectName("form-separator")
+        block_wheel_in(self)
         return f

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui  import QFont
+from ui.utils.wheel_blocker import block_wheel_in
 
 from core.base_dialog  import BaseDialog
 from core.translator   import TranslationManager
@@ -309,6 +310,7 @@ class AddEditContainerDialog(BaseDialog):
     # ─────────────────────────────────────────────────────────────────────
     # POPULATE
     # ─────────────────────────────────────────────────────────────────────
+        block_wheel_in(self)
 
     def _populate(self, rec: ContainerTracking):
         self._f_container_no.setText(rec.container_no  or "")

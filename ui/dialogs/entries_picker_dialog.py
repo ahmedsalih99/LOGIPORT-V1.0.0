@@ -50,7 +50,8 @@ def _pick(row: dict, *keys, default=None):
     return default
 
 
-class EntriesPickerDialog(QDialog):
+from core.base_dialog import BaseDialog
+class EntriesPickerDialog(BaseDialog):
     """
     - عمود واحد لرقم الإدخال (يُعرض من transport_ref/entry_no).
     - عمود ID يظهر للأدمن فقط.

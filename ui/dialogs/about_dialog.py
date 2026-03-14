@@ -28,7 +28,9 @@ except Exception:
 APP_YEAR = "2025 – 2026"
 
 
-class AboutDialog(QDialog):
+from core.base_dialog import BaseDialog
+
+class AboutDialog(BaseDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)

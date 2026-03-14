@@ -1,4 +1,5 @@
 from core.base_tab import BaseTab
+from core.data_bus import DataBus
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from core.permissions import has_perm, is_admin
@@ -128,6 +129,8 @@ class EntriesTab(BaseTab):
 
         self._build_filter_bar()
         self.reload_data()
+        DataBus.get_instance().subscribe('entries', self.reload_data)
+        DataBus.get_instance().subscribe('clients', self.reload_data)
         self._init_done = True
 
     # ── Filter bar ──────────────────────────────────────────────────────────
@@ -149,6 +152,9 @@ class EntriesTab(BaseTab):
 
     # ---------- data ----------
     def reload_data(self):
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.WaitCursor)
         self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
         self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
         _ = TranslationManager.get_instance().translate
@@ -209,8 +215,8 @@ class EntriesTab(BaseTab):
                 "total_net": f"{float(r.get('total_net') or 0):.2f}",
                 "total_gross": f"{float(r.get('total_gross') or 0):.2f}",
                 "id": r.get("id"),
-                "created_by_name": "",
-                "updated_by_name": "",
+                "created_by_name": r.get("created_by_name") or "",
+                "updated_by_name": r.get("updated_by_name") or "",
                 "created_at": str(r.get("created_at") or ""),
                 "updated_at": str(r.get("updated_at") or ""),
                 "actions": r.get("id"),
@@ -218,18 +224,21 @@ class EntriesTab(BaseTab):
                 "_raw_client": client_name,
             })
 
-        # جلب الكونتينرات المرتبطة دفعة واحدة
+        # جلب الكونتينرات دفعة واحدة (Batch — بدون N+1)
         try:
             c_crud = _get_container_crud()
-            for row in self.data:
-                eid = row.get("id")
-                if eid:
-                    containers = c_crud.get_containers_for_entry(eid)
-                    if containers:
-                        nos = ", ".join(c.container_no for c in containers[:2])
-                        if len(containers) > 2:
-                            nos += f" +{len(containers)-2}"
-                        row["containers_display"] = f"🚢 {nos}"
+            entry_ids = [row.get("id") for row in self.data if row.get("id")]
+            if entry_ids:
+                containers_map = c_crud.get_containers_for_entries(entry_ids)
+                for row in self.data:
+                    eid = row.get("id")
+                    if eid:
+                        containers = containers_map.get(eid, [])
+                        if containers:
+                            nos = ", ".join(c.container_no for c in containers[:2])
+                            if len(containers) > 2:
+                                nos += f" +{len(containers)-2}"
+                            row["containers_display"] = f"🚢 {nos}"
         except Exception:
             pass
 
@@ -246,6 +255,7 @@ class EntriesTab(BaseTab):
             self._count_lbl.setText(f"({len(self.data)} " + _("total_rows") + ")")
 
         # عرض البيانات في الجدول
+        QApplication.restoreOverrideCursor()
         self.display_data()
 
     def display_data(self):
@@ -377,6 +387,7 @@ class EntriesTab(BaseTab):
             user_id = self._user_id()
             new_id = self.crud.create(header, items, user_id=user_id)
             QMessageBox.information(self, self._("added"), self._("entry_added_success"))
+            DataBus.get_instance().emit('entries')
             self.reload_data()
 
     def edit_selected_item(self, row=None):
@@ -403,7 +414,8 @@ class EntriesTab(BaseTab):
             ok = self.crud.update(entry_obj.id, header, items, user_id=user_id)  # ✅
             if ok:
                 QMessageBox.information(self, self._("updated"), self._("entry_updated_success"))
-                self.reload_data()
+            DataBus.get_instance().emit('entries')
+            self.reload_data()
 
 
     def delete_selected_items(self, rows=None):
@@ -420,6 +432,7 @@ class EntriesTab(BaseTab):
                 e = self.data[row]["actions"]
                 self._delete_single(e, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("entry_deleted_success"))
+            DataBus.get_instance().emit('entries')
             self.reload_data()
 
     def _delete_single(self, entry_obj, confirm=True):

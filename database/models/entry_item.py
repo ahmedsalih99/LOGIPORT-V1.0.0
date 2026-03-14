@@ -12,21 +12,21 @@ class EntryItem(Base):
 
     id                = Column(Integer, primary_key=True)
     entry_id          = Column(Integer, ForeignKey("entries.id", ondelete="CASCADE"), nullable=False)
-    material_id       = Column(Integer, ForeignKey("materials.id"), nullable=False)
-    packaging_type_id = Column(Integer, ForeignKey("packaging_types.id"), nullable=True)
+    material_id       = Column(Integer, ForeignKey("materials.id", ondelete="RESTRICT"), nullable=False)
+    packaging_type_id = Column(Integer, ForeignKey("packaging_types.id", ondelete="SET NULL"), nullable=True)
     count             = Column(Integer, default=0)
     net_weight_kg     = Column(Float, default=0.0)
     gross_weight_kg   = Column(Float, default=0.0)
     mfg_date          = Column(Date, nullable=True)
     exp_date          = Column(Date, nullable=True)
-    origin_country_id = Column(Integer, ForeignKey("countries.id"), nullable=True)
+    origin_country_id = Column(Integer, ForeignKey("countries.id", ondelete="SET NULL"), nullable=True)
     batch_no          = Column(String(100), nullable=True)
     notes             = Column(Text, nullable=True)
 
     # --- حقول الأدمن المطلوبة ---
-    created_by_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_id     = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at        = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_by_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_by_id     = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_at        = Column(DateTime, server_default=func.now(),
                                onupdate=func.now(), nullable=False)
 

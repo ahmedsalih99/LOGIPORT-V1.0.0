@@ -9,6 +9,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
+from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QTextEdit, QComboBox, QDateEdit,
@@ -22,10 +23,7 @@ try:
 except Exception:
     _ = lambda k: k
 
-try:
-    from core.base_dialog import BaseDialog as _Base
-except Exception:
-    _Base = QDialog
+from core.base_dialog import BaseDialog as _Base
 
 
 class TaskDialog(_Base):
@@ -226,10 +224,12 @@ class TaskDialog(_Base):
             "due_date":       due,
             "assigned_to_id": self._assigned_cb.currentData(),
             "description":    self._desc_edit.toPlainText().strip() or None,
-            "created_by_id":  getattr(self._user, "id", None),
+            "created_by_id":  getattr(self._user, "id", None) if not self._task_data else None,
+            "updated_by_id":  getattr(self._user, "id", None) if self._task_data else None,
         }
         self.accept()
 
     @property
     def result_data(self):
         return self._result
+        block_wheel_in(self)

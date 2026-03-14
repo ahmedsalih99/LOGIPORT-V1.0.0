@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
+from ui.utils.wheel_blocker import block_wheel_in
 from core.translator import TranslationManager
 from database.crud.permissions_crud import RolesCRUD
 from database.crud.offices_crud import OfficesCRUD
@@ -35,6 +36,7 @@ class UserDialog(BaseDialog):
         self.load_offices()
         self.load_user_data()
         TranslationManager.get_instance().language_changed.connect(self.on_language_change)
+        block_wheel_in(self)
 
     def init_ui(self):
         layout = QVBoxLayout()

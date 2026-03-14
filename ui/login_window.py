@@ -46,6 +46,17 @@ class LoginWindow(BaseDialog):
         self.retranslate_ui()
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
 
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not getattr(self, "_field_ux_installed", False):
+            try:
+                from ui.utils.field_navigation import setup_field_ux
+                setup_field_ux(self)
+                self._field_ux_installed = True
+            except Exception:
+                pass
+
     def _set_responsive_size(self):
         """Set dialog initial size based on screen — resizable by user"""
         screen = QApplication.primaryScreen()

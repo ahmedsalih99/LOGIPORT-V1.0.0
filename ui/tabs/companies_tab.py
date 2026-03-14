@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 
 # ========== Core ==========
 from core.base_tab import BaseTab
+from core.data_bus import DataBus
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 
@@ -113,12 +114,31 @@ class CompaniesTab(BaseTab):
         self.row_double_clicked.connect(self.on_row_double_clicked)
 
         self.reload_data()
+        DataBus.get_instance().subscribe('companies', self.reload_data)
+        from PySide6.QtGui import QKeySequence, QShortcut
+
+        # ── Keyboard shortcuts ─────────────────────────────
+        _sc_del = QShortcut(QKeySequence.StandardKey.Delete, self)
+        _sc_del.activated.connect(self._kb_delete)
+        _sc_f5 = QShortcut(QKeySequence("F5"), self)
+        _sc_f5.activated.connect(self.reload_data)
         self._init_done = True
 
     # =========================
     # Data loading
     # =========================
+    def _kb_delete(self):
+        """Delete key handler."""
+        try:
+            if hasattr(self, "delete_selected_items"):
+                self.delete_selected_items()
+        except Exception:
+            pass
+
     def reload_data(self):
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.WaitCursor)
         admin = is_admin(self.current_user)
         lang  = self._lang   # نعرّف lang مبكراً لأن country_map يحتاجه
 
@@ -234,6 +254,7 @@ class CompaniesTab(BaseTab):
 
             self.data.append(row)
 
+        QApplication.restoreOverrideCursor()
         self.display_data()
 
     # =========================
@@ -262,6 +283,7 @@ class CompaniesTab(BaseTab):
 
             QMessageBox.information(self, self._("added"),
                                     self._("company_added_success"))
+            DataBus.get_instance().emit('companies')
             self.reload_data()
 
     def edit_selected_item(self, row=None):
@@ -281,6 +303,7 @@ class CompaniesTab(BaseTab):
             user_id = getattr(self.current_user, "id", None)
             self.companies_crud.update_company(company.id, data, user_id=user_id)
             QMessageBox.information(self, self._("updated"), self._("company_updated_success"))
+            DataBus.get_instance().emit('companies')
             self.reload_data()
 
     def delete_selected_items(self, rows=None):
@@ -297,6 +320,7 @@ class CompaniesTab(BaseTab):
                 company = self.data[row]["actions"]
                 self._delete_single(company, confirm=False)
             QMessageBox.information(self, self._("deleted"), self._("company_deleted_success"))
+            DataBus.get_instance().emit('companies')
             self.reload_data()
 
     def _delete_single(self, company, confirm=True):

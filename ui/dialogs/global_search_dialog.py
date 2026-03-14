@@ -47,7 +47,8 @@ class _SearchWorker(QObject):
 
 # ─── نافذة البحث ──────────────────────────────────────────────────────────
 
-class GlobalSearchDialog(QDialog):
+from core.base_dialog import BaseDialog
+class GlobalSearchDialog(BaseDialog):
     """
     Spotlight-style search dialog.
     Signal navigate_to(entity_key, record_id) يُصدَر عند اختيار نتيجة.

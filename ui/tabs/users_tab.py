@@ -102,6 +102,9 @@ class UsersTab(BaseTab):
     # Data loading/building
     # -----------------------------
     def reload_data(self):
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.WaitCursor)
         admin = is_admin(self.current_user)
 
         users = self.users_crud.get_all() or []
@@ -158,6 +161,7 @@ class UsersTab(BaseTab):
                 })
             self.data.append(row)
 
+        QApplication.restoreOverrideCursor()
         self.display_data()
 
     def display_data(self):

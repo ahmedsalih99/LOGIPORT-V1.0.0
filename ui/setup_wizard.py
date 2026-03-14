@@ -16,10 +16,12 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QPixmap, QIcon
 
+from core.translator import TranslationManager
 logger = logging.getLogger(__name__)
 
 
-class SetupWizard(QDialog):
+from core.base_dialog import BaseDialog
+class SetupWizard(BaseDialog):
     """
     نافذة الإعداد الأولي للتطبيق.
     تظهر مرة واحدة فقط عند أول تشغيل حين لا يوجد أي مستخدم.
@@ -35,6 +37,8 @@ class SetupWizard(QDialog):
         self.setup_done = False
         self.created_username = ""
 
+        self._ = TranslationManager.get_instance().translate
+        TranslationManager.get_instance().language_changed.connect(self._retranslate)
         self._set_size()
         self._build_ui()
         self._apply_style()
@@ -56,7 +60,7 @@ class SetupWizard(QDialog):
     # ──────────────────────────────────────────────
 
     def _build_ui(self):
-        self.setWindowTitle("LOGIPORT — الإعداد الأولي")
+        self.setWindowTitle(self._("setup_wizard_title"))
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -85,7 +89,7 @@ class SetupWizard(QDialog):
         title_lbl.setAlignment(Qt.AlignCenter)
         header_lay.addWidget(title_lbl)
 
-        sub_lbl = QLabel("أول تشغيل — إنشاء حساب المسؤول")
+        sub_lbl = QLabel(self._("setup_subtitle"))
         sub_lbl.setObjectName("WizardSubtitle")
         sub_lbl.setAlignment(Qt.AlignCenter)
         header_lay.addWidget(sub_lbl)
@@ -138,7 +142,7 @@ class SetupWizard(QDialog):
         body_lay.addStretch()
 
         # زر الإنشاء
-        self.create_btn = QPushButton("✅  إنشاء الحساب والبدء")
+        self.create_btn = QPushButton(self._("setup_create_btn"))
         self.create_btn.setObjectName("WizardCreateBtn")
         self.create_btn.setFixedHeight(46)
         self.create_btn.setCursor(Qt.PointingHandCursor)
@@ -218,7 +222,7 @@ class SetupWizard(QDialog):
 
         # تعطيل الزر وإظهار التحميل
         self.create_btn.setEnabled(False)
-        self.create_btn.setText("⏳  جارٍ الإنشاء…")
+        self.create_btn.setText(self._("setup_creating"))
         self.progress.show()
         QApplication.processEvents()
 
@@ -236,7 +240,7 @@ class SetupWizard(QDialog):
                 self.setup_done = True
                 self._show_success(username)
             else:
-                self._show_error("❌  فشل إنشاء الحساب. تحقق من السجلات.")
+                self._show_error(self._("setup_failed"))
                 self._reset_button()
 
         except Exception as exc:
@@ -247,7 +251,7 @@ class SetupWizard(QDialog):
     def _show_success(self, username: str):
         """يعرض رسالة النجاح ثم يُغلق النافذة."""
         self.progress.hide()
-        self.create_btn.setText("✅  تم! جارٍ فتح التطبيق…")
+        self.create_btn.setText(self._("setup_done"))
         self.create_btn.setObjectName("success-btn")
 
         # اخفِ خانات الإدخال
@@ -283,7 +287,7 @@ class SetupWizard(QDialog):
     def _reset_button(self):
         self.progress.hide()
         self.create_btn.setEnabled(True)
-        self.create_btn.setText("✅  إنشاء الحساب والبدء")
+        self.create_btn.setText(self._("setup_create_btn"))
 
     # ──────────────────────────────────────────────
     # التصميم

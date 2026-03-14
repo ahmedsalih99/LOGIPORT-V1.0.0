@@ -10,6 +10,7 @@ Added filters:
 """
 
 from core.base_tab import BaseTab
+from core.data_bus import DataBus
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from core.permissions import has_perm, is_admin
@@ -122,6 +123,8 @@ class TransactionsTab(BaseTab):
                 except Exception: pass
 
         self.reload_data()
+        DataBus.get_instance().subscribe('transactions', self.reload_data)
+        DataBus.get_instance().subscribe('clients', self.reload_data)
 
     # ── Filter bar ────────────────────────────────────────────────────────
 
@@ -576,6 +579,7 @@ class TransactionsTab(BaseTab):
             if 0 <= r < len(self.data):
                 self._delete_single(self.data[r]["actions"], confirm=False)
         QMessageBox.information(self, self._("deleted"), self._("transaction_deleted_success"))
+        DataBus.get_instance().emit('transactions')
         self.reload_data()
 
     def _delete_single(self, trx_obj, confirm=True):

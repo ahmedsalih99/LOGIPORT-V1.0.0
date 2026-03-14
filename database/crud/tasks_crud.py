@@ -185,8 +185,11 @@ class TasksCRUD:
         finally:
             s.close()
 
-    def mark_done(self, task_id: int) -> bool:
-        return self.update(task_id, status="done", completed_at=datetime.utcnow())
+    def mark_done(self, task_id: int, updated_by_id=None) -> bool:
+        kwargs = {"status": "done", "completed_at": datetime.utcnow()}
+        if updated_by_id is not None:
+            kwargs["updated_by_id"] = updated_by_id
+        return self.update(task_id, **kwargs)
 
     def mark_cancelled(self, task_id: int) -> bool:
         return self.update(task_id, status="cancelled")

@@ -50,6 +50,14 @@ class ContainerTracking(Base):
         index=True,
     )
 
+    # ── ربط بالمكتب (للفلترة في بيئة multi-office) ───────────────────────────
+    office_id = Column(
+        Integer,
+        ForeignKey("offices.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # ── بيانات الكونتينر الأساسية ─────────────────────────────────────────────
     container_no   = Column(String(32),  nullable=False, index=True)
     bl_number      = Column(String(64),  nullable=True)
@@ -94,6 +102,12 @@ class ContainerTracking(Base):
     client = relationship(
         "Client",
         foreign_keys=[client_id],
+        lazy="joined",
+    )
+
+    office = relationship(
+        "Office",
+        foreign_keys=[office_id],
         lazy="joined",
     )
 

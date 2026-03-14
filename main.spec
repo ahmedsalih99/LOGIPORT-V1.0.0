@@ -41,6 +41,8 @@ a = Analysis(
         'sqlalchemy.sql.default_comparator',
         'sqlalchemy.event',
         'sqlalchemy.pool',
+        'database.models.task',
+        'database.crud.tasks_crud',
         'sqlalchemy.engine',
         'sqlalchemy.engine.url',
 
@@ -94,6 +96,7 @@ a = Analysis(
         'ui.tabs.offices_tab',
         'ui.tabs.users_tab',
         'ui.tabs.values_tab',
+        'ui.tabs.tasks_tab',
 
         # UI Dialogs
         'ui.dialogs.about_dialog',
@@ -117,6 +120,7 @@ a = Analysis(
         'ui.dialogs.company_partners_dialog',
         'ui.dialogs.entries_picker_dialog',
         'ui.dialogs.generate_document_dialog',
+        'ui.dialogs.task_dialog',
         'ui.dialogs.manual_item_dialog',
         'ui.dialogs.mixins.documents_tab',
         'ui.dialogs.mixins.general_tab',
@@ -152,6 +156,9 @@ a = Analysis(
         'ui.widgets.custom_button',
         'ui.widgets.custom_table',
         'ui.widgets.notification_bell',
+        'ui.widgets.pdf_preview_dialog',
+        'ui.widgets.container_timeline',
+        'ui.widgets.container_timeline',
         'ui.widgets.searchable_combo',
         'ui.widgets.sidebar',
         'ui.widgets.sync_widget',
@@ -160,6 +167,8 @@ a = Analysis(
         # UI Utils
         'ui.utils',
         'ui.utils.svg_icons',
+        'ui.utils.field_navigation',
+        'ui.utils.wheel_blocker',
         'ui.utils.__init___utils',
 
         # Utils
@@ -256,6 +265,7 @@ a = Analysis(
         'services.healthcheck',
         'services.html_engine',
         'services.notification_service',
+        'services.alert_service',
         'services.numbering_service',
         'services.pdf_renderer',
         'services.persist_generated_doc',

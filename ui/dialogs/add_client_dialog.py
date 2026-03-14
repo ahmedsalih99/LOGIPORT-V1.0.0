@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialogButtonBox
 )
 from PySide6.QtGui import QGuiApplication
+from ui.utils.wheel_blocker import block_wheel_in
 
 
 def _name_by_lang(obj, lang: str) -> str:
@@ -33,6 +34,7 @@ class AddClientDialog(BaseDialog):
 
         self.set_translated_title("add_client" if client is None else "edit_client")
         self.init_ui()
+        block_wheel_in(self)
 
     def init_ui(self):
         self.setSizeGripEnabled(True)

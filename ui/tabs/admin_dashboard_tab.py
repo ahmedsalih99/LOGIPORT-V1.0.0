@@ -219,7 +219,7 @@ class AdminDashboardTab(QWidget):
         self._audit_tbl.setAlternatingRowColors(True)
         self._audit_tbl.setEditTriggers(QTableWidget.NoEditTriggers)
 
-        self._load_audit()
+        QTimer.singleShot(0, self._load_audit)
         lay.addWidget(self._audit_tbl)
 
         return f
@@ -244,7 +244,7 @@ class AdminDashboardTab(QWidget):
         self._db_info_layout = QVBoxLayout(self._db_info_container)
         self._db_info_layout.setSpacing(8)
         self._db_info_layout.setContentsMargins(0, 0, 0, 0)
-        self._load_db_info()
+        QTimer.singleShot(50, self._load_db_info)
         lay.addWidget(self._db_info_container)
 
         self._sys_title_lbl = QLabel(self._("system_status_title"))
@@ -256,7 +256,7 @@ class AdminDashboardTab(QWidget):
         self._health_layout = QVBoxLayout(self._health_container)
         self._health_layout.setSpacing(6)
         self._health_layout.setContentsMargins(0, 0, 0, 0)
-        self._load_health()
+        QTimer.singleShot(100, self._load_health)
         lay.addWidget(self._health_container)
 
         lay.addStretch()
@@ -312,7 +312,7 @@ class AdminDashboardTab(QWidget):
         self._backup_list_lbl.setFont(QFont("Tajawal", 9))
         self._backup_list_lbl.setObjectName("text-muted")
         self._backup_list_lbl.setWordWrap(True)
-        self._refresh_backup_list()
+        QTimer.singleShot(150, self._refresh_backup_list)
         lay.addWidget(self._backup_list_lbl)
 
         return f
@@ -520,7 +520,7 @@ class AdminDashboardTab(QWidget):
             QMessageBox.information(self, self._("backup_dialog_title"),
                 self._("backup_success_detail") + f"\n\n📂  {path}\n💾  {sz} KB")
             self._refresh_backup_list()
-            self._refresh_stats()
+            QTimer.singleShot(200, self._refresh_stats)
 
         except Exception as e:
             try:

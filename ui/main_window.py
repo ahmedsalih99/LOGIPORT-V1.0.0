@@ -20,6 +20,7 @@ from ui.tabs.dashboard_tab import DashboardTab        # أول تبويب — ي
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from services.notification_service import NotificationService
+from core.data_bus import DataBus
 from services.alert_service import AlertService
 from services.backup_service import backup
 import logging
@@ -85,6 +86,7 @@ class MainWindow(BaseWindow):
 
         self._notif_svc = NotificationService.get_instance()
         self._notif_svc.start()
+        DataBus.get_instance()   # تهيئة مبكرة للـ event bus
 
         self._alert_svc = AlertService.get_instance()
         self._alert_svc.start()

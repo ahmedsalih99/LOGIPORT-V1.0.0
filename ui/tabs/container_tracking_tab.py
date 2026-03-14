@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui  import QFont, QColor
 
 from core.translator import TranslationManager
+from core.data_bus import DataBus
 from core.permissions import has_perm, is_admin
 
 from database.crud.container_tracking_crud import ContainerTrackingCRUD

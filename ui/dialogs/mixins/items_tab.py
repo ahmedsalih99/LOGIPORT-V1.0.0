@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QMenu, QHeaderView
 )
 from PySide6.QtGui import QAction, QIcon
+from ui.utils.wheel_blocker import block_wheel_in
 
 # ---------- Real DB models (SQLAlchemy) ----------
 from database.models import (

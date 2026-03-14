@@ -187,8 +187,7 @@ def render_document(
     # -------------------------------------------------------------------------
     # Fetch real transaction_no from DB
     SessionLocal = get_session_local()
-    s = SessionLocal()
-    try:
+    with SessionLocal() as s:
         row = s.execute(
             text(
                 "SELECT COALESCE(transaction_no, CAST(id AS TEXT)) "
@@ -203,8 +202,7 @@ def render_document(
 
         transaction_no = str(row[0])
         logger.debug("Resolved transaction_no=%s", transaction_no)
-    finally:
-        s.close()
+
 
     # -------------------------------------------------------------------------
     # Resolve builder

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QSizePolicy, QPushButton,
 )
 from PySide6.QtCore import Qt, QDate
+from ui.utils.wheel_blocker import block_wheel_in
 
 from database.models import get_session_local, Company
 

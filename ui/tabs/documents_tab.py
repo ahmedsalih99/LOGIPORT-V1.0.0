@@ -30,7 +30,9 @@ from PySide6.QtWidgets import (
     QMenu, QMessageBox, QHeaderView, QSplitter,
 )
 
-from core.base_tab import BaseTab, DateRangeBar
+from core.base_tab import BaseTab
+from core.data_bus import DataBus
+from core.base_tab import DateRangeBar
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from core.permissions import has_perm, is_admin
@@ -195,6 +197,8 @@ class DocumentsTab(BaseTab):
 
         self._refresh_transactions_seed()
         self.reload_data()
+        DataBus.get_instance().subscribe('documents', self.reload_data)
+        DataBus.get_instance().subscribe('transactions', self.reload_data)
 
     # ------------------------------------------------------------------
     # Override _setup_ui to inject Splitter
@@ -574,6 +578,14 @@ class DocumentsTab(BaseTab):
         if reply != QMessageBox.Yes:
             return
 
+        # User ID للـ audit log
+        user_id = None
+        try:
+            u = getattr(self, "current_user", None)
+            user_id = u.get("id") if isinstance(u, dict) else getattr(u, "id", None)
+        except Exception:
+            pass
+
         errors = []
         path = rec.get("path", "")
         if path and os.path.exists(path):
@@ -586,23 +598,23 @@ class DocumentsTab(BaseTab):
         if doc_id:
             try:
                 from database.crud.documents_crud import DocumentsCRUD
-                DocumentsCRUD().delete_document(int(doc_id))
+                DocumentsCRUD().delete_document(int(doc_id), user_id=user_id)
             except Exception as e:
                 errors.append(f"DB: {e}")
         elif path:
+            # Fallback: حذف بالمسار — نستخدم context manager بدل raw session
             try:
                 from sqlalchemy import text as _sql
                 from database.models import get_session_local as _gs
-                s = _gs()()
-                s.execute(_sql("DELETE FROM documents WHERE file_path = :p"), {"p": path})
-                s.commit()
-                s.close()
+                with _gs()() as s:
+                    s.execute(_sql("DELETE FROM documents WHERE file_path = :p"), {"p": path})
+                    s.commit()
             except Exception as e:
                 errors.append(f"DB path: {e}")
 
         if errors:
             import logging
-            logging.getLogger(__name__).warning("Delete errors: %s", errors)
+            logging.getLogger(__name__).warning("Delete document errors: %s", errors)
 
         self.reload_data()
 

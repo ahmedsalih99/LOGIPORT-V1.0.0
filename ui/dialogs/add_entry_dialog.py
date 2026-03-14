@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, cast
 from datetime import date as _date
 
 from PySide6.QtCore import Qt, QDate
+from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QLabel,
     QLineEdit, QComboBox, QTextEdit, QDateEdit, QPushButton, QTableWidget,
@@ -268,12 +269,17 @@ class AddEntryDialog(BaseDialog):
         r = self.table.rowCount()
         self.table.insertRow(r)
 
-        # material
-        cmb_mat = QComboBox()
-        cmb_mat.setFocusPolicy(Qt.ClickFocus)
-        cmb_mat.addItem(self._("choose"), None)
-        for m in self.materials:
-            cmb_mat.addItem(self._label(m), getattr(m, "id", None))
+        # material — searchable
+        cmb_mat = SearchableComboBox(parent=self.table)
+        lang = self._lang
+        cmb_mat.set_loader(
+            loader=lambda q="": [
+                m for m in self.materials
+                if not q or q.lower() in self._label(m).lower()
+            ],
+            display=lambda m, _lang: self._label(m),
+            value=lambda m: getattr(m, "id", None),
+        )
         self.table.setCellWidget(r, 0, cmb_mat)
 
         # packaging_type
@@ -305,15 +311,18 @@ class AddEntryDialog(BaseDialog):
         self.table.setCellWidget(r, 3, ds_net)
         self.table.setCellWidget(r, 4, ds_gross)
 
-        # mfg, exp
-        de_mfg = QDateEdit()
-        de_mfg.setFocusPolicy(Qt.ClickFocus)
-        de_mfg.setCalendarPopup(True)
-        de_mfg.setDisplayFormat("yyyy-MM-dd")
-        de_exp = QDateEdit()
-        de_exp.setFocusPolicy(Qt.ClickFocus)
-        de_exp.setCalendarPopup(True)
-        de_exp.setDisplayFormat("yyyy-MM-dd")
+        # mfg, exp — with empty option
+        def _make_date_edit():
+            de = QDateEdit()
+            de.setFocusPolicy(Qt.ClickFocus)
+            de.setCalendarPopup(True)
+            de.setDisplayFormat("yyyy-MM-dd")
+            de.setSpecialValueText("—")          # نص عند القيمة الدنيا = فارغ
+            de.setMinimumDate(QDate(2000, 1, 1)) # تاريخ "صفر" يعني لا تاريخ
+            de.setDate(de.minimumDate())          # افتراضي: فارغ
+            return de
+        de_mfg = _make_date_edit()
+        de_exp = _make_date_edit()
         self.table.setCellWidget(r, 5, de_mfg)
         self.table.setCellWidget(r, 6, de_exp)
 
@@ -344,17 +353,25 @@ class AddEntryDialog(BaseDialog):
             sp_count.setValue(int(preset.get("count") or 0))
             ds_net.setValue(float(preset.get("net_weight_kg") or 0))
             ds_gross.setValue(float(preset.get("gross_weight_kg") or 0))
-            if preset.get("mfg_date"):
-                y, m, d = str(preset["mfg_date"]).split("-")
-                de_mfg.setDate(QDate(int(y), int(m), int(d)))
-            if preset.get("exp_date"):
-                y, m, d = str(preset["exp_date"]).split("-")
-                de_exp.setDate(QDate(int(y), int(m), int(d)))
+            def _set_date(de, val):
+                if val:
+                    try:
+                        parts = str(val).split("-")
+                        if len(parts) == 3:
+                            de.setDate(QDate(int(parts[0]), int(parts[1]), int(parts[2])))
+                    except Exception:
+                        pass
+            _set_date(de_mfg, preset.get("mfg_date"))
+            _set_date(de_exp, preset.get("exp_date"))
             idx = cmb_country.findData(preset.get("origin_country_id"))
             if idx != -1:
                 cmb_country.setCurrentIndex(idx)
             le_batch.setText(preset.get("batch_no") or "")
             le_notes.setText(preset.get("notes") or "")
+
+        # Wheel blocker على كل widgets الصف
+        from ui.utils.wheel_blocker import block_wheel
+        block_wheel(cmb_pack, sp_count, ds_net, ds_gross, cmb_country, de_mfg, de_exp)
 
         # بعد إضافة صف جديد، زامن مقاسات محرراته فورًا
         self.table.setUpdatesEnabled(True)
@@ -458,10 +475,21 @@ class AddEntryDialog(BaseDialog):
         for r in range(self.table.rowCount()):
             de_mfg = self._dateedit(r, 5)
             de_exp = self._dateedit(r, 6)
-            mfg = _qdate_to_py(de_mfg.date()) if de_mfg.date().isValid() else None
-            exp = _qdate_to_py(de_exp.date()) if de_exp.date().isValid() else None
+            # التاريخ فارغ إذا كان عند minimumDate (special value)
+            mfg = (_qdate_to_py(de_mfg.date())
+                   if de_mfg.date().isValid() and de_mfg.date() != de_mfg.minimumDate()
+                   else None)
+            exp = (_qdate_to_py(de_exp.date())
+                   if de_exp.date().isValid() and de_exp.date() != de_exp.minimumDate()
+                   else None)
+            # material_id: SearchableComboBox or regular QComboBox
+            mat_widget = self.table.cellWidget(r, 0)
+            if hasattr(mat_widget, "current_value"):
+                mat_id = mat_widget.current_value()
+            else:
+                mat_id = self._cmb(r, 0).currentData()
             items.append({
-                "material_id":       self._cmb(r, 0).currentData(),
+                "material_id":       mat_id,
                 "packaging_type_id": self._cmb(r, 1).currentData(),
                 "count":             self._spin(r, 2).value(),
                 "net_weight_kg":     float(self._dspin(r, 3).value()),
@@ -495,4 +523,5 @@ class AddEntryDialog(BaseDialog):
                     ed.setProperty("variant", "entry")
 
     def _warn(self, msg):
+        block_wheel_in(self)
         self.show_warning("warning", msg)

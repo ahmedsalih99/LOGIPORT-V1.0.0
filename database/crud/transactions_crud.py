@@ -388,6 +388,15 @@ class TransactionsCRUD(BaseCRUD):
 
             s.commit()
             s.refresh(trx)
+            # Audit log
+            try:
+                self._audit(s, user_id=user_id, action="create",
+                            before=None,
+                            after={"id": trx.id, "transaction_no": trx.transaction_no,
+                                   "type": trx.transaction_type})
+                s.commit()
+            except Exception as _ae:
+                logger.warning("Audit log failed (non-critical): %s", _ae)
             return trx
 
     # ── Update (override) ────────────────────────────────────────────────

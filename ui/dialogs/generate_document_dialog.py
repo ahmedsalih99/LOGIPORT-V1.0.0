@@ -15,6 +15,7 @@ import os
 
 from PySide6.QtCore import Qt, QThread, Signal, QObject, QUrl, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QDesktopServices, QFont, QColor, QPalette
+from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QMessageBox, QProgressBar, QLineEdit, QFileDialog,
@@ -123,7 +124,7 @@ class _Worker(QObject):
 # =============================================================================
 # Results Dialog (محسّن بسيط)
 # =============================================================================
-class _ResultsDialog(QDialog):
+class _ResultsDialog(BaseDialog):
     def __init__(self, files, html_only, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_("generated_files"))
@@ -969,4 +970,5 @@ class GenerateDocumentDialog(_BaseDialog):
         if self._thread and self._thread.isRunning():
             QMessageBox.information(self, _("please_wait"),
                                     _("documents_are_being_generated_please_wait")); return
+        block_wheel_in(self)
         self.reject()

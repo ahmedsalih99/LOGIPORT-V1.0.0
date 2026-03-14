@@ -15,7 +15,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UpdateDialog(QDialog):
+from core.base_dialog import BaseDialog
+
+class UpdateDialog(BaseDialog):
     """
     نافذة التحديث.
     تُعرض عند اكتشاف إصدار أحدث.
@@ -26,7 +28,7 @@ class UpdateDialog(QDialog):
         self.update_info = update_info
         self._downloading = False
 
-        self.setWindowTitle("تحديث متاح — LOGIPORT")
+        self.setWindowTitle(self._("update_available_title"))
         self.setMinimumWidth(480)
         self.setModal(True)
 
@@ -34,11 +36,32 @@ class UpdateDialog(QDialog):
         self._apply_style()
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 20)
-        layout.setSpacing(16)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # ── العنوان ──────────────────────────────────────────────────────────
+        # ── Primary header ────────────────────────────────────────────────
+        hdr = QWidget()
+        hdr.setObjectName("form-dialog-header")
+        hl = QVBoxLayout(hdr)
+        hl.setContentsMargins(24, 18, 24, 14)
+        hl.setSpacing(4)
+        title_lbl = QLabel(self._("update_available_title"))
+        title_lbl.setObjectName("form-dialog-title")
+        from PySide6.QtGui import QFont as _QFont
+        f = _QFont(); f.setPointSize(13); f.setBold(True); title_lbl.setFont(f)
+        hl.addWidget(title_lbl)
+        root.addWidget(hdr)
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("form-dialog-sep"); sep.setFixedHeight(1)
+        root.addWidget(sep)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(24, 18, 24, 20)
+        layout.setSpacing(16)
+        root.addLayout(layout)
+        root.addStretch()
+
+        # ── المحتوى ───────────────────────────────────────────────────────
         title = QLabel("🎉  يتوفر إصدار جديد من LOGIPORT")
         title.setFont(QFont("Tajawal", 14, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
@@ -74,7 +97,7 @@ class UpdateDialog(QDialog):
         self._progress.setValue(0)
         self._progress.setVisible(False)
         self._progress.setTextVisible(True)
-        self._progress.setFormat("جاري التنزيل... %p%")
+        self._progress.setFormat(self._("update_downloading"))
         layout.addWidget(self._progress)
 
         self._status_lbl = QLabel("")
@@ -91,7 +114,7 @@ class UpdateDialog(QDialog):
         self._btn_later.clicked.connect(self.reject)
         btn_row.addWidget(self._btn_later)
 
-        self._btn_update = QPushButton("تحديث الآن ⬇")
+        self._btn_update = QPushButton(self._("update_now_btn"))
         self._btn_update.setMinimumHeight(36)
         self._btn_update.setDefault(True)
         self._btn_update.clicked.connect(self._start_download)
@@ -183,7 +206,7 @@ class UpdateDialog(QDialog):
             )
 
     def _show_success(self):
-        self._status_lbl.setText("✅ تم التنزيل. سيبدأ التثبيت تلقائياً...")
+        self._status_lbl.setText(self._("update_done"))
         self._status_lbl.setVisible(True)
         self._progress.setValue(100)
         # أغلق النافذة بعد ثانيتين

@@ -1,2 +1,1 @@
-# __init__.py
-# TODO: implement logic
+# -*- coding: utf-8 -*-

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialogButtonBox
 )
 from PySide6.QtGui import QGuiApplication
+from ui.utils.wheel_blocker import block_wheel_in
 
 from database.crud.countries_crud import CountriesCRUD
 
@@ -210,6 +211,7 @@ class AddCompanyDialog(BaseDialog):
             name = _name_by_lang(c, self._lang) or code
             label = f"{name} ({code})" if code and code not in name else name or f"#{cid}"
             self.cmb_currency.addItem(label, cid)
+        block_wheel_in(self)
 
     def _fill_countries(self):
         self.cmb_country.clear()

@@ -46,7 +46,9 @@ def _has_webengine() -> bool:
         return False
 
 
-class PdfPreviewDialog(QDialog):
+from core.base_dialog import BaseDialog
+
+class PdfPreviewDialog(BaseDialog):
     """
     نافذة معاينة مستند داخلية.
 
@@ -103,7 +105,7 @@ class PdfPreviewDialog(QDialog):
 
         # ── شريط الأدوات ───────────────────────────────────────────────────
         toolbar = QWidget()
-        toolbar.setObjectName("preview-toolbar")
+        toolbar.setObjectName("form-dialog-header")
         toolbar.setFixedHeight(52)
         bar = QHBoxLayout(toolbar)
         bar.setContentsMargins(16, 8, 16, 8)
@@ -196,9 +198,10 @@ class PdfPreviewDialog(QDialog):
             bg = "#FFFFFF"; toolbar_bg = "#F8F9FA"; border = "#E0E0E0"
 
         self.setStyleSheet(f"""
-            QWidget#preview-toolbar {{
-                background: {toolbar_bg};
-                border-bottom: 1px solid {border};
+            /* toolbar now uses form-dialog-header CSS from theme */
+            QLabel#form-dialog-title {{
+                color: #ffffff;
+                font-weight: 700;
             }}
             QProgressBar#loading-bar {{
                 border: none;

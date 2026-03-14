@@ -36,6 +36,7 @@ class Task(Base):
     # الربط بالكيانات
     assigned_to_id   = Column(Integer, ForeignKey("users.id",         ondelete="SET NULL"), nullable=True, index=True)
     created_by_id    = Column(Integer, ForeignKey("users.id",         ondelete="SET NULL"), nullable=True)
+    updated_by_id    = Column(Integer, ForeignKey("users.id",         ondelete="SET NULL"), nullable=True)
     transaction_id   = Column(Integer, ForeignKey("transactions.id",  ondelete="SET NULL"), nullable=True, index=True)
     container_id     = Column(Integer, ForeignKey("container_tracking.id", ondelete="SET NULL"), nullable=True, index=True)
     client_id        = Column(Integer, ForeignKey("clients.id",       ondelete="SET NULL"), nullable=True, index=True)
@@ -43,6 +44,7 @@ class Task(Base):
     # Relationships
     assigned_to  = relationship("User", foreign_keys=[assigned_to_id], lazy="joined")
     created_by   = relationship("User", foreign_keys=[created_by_id],  lazy="joined")
+    updated_by   = relationship("User", foreign_keys="[Task.updated_by_id]", lazy="select")
     transaction  = relationship("Transaction", foreign_keys=[transaction_id], lazy="select")
     client       = relationship("Client",      foreign_keys=[client_id],      lazy="select")
 

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialogButtonBox
 )
 from PySide6.QtGui import QGuiApplication
+from ui.utils.wheel_blocker import block_wheel_in
 try:
     from database.models import get_session_local
 except Exception:
@@ -42,6 +43,7 @@ class AddPricingDialog(BaseDialog):
 
         self.set_translated_title("add_pricing" if pricing is None else "edit_pricing")
         self.init_ui()
+        block_wheel_in(self)
 
     def init_ui(self):
         self.setSizeGripEnabled(True)

@@ -253,6 +253,10 @@ class BaseDialog(QDialog):
         # Ctrl+S → حفظ (إذا كان الـ dialog فيه زر حفظ)
         QShortcut(QKeySequence("Ctrl+S"), self, self._on_save_shortcut)
 
+        # Enter navigation + keyboard switch — يُثبَّت بعد بناء الـ UI
+        # يُستدعى تلقائياً من showEvent إذا لم يُستدعَ مسبقاً
+        self._field_ux_installed = False
+
     def _on_escape(self) -> None:
         """Escape يُغلق الـ dialog فقط إذا لم يكن الـ focus على QLineEdit أو QComboBox."""
         from PySide6.QtWidgets import QLineEdit, QComboBox, QAbstractSpinBox, QTextEdit, QPlainTextEdit
@@ -446,6 +450,15 @@ class BaseDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
 
+        # تثبيت Enter navigation + keyboard switch (مرة واحدة فقط)
+        if not getattr(self, "_field_ux_installed", False):
+            try:
+                from ui.utils.field_navigation import setup_field_ux
+                setup_field_ux(self)
+                self._field_ux_installed = True
+            except Exception:
+                pass
+
         # استعادة الحجم والموقع بعد اكتمال بناء الـ UI
         self._restore_geometry()
 
@@ -463,6 +476,59 @@ class BaseDialog(QDialog):
 
         self.log_event("Dialog opened")
         self.dialog_opened.emit()
+
+
+    def _build_primary_header(self, title: str = "", subtitle: str = "") -> "QWidget":
+        """
+        يبني header بالنمط المعتمد: خلفية بلون primary + نص أبيض.
+        يُستخدم في dialogs التي لا ترث FormDialog.
+        """
+        from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
+        from PySide6.QtGui import QFont
+        header = QWidget()
+        header.setObjectName("form-dialog-header")
+        lay = QVBoxLayout(header)
+        lay.setContentsMargins(24, 18, 24, 14)
+        lay.setSpacing(3)
+        if title:
+            lbl = QLabel(title)
+            lbl.setObjectName("form-dialog-title")
+            f = QFont()
+            f.setPointSize(13)
+            f.setWeight(QFont.Bold)
+            lbl.setFont(f)
+            lay.addWidget(lbl)
+            self._primary_header_title_lbl = lbl
+        if subtitle:
+            sub = QLabel(subtitle)
+            sub.setObjectName("form-dialog-subtitle")
+            lay.addWidget(sub)
+            self._primary_header_subtitle_lbl = sub
+        sep = QFrame()
+        sep.setObjectName("form-dialog-sep")
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFixedHeight(1)
+        return header, sep
+    def keyPressEvent(self, event) -> None:
+        """Intercept Enter at dialog level — navigate to next field."""
+        from PySide6.QtCore import Qt
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            focused = QApplication.focusWidget()
+            from PySide6.QtWidgets import QLineEdit, QAbstractSpinBox, QDateEdit, QPlainTextEdit
+            # QPlainTextEdit/QTextEdit: allow normal Enter
+            if isinstance(focused, QPlainTextEdit):
+                super().keyPressEvent(event)
+                return
+            # For all other inputs: navigate to next field
+            if isinstance(focused, (QLineEdit, QAbstractSpinBox, QDateEdit)):
+                mods = event.modifiers()
+                if mods & Qt.KeyboardModifier.ShiftModifier:
+                    self.focusPreviousChild()
+                else:
+                    self.focusNextChild()
+                return  # Don't pass to default button
+        super().keyPressEvent(event)
 
     def closeEvent(self, event):
         self._save_geometry()

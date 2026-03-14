@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QComboBox, QLabel, QSizePolicy, QScrollArea
 )
 from PySide6.QtCore import Qt
+from ui.utils.wheel_blocker import block_wheel_in
 
 from database.models import get_session_local, Country, DeliveryMethod
 from ui.widgets.searchable_combo import SearchableComboBox

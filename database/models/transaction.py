@@ -77,9 +77,9 @@ class Transaction(Base):
     office_id = Column(Integer, ForeignKey("offices.id", ondelete="RESTRICT"), nullable=True, index=True)
 
     # Audit
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships

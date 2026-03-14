@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from core.base_dialog import BaseDialog
 from core.translator import TranslationManager
+from ui.utils.wheel_blocker import block_wheel_in
 
 from PySide6.QtWidgets import (
     QVBoxLayout, QLineEdit, QLabel, QPushButton, QHBoxLayout, QMessageBox, QComboBox
@@ -176,3 +177,4 @@ class AddMaterialDialog(BaseDialog):
             return
 
         super().accept()
+        block_wheel_in(self)

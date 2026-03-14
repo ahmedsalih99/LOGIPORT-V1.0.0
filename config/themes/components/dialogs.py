@@ -268,16 +268,22 @@ QDialog QLineEdit:focus {{
     /* ========== FORM DIALOG ========== */
 
     QWidget#form-dialog-header {{
-        background: {c["bg_card"]};
+        background: qlineargradient(
+            x1: 0, y1: 0, x2: 1, y2: 0,
+            stop: 0 {c["primary"]},
+            stop: 1 {c["primary_hover"]}
+        );
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
     }}
 
     QLabel#form-dialog-title {{
-        color: {c["text_primary"]};
+        color: #ffffff;
         font-weight: 700;
     }}
 
     QLabel#form-dialog-subtitle {{
-        color: {c["text_secondary"]};
+        color: rgba(255, 255, 255, 0.82);
         font-weight: 500;
     }}
 
@@ -292,7 +298,7 @@ QDialog QLineEdit:focus {{
     }}
 
     QFrame#form-dialog-sep {{
-        background: {c["border_subtle"]};
+        background: rgba(255, 255, 255, 0.25);
         border: none;
     }}
 
