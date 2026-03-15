@@ -259,20 +259,28 @@ class _AvatarWidget(QLabel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ActivityItem(QFrame):
-    _ACTION_META = {
-        "create": ("#10B981", "＋"),
-        "insert": ("#10B981", "＋"),
-        "update": ("#F59E0B", "✎"),
-        "delete": ("#EF4444", "✕"),
-        "export": ("#6366F1", "↗"),
-        "import": ("#8B5CF6", "↙"),
-        "print":  ("#3B82F6", "⎙"),
-    }
+    @staticmethod
+    def _get_action_meta():
+        """ألوان أحداث النشاط — تقرأ من الثيم."""
+        try:
+            from core.theme_manager import ThemeManager
+            c = ThemeManager.get_instance().current_theme.colors
+        except Exception:
+            c = {}
+        return {
+            "create": (c.get("success",       "#10B981"), "＋"),
+            "insert": (c.get("success",       "#10B981"), "＋"),
+            "update": (c.get("warning",       "#F59E0B"), "✎"),
+            "delete": (c.get("danger",        "#EF4444"), "✕"),
+            "export": (c.get("accent_indigo", "#6366F1"), "↗"),
+            "import": (c.get("accent_violet", "#8B5CF6"), "↙"),
+            "print":  (c.get("primary",       "#3B82F6"), "⎙"),
+        }
 
     def __init__(self, action: str, table: str, timestamp: str, is_last=False, parent=None):
         super().__init__(parent)
         action_l = (action or "update").lower()
-        accent, symbol = self._ACTION_META.get(action_l, ("#64748B", "●"))
+        accent, symbol = self._get_action_meta().get(action_l, ("#64748B", "●"))
 
         self.setObjectName("activity-row")
         self.setStyleSheet("QFrame#activity-row { background: transparent; }")
@@ -460,13 +468,13 @@ class UserProfileTab(QWidget):
         right.setAlignment(Qt.AlignTop)
 
         self._online_badge = QLabel("● متصل")
-        self._online_badge.setStyleSheet("""
-            color: #6EE7B7;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-            padding: 3px 10px;
-            font-size: 11px;
-        """)
+        self._online_badge.setStyleSheet(
+            "color: #6EE7B7;"
+            " background: rgba(0,0,0,0.2);"
+            " border-radius: 10px;"
+            " padding: 3px 10px;"
+            " font-size: 11px;"
+        )
         right.addWidget(self._online_badge)
 
         self._btn_avatar_hero = QPushButton("📷  " + self._("change_avatar"))
@@ -695,13 +703,20 @@ class UserProfileTab(QWidget):
         has_digit = any(c.isdigit() for c in text)
         has_sym   = any(c in "!@#$%^&*" for c in text)
         score = sum([n >= 6, n >= 10, has_upper, has_digit, has_sym])
-        colors = ["#EF4444", "#F97316", "#F59E0B", "#84CC16", "#10B981"]
+        try:
+            from core.theme_manager import ThemeManager
+            _tc = ThemeManager.get_instance().current_theme.colors
+        except Exception:
+            _tc = {}
+        _colors = [_tc.get("chart_red","#EF4444"), _tc.get("chart_orange","#F97316"),
+                   _tc.get("chart_yellow","#F59E0B"), _tc.get("chart_lime","#84CC16"),
+                   _tc.get("chart_green","#10B981")]
         widths = [20, 40, 60, 80, 100]
-        c = colors[min(score, 4)] if text else "#E2E8F0"
+        _bar_color = _colors[min(score, 4)] if text else "#E2E8F0"
         w = widths[min(score, 4)] if text else 100
         self._strength_bar.setStyleSheet(f"""
             background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 {c}, stop:{w/100:.2f} {c}, stop:{w/100+0.01:.2f} #E2E8F0, stop:1 #E2E8F0);
+                stop:0 {_bar_color}, stop:{w/100:.2f} {_bar_color}, stop:{w/100+0.01:.2f} #E2E8F0, stop:1 #E2E8F0);
             border-radius: 2px;
         """)
 
@@ -877,7 +892,12 @@ class UserProfileTab(QWidget):
     def _flash_success(self, btn: QPushButton):
         """وميض أخضر لمدة 1.5 ثانية على الزر عند النجاح."""
         original = btn.styleSheet()
-        btn.setStyleSheet("background: #10B981; color: white; border-radius: 8px;")
+        try:
+            from core.theme_manager import ThemeManager
+            _success = ThemeManager.get_instance().current_theme.colors.get('success', '#10B981')
+        except Exception:
+            _success = '#10B981'
+        btn.setStyleSheet(f"background: {_success}; color: white; border-radius: 8px;")
         btn.setText("✓  " + self._("success"))
         def _restore():
             btn.setStyleSheet(original)

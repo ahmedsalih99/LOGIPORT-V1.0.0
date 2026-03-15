@@ -14,7 +14,6 @@ from PySide6.QtGui     import QWheelEvent
 
 from core.translator import TranslationManager
 
-# مدة الـ debounce بالملي ثانية — تمنع استدعاء loader عند كل ضغطة مفتاح
 _DEBOUNCE_MS = 250
 
 
@@ -32,19 +31,19 @@ class SearchableComboBox(QComboBox):
 
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
-        self.setMaxVisibleItems(10)
+        self.setMaxVisibleItems(12)
         self.lineEdit().setObjectName("search-field")
         self.lineEdit().setClearButtonEnabled(True)
 
-        # completer يعرض النتائج فقط - بدون فلترة إضافية (الـ loader يفلتر)
+        # completer بدون فلترة — الـ loader يفلتر، الـ completer يعرض فقط
         self._str_model = QStringListModel()
         self._completer = QCompleter(self._str_model, self)
         self._completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
         self._completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self._completer.setMaxVisibleItems(10)
+        self._completer.setMaxVisibleItems(12)
         self.setCompleter(self._completer)
 
-        # Debounce timer — ينتظر قبل استدعاء loader
+        # Debounce timer
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(_DEBOUNCE_MS)
@@ -90,22 +89,31 @@ class SearchableComboBox(QComboBox):
 
     def eventFilter(self, obj, event):
         if obj is self.lineEdit() and event.type() == QEvent.FocusIn:
-            if self._str_model.rowCount() > 0:
-                self._completer.complete()
+            # عند الـ focus: أظهر النتائج بعد لحظة قصيرة
+            # singleShot(0) ينتظر انتهاء حدث الـ FocusIn ثم يُظهر الـ popup
+            QTimer.singleShot(50, self._show_popup_if_ready)
         return super().eventFilter(obj, event)
 
     # ── INTERNAL ──────────────────────────────────────────────────────────
 
+    def _show_popup_if_ready(self):
+        """يُظهر الـ popup إذا كان فيه بيانات والـ widget لا يزال focused."""
+        if not self.lineEdit().hasFocus():
+            return
+        if self._str_model.rowCount() > 0:
+            self._completer.complete()
+        elif self._loader:
+            # البيانات لم تُحمَّل بعد — اجلبها الآن ثم أظهر
+            self._fetch_and_fill("", show_popup_after=True)
+
     def _on_text_edited(self, text: str):
         if self._loading:
             return
-        # Debounce: انتظر _DEBOUNCE_MS قبل الاستدعاء
         self._pending_query = text.strip()
         self._debounce.start()
 
     def _do_fetch(self):
-        """يُستدعى بعد انقضاء الـ debounce."""
-        self._fetch_and_fill(self._pending_query)
+        self._fetch_and_fill(self._pending_query, show_popup_after=True)
 
     def _on_activated(self, text: str):
         self._loading = True
@@ -117,7 +125,7 @@ class SearchableComboBox(QComboBox):
             pass
         self._loading = False
 
-    def _fetch_and_fill(self, q: str):
+    def _fetch_and_fill(self, q: str, show_popup_after: bool = False):
         if not self._loader:
             return
 
@@ -153,6 +161,10 @@ class SearchableComboBox(QComboBox):
         self.lineEdit().setText(q)
         self.lineEdit().blockSignals(False)
         self._loading = False
+
+        # أظهر الـ popup بعد تحديث البيانات
+        if show_popup_after and self.lineEdit().hasFocus() and labels:
+            QTimer.singleShot(0, self._completer.complete)
 
 
 class _Placeholder:

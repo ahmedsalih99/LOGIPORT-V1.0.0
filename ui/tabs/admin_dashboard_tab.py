@@ -359,9 +359,16 @@ class AdminDashboardTab(QWidget):
             "clients":      "table_clients",      "users":    "table_users",
             "documents":    "table_documents",    "entries":  "table_entries",
         }
+        try:
+            from core.theme_manager import ThemeManager as _TM
+            _tc = _TM.get_instance().current_theme.colors
+        except Exception:
+            _tc = {}
         COLOR_MAP = {
-            "create": "#2ECC71", "insert": "#2ECC71",
-            "update": "#F39C12", "delete": "#E74C3C",
+            "create": _tc.get("success",  "#2ECC71"),
+            "insert": _tc.get("success",  "#2ECC71"),
+            "update": _tc.get("warning",  "#F39C12"),
+            "delete": _tc.get("danger",   "#E74C3C"),
         }
 
         try:

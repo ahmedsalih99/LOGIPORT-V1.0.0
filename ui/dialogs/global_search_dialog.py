@@ -98,6 +98,11 @@ class GlobalSearchDialog(BaseDialog):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
+        # ── Primary header ───────────────────────────────────────
+        _hdr, _sep = self._build_primary_header(self.windowTitle())
+        outer.addWidget(_hdr)
+        outer.addWidget(_sep)
+
         self.card = QFrame()
         self.card.setObjectName("search-card")
         card_lay = QVBoxLayout(self.card)
@@ -399,7 +404,7 @@ class GlobalSearchDialog(BaseDialog):
             header = QListWidgetItem(f"  {icon}  {label}")
             header.setFlags(Qt.NoItemFlags)
             header.setFont(QFont("Tajawal", 9, QFont.Bold))
-            header.setForeground(QColor("#6B7280"))
+            header.setForeground(QColor(c.get("text_muted", "#6B7280")))
             self.results_list.addItem(header)
 
             for r in entity_results:

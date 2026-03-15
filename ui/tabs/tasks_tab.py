@@ -25,18 +25,44 @@ from PySide6.QtWidgets import (
 from core.translator import TranslationManager
 from core.data_bus import DataBus
 
-_PRIORITY_COLORS = {
-    "urgent": ("#FEF2F2", "#DC2626"),  # bg, badge
-    "high":   ("#FFFBEB", "#D97706"),
-    "medium": ("#EFF6FF", "#2563EB"),
-    "low":    ("#F9FAFB", "#6B7280"),
-}
-_STATUS_BADGE = {
-    "pending":     ("#FEF3C7", "#92400E"),
-    "in_progress": ("#DBEAFE", "#1E40AF"),
-    "done":        ("#D1FAE5", "#065F46"),
-    "cancelled":   ("#F3F4F6", "#6B7280"),
-}
+def _get_priority_colors():
+    """ألوان الأولوية — تتكيف مع الثيم."""
+    try:
+        from core.theme_manager import ThemeManager
+        c = ThemeManager.get_instance().current_theme.colors
+        return {
+            "urgent": (c.get("danger_light",   "#FEF2F2"), c.get("danger",         "#DC2626")),
+            "high":   (c.get("warning_light",  "#FFFBEB"), c.get("warning",        "#D97706")),
+            "medium": (c.get("primary_lighter","#EFF6FF"), c.get("primary",        "#2563EB")),
+            "low":    (c.get("bg_disabled",    "#F9FAFB"), c.get("text_muted",     "#6B7280")),
+        }
+    except Exception:
+        return {
+            "urgent": ("#FEF2F2", "#DC2626"),
+            "high":   ("#FFFBEB", "#D97706"),
+            "medium": ("#EFF6FF", "#2563EB"),
+            "low":    ("#F9FAFB", "#6B7280"),
+        }
+_PRIORITY_COLORS = _get_priority_colors()  # initial load
+def _get_status_badge():
+    """ألوان بادجات الحالة — تتكيف مع الثيم."""
+    try:
+        from core.theme_manager import ThemeManager
+        c = ThemeManager.get_instance().current_theme.colors
+        return {
+            "pending":     (c.get("warning_light",  "#FEF3C7"), c.get("warning_active",  "#92400E")),
+            "in_progress": (c.get("primary_light",  "#DBEAFE"), c.get("primary_active",  "#1E40AF")),
+            "done":        (c.get("success_light",  "#D1FAE5"), c.get("success_active",  "#065F46")),
+            "cancelled":   (c.get("bg_disabled",    "#F3F4F6"), c.get("text_muted",      "#6B7280")),
+        }
+    except Exception:
+        return {
+            "pending":     ("#FEF3C7", "#92400E"),
+            "in_progress": ("#DBEAFE", "#1E40AF"),
+            "done":        ("#D1FAE5", "#065F46"),
+            "cancelled":   ("#F3F4F6", "#6B7280"),
+        }
+_STATUS_BADGE = _get_status_badge()  # initial load
 
 
 class TasksTab(QWidget):
@@ -65,6 +91,11 @@ class TasksTab(QWidget):
         TranslationManager.get_instance().language_changed.connect(self._retranslate)
         self._build_ui()
         self._load()
+        try:
+            from core.theme_manager import ThemeManager
+            ThemeManager.get_instance().theme_changed.connect(lambda _: self._load())
+        except Exception:
+            pass
 
     # ─── Permissions ─────────────────────────────────────────────────────────
 
@@ -210,7 +241,7 @@ class TasksTab(QWidget):
 
         for ri, task in enumerate(page_rows):
             pri = getattr(task, "priority", "medium")
-            bg_hex, _ = _PRIORITY_COLORS.get(pri, ("#FFFFFF", "#6B7280"))
+            bg_hex, _ = _get_priority_colors().get(pri, ("#FFFFFF", "#6B7280"))
 
             # عنوان
             t_item = QTableWidgetItem(getattr(task, "title", ""))
@@ -412,54 +443,21 @@ class _FilterBar(QWidget):
             btn = QPushButton(self._(key))
             btn.setCheckable(True)
             btn.setChecked(code == "all")
-            btn.setObjectName("filter-chip")
+            btn.setObjectName("stats-filter-btn")
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda _, c=code: self._set_active(c))
             self._btns[code] = btn
             lay.addWidget(btn)
         lay.addStretch()
-        self._apply_style()
+        self._refresh_btn_text()
+        # تحديث عند تغيير الثيم
 
     def _set_active(self, code: str):
         self._active = code
         for c, btn in self._btns.items():
             btn.setChecked(c == code)
-        self._apply_style()
         self.filter_changed.emit(code)
 
-    def _apply_style(self):
-        try:
-            from core.theme_manager import ThemeManager
-            c = ThemeManager.get_instance().current_theme.colors
-            pri = c.get("primary", "#2563EB")
-            bdr = c.get("border",  "#E0E0E0")
-            txt = c.get("text_primary", "#111827")
-        except Exception:
-            pri, bdr, txt = "#2563EB", "#E0E0E0", "#111827"
-
-        for code, btn in self._btns.items():
-            cnt = self._counts.get(code, "")
-            label_key = dict(self._FILTERS).get(code, code)
-            label = self._(label_key)
-            btn.setText(f"{label}  {cnt}".strip())
-            if code == self._active:
-                color = "#DC2626" if code == "overdue" else pri
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background: {color}; color: white;
-                        border: none; border-radius: 14px;
-                        padding: 4px 14px; font-weight: 600; font-size: 12px;
-                    }}
-                """)
-            else:
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background: transparent; color: {txt};
-                        border: 1px solid {bdr}; border-radius: 14px;
-                        padding: 4px 14px; font-weight: 500; font-size: 12px;
-                    }}
-                    QPushButton:hover {{ border-color: {pri}; color: {pri}; }}
-                """)
 
     def update_counts(self, crud):
         """تحديث عدادات كل فلتر."""
@@ -478,8 +476,17 @@ class _FilterBar(QWidget):
             }
         except Exception:
             self._counts = {}
-        self._apply_style()
+        # تحديث نص الأزرار
+        self._refresh_btn_text()
+
+    def _refresh_btn_text(self):
+        """تحديث نص الأزرار بالعداد الحالي."""
+        for code, btn in self._btns.items():
+            label_key = dict(self._FILTERS).get(code, code)
+            label = self._(label_key)
+            cnt = self._counts.get(code, "")
+            btn.setText(f"{label}  {cnt}".strip())
 
     def retranslate(self):
         self._ = TranslationManager.get_instance().translate
-        self._apply_style()
+        self._refresh_btn_text()

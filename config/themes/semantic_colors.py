@@ -116,6 +116,33 @@ class SemanticColors:
 
             # ========== Inputs ==========
             "input_bg": "#FFFFFF",
+
+            # ========== Extended Accent Colors ==========
+            "accent_indigo":       "#6366F1",   # export / booked status
+            "accent_violet":       "#8B5CF6",   # import
+            "accent_purple":       "#7C3AED",   # arrived status
+            "accent_cyan":         "#0891B2",   # loaded status
+
+            # ========== Status Colors (container timeline) ==========
+            "status_booked":       "#6366F1",
+            "status_loaded":       "#0891B2",
+            "status_in_transit":   "#2563EB",
+            "status_arrived":      "#7C3AED",
+            "status_customs":      "#D97706",
+            "status_delivered":    "#059669",
+            "status_hold":         "#DC2626",
+
+            # ========== Progress / Chart Colors ==========
+            "chart_red":           "#EF4444",
+            "chart_orange":        "#F97316",
+            "chart_yellow":        "#F59E0B",
+            "chart_lime":          "#84CC16",
+            "chart_green":         "#10B981",
+            "chart_green_light":   "#6EE7B7",
+
+            # ========== Background aliases (legacy support) ==========
+            "background":          "#F8FAFC",
+            "surface":             "#FFFFFF",
         }
 
     @staticmethod
@@ -221,6 +248,33 @@ class SemanticColors:
 
             # ========== Inputs ==========
             "input_bg": "#1e2430",
+
+            # ========== Extended Accent Colors ==========
+            "accent_indigo":       "#818CF8",
+            "accent_violet":       "#A78BFA",
+            "accent_purple":       "#9061F9",
+            "accent_cyan":         "#22D3EE",
+
+            # ========== Status Colors ==========
+            "status_booked":       "#818CF8",
+            "status_loaded":       "#22D3EE",
+            "status_in_transit":   "#60A5FA",
+            "status_arrived":      "#9061F9",
+            "status_customs":      "#FCD34D",
+            "status_delivered":    "#34D399",
+            "status_hold":         "#F87171",
+
+            # ========== Progress / Chart Colors ==========
+            "chart_red":           "#F87171",
+            "chart_orange":        "#FB923C",
+            "chart_yellow":        "#FCD34D",
+            "chart_lime":          "#A3E635",
+            "chart_green":         "#34D399",
+            "chart_green_light":   "#6EE7B7",
+
+            # ========== Background aliases ==========
+            "background":          "#111827",
+            "surface":             "#1F2937",
         }
 
     @classmethod

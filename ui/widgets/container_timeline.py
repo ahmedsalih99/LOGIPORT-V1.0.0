@@ -25,14 +25,51 @@ from core.translator import TranslationManager
 
 # ── ترتيب المراحل وبياناتها ──────────────────────────────────────────────────
 
+
+
+def _stage_color(key: str) -> str:
+    """Returns theme-aware color for container status stage."""
+    _DEFAULTS = {
+        "booked":     "#6366F1",
+        "loaded":     "#0891B2",
+        "in_transit": "#2563EB",
+        "arrived":    "#7C3AED",
+        "customs":    "#D97706",
+        "delivered":  "#059669",
+        "hold":       "#DC2626",
+    }
+    try:
+        from core.theme_manager import ThemeManager
+        c = ThemeManager.get_instance().current_theme.colors
+        _KEY_MAP = {
+            "booked":     "status_booked",
+            "loaded":     "status_loaded",
+            "in_transit": "status_in_transit",
+            "arrived":    "status_arrived",
+            "customs":    "status_customs",
+            "delivered":  "status_delivered",
+            "hold":       "status_hold",
+        }
+        return c.get(_KEY_MAP.get(key, key), _DEFAULTS.get(key, "#888"))
+    except Exception:
+        return _DEFAULTS.get(key, "#888")
+
+
+def _get_theme_color(key: str, default: str = "#888") -> str:
+    try:
+        from core.theme_manager import ThemeManager
+        return ThemeManager.get_instance().current_theme.colors.get(key, default)
+    except Exception:
+        return default
+
 STAGES = [
-    {"key": "booked",     "icon": "📋", "color": "#6366F1", "date_attr": None},
-    {"key": "loaded",     "icon": "📦", "color": "#0891B2", "date_attr": "etd"},
-    {"key": "in_transit", "icon": "🚢", "color": "#2563EB", "date_attr": "atd"},
-    {"key": "arrived",    "icon": "⚓", "color": "#7C3AED", "date_attr": "ata"},
-    {"key": "customs",    "icon": "🏛", "color": "#D97706", "date_attr": "customs_date"},
-    {"key": "delivered",  "icon": "✅", "color": "#059669", "date_attr": "delivery_date"},
-    {"key": "hold",       "icon": "⚠",  "color": "#DC2626", "date_attr": None},
+    {"key": "booked",     "icon": "📋", "color": _stage_color("booked"),     "date_attr": None},
+    {"key": "loaded",     "icon": "📦", "color": _stage_color("loaded"),     "date_attr": "etd"},
+    {"key": "in_transit", "icon": "🚢", "color": _stage_color("in_transit"), "date_attr": "atd"},
+    {"key": "arrived",    "icon": "⚓", "color": _stage_color("arrived"),    "date_attr": "ata"},
+    {"key": "customs",    "icon": "🏛", "color": _stage_color("customs"),    "date_attr": "customs_date"},
+    {"key": "delivered",  "icon": "✅", "color": _stage_color("delivered"),  "date_attr": "delivery_date"},
+    {"key": "hold",       "icon": "⚠",  "color": _stage_color("hold"),       "date_attr": None},
 ]
 
 _STATUS_ORDER = {s["key"]: i for i, s in enumerate(STAGES)}
@@ -99,7 +136,7 @@ class _StageNode(QWidget):
         name_font.setBold(self._state == "current")
         name_lbl.setFont(name_font)
         if self._state == "pending":
-            name_lbl.setStyleSheet("color: #9CA3AF;")
+            name_lbl.setStyleSheet(f"color: {_get_theme_color('text_disabled', '#9CA3AF')};")
         elif self._state == "current":
             name_lbl.setStyleSheet(f"color: {self._stage['color']}; font-weight: bold;")
         v.addWidget(name_lbl)
@@ -110,7 +147,7 @@ class _StageNode(QWidget):
             date_lbl.setAlignment(Qt.AlignHCenter)
             date_font = QFont("Tajawal", 7)
             date_lbl.setFont(date_font)
-            date_lbl.setStyleSheet("color: #6B7280;")
+            date_lbl.setStyleSheet(f"color: {_get_theme_color('text_muted', '#6B7280')};")
             v.addWidget(date_lbl)
 
 
@@ -136,8 +173,8 @@ class _CircleWidget(QWidget):
 
         if self._state == "pending":
             # دائرة رمادية فارغة
-            p.setPen(QPen(QColor("#D1D5DB"), 2))
-            p.setBrush(QBrush(QColor("#F9FAFB")))
+            p.setPen(QPen(QColor(_get_theme_color("border_subtle", "#D1D5DB")), 2))
+            p.setBrush(QBrush(QColor(_get_theme_color("bg_main", "#F9FAFB"))))
             p.drawEllipse(QPointF(cx, cy), r, r)
         elif self._state == "completed":
             # دائرة ممتلئة بلون المرحلة
@@ -197,7 +234,7 @@ class _ConnectorLine(QWidget):
         if self._completed:
             p.setPen(QPen(self._color, 3))
         else:
-            p.setPen(QPen(QColor("#D1D5DB"), 2, Qt.DashLine))
+            p.setPen(QPen(QColor(_get_theme_color("border_subtle", "#D1D5DB")), 2, Qt.DashLine))
         p.drawLine(0, cy, self.width(), cy)
         p.end()
 
@@ -279,7 +316,7 @@ class ContainerTimeline(QWidget):
             # خط وصل (ما عدا بعد آخر مرحلة)
             if i < len(display_stages) - 1:
                 line_completed = (not is_hold) and stage_idx < current_idx
-                line_color     = stage["color"] if line_completed else "#D1D5DB"
+                line_color     = stage["color"] if line_completed else _get_theme_color("border_subtle", "#D1D5DB")
                 connector = _ConnectorLine(line_completed, line_color, self)
                 row.addWidget(connector, 0)
 
@@ -289,7 +326,7 @@ class ContainerTimeline(QWidget):
         if is_hold:
             hold_lbl = QLabel(f"⚠️  {self._('container_status_hold')}")
             hold_lbl.setStyleSheet(
-                "color: #DC2626; background: #FEE2E2; border-radius: 6px;"
+                f"color: {_get_theme_color('status_hold', '#DC2626')}; background: {_get_theme_color('danger_light', '#FEE2E2')}; border-radius: 6px;"
                 "padding: 6px 12px; font-weight: bold;"
             )
             hold_lbl.setAlignment(Qt.AlignCenter)
