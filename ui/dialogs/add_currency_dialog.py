@@ -6,7 +6,7 @@ class AddCurrencyDialog(FormDialog):
     def __init__(self, parent=None, currency=None):
         self.currency = currency
         title_key = "add_currency" if currency is None else "edit_currency"
-        super().__init__(parent, title_key=title_key, min_width=420)
+        super().__init__(parent, title_key=title_key, min_width=420, icon="💱", icon_bg="#F0FDF4")
         self._build_form()
         if currency:
             self._populate(currency)

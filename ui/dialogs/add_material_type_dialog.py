@@ -6,7 +6,7 @@ class AddMaterialTypeDialog(FormDialog):
     def __init__(self, parent=None, material_type=None):
         self.material_type = material_type
         title_key = "add_material_type" if material_type is None else "edit_material_type"
-        super().__init__(parent, title_key=title_key, min_width=420)
+        super().__init__(parent, title_key=title_key, min_width=420, icon="🏷️", icon_bg="#FFF7ED")
         self._build_form()
         if material_type:
             self._populate(material_type)

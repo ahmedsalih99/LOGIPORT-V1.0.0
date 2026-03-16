@@ -5,9 +5,8 @@ from core.translator import TranslationManager
 from PySide6.QtWidgets import (
     QVBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox,
     QCheckBox, QMessageBox, QTabWidget, QScrollArea, QWidget,
-    QGridLayout, QDialogButtonBox
+    QGridLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy
 )
-from PySide6.QtGui import QGuiApplication
 from ui.utils.wheel_blocker import block_wheel_in
 try:
     from database.models import get_session_local
@@ -44,19 +43,23 @@ class AddPricingDialog(BaseDialog):
         self.set_translated_title("add_pricing" if pricing is None else "edit_pricing")
         self.init_ui()
         block_wheel_in(self)
-        self.set_responsive_size(500, 420)
 
     def init_ui(self):
         self.setSizeGripEnabled(True)
-        screen_rect = QGuiApplication.primaryScreen().availableGeometry()
-        self.setMaximumHeight(int(screen_rect.height() * 0.9))
-        self.setMaximumWidth(int(screen_rect.width() * 0.9))
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(8)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ── Header ────────────────────────────────────────────────────
+        header, sep = self._build_primary_header(
+            title=self._("add_pricing" if not self.pricing else "edit_pricing")
+        )
+        root.addWidget(header)
+        root.addWidget(sep)
 
         tabs = QTabWidget(self)
+        tabs.setDocumentMode(True)
 
         # ---------- General ----------
         general = self._make_form_tab()
@@ -98,12 +101,30 @@ class AddPricingDialog(BaseDialog):
         self.is_active = QCheckBox(self._("active")); self.is_active.setChecked(True)
         self._add_row(general, r, "is_active", self.is_active); r += 1
 
-        self.notes = QTextEdit(); self.notes.setFixedHeight(64)
+        self.notes = QTextEdit()
+        self.notes.setMinimumHeight(64)
+        self.notes.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._add_row(general, r, "notes", self.notes); r += 1
 
         tabs.addTab(general["scroll"], self._tab_title("tab_general", self._("tab_general")))
 
-        root.addWidget(tabs)
+        root.addWidget(tabs, 1)
+
+        # ── Footer ────────────────────────────────────────────────────
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.HLine)
+        sep2.setObjectName("form-dialog-sep"); sep2.setFixedHeight(1)
+        footer = QWidget(); footer.setObjectName("form-dialog-footer")
+        f_lay = QHBoxLayout(footer)
+        f_lay.setContentsMargins(24, 14, 24, 14); f_lay.setSpacing(10)
+        f_lay.addStretch()
+        self.btn_cancel = QPushButton(self._("cancel"))
+        self.btn_cancel.setObjectName("secondary-btn"); self.btn_cancel.setMinimumWidth(90)
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_save = QPushButton(self._("save"))
+        self.btn_save.setObjectName("primary-btn"); self.btn_save.setMinimumWidth(90)
+        self.btn_save.clicked.connect(self.accept)
+        f_lay.addWidget(self.btn_cancel); f_lay.addWidget(self.btn_save)
+        root.addWidget(sep2); root.addWidget(footer)
 
         # Prefill
         if self.pricing:
@@ -119,11 +140,7 @@ class AddPricingDialog(BaseDialog):
             self.is_active.setChecked(bool(g("is_active", True)))
             self.notes.setText(g("notes", "") or "")
 
-        # Footer
-        btn_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self)
-        btn_box.accepted.connect(self.accept)
-        btn_box.rejected.connect(self.reject)
-        root.addWidget(btn_box)
+
 
     # ---- helpers ----
     def _tab_title(self, key: str, fallback: str) -> str:

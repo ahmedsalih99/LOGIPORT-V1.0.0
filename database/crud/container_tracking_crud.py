@@ -1,7 +1,7 @@
 """
-container_tracking_crud.py — LOGIPORT
-=======================================
-CRUD لجدول container_tracking — يرث من BaseCRUD.
+container_tracking_crud.py — LOGIPORT v2
+==========================================
+CRUD لجدول container_tracking + shipment_containers.
 """
 from __future__ import annotations
 
@@ -12,9 +12,20 @@ from sqlalchemy.orm import joinedload
 
 from database.crud.base_crud import BaseCRUD
 from database.models import get_session_local
-from database.models.container_tracking import ContainerTracking
+from database.models.container_tracking import ContainerTracking, ShipmentContainer
 
 logger = logging.getLogger(__name__)
+
+
+def _get_current_office_id() -> Optional[int]:
+    try:
+        from core.settings_manager import SettingsManager
+        user = SettingsManager.get_instance().get("user")
+        if isinstance(user, dict):
+            return user.get("office_id")
+        return getattr(user, "office_id", None)
+    except Exception:
+        return None
 
 
 class ContainerTrackingCRUD(BaseCRUD):
@@ -37,11 +48,11 @@ class ContainerTrackingCRUD(BaseCRUD):
         limit: int = 200,
         offset: int = 0,
     ) -> List[ContainerTracking]:
-        """إرجاع كل الكونتينرات مع فلترة اختيارية."""
+        """إرجاع كل البوليصات مع فلترة اختيارية."""
         with self.get_session() as session:
             q = session.query(ContainerTracking).options(
-                joinedload(ContainerTracking.transaction),
                 joinedload(ContainerTracking.client),
+                joinedload(ContainerTracking.transaction),
             )
             if status:
                 q = q.filter(ContainerTracking.status == status)
@@ -52,11 +63,11 @@ class ContainerTrackingCRUD(BaseCRUD):
             if search:
                 like = f"%{search}%"
                 q = q.filter(or_(
-                    ContainerTracking.container_no.ilike(like),
                     ContainerTracking.bl_number.ilike(like),
-                    ContainerTracking.booking_no.ilike(like),
-                    ContainerTracking.vessel_name.ilike(like),
                     ContainerTracking.shipping_line.ilike(like),
+                    ContainerTracking.cargo_type.ilike(like),
+                    ContainerTracking.origin_country.ilike(like),
+                    ContainerTracking.port_of_discharge.ilike(like),
                 ))
             from sqlalchemy.orm import make_transient
             results = (
@@ -65,53 +76,44 @@ class ContainerTrackingCRUD(BaseCRUD):
                  .all()
             )
             for obj in results:
-                # pre-load relationship data before session closes
                 if obj.client:
                     obj._client_name_ar = getattr(obj.client, "name_ar", "") or ""
                     obj._client_name_en = getattr(obj.client, "name_en", "") or ""
-                    obj._client_name_tr = getattr(obj.client, "name_tr", "") or ""
                 if obj.transaction:
                     obj._transaction_no = getattr(obj.transaction, "transaction_no", "") or ""
                 session.expunge(obj)
                 make_transient(obj)
             return results
 
-    def count(self, search: str = "", status: Optional[str] = None, office_id: Optional[int] = None) -> int:
-        with self.get_session() as session:
-            q = session.query(ContainerTracking)
-            if status:
-                q = q.filter(ContainerTracking.status == status)
-            if office_id:
-                q = q.filter(ContainerTracking.office_id == office_id)
-            if search:
-                like = f"%{search}%"
-                q = q.filter(or_(
-                    ContainerTracking.container_no.ilike(like),
-                    ContainerTracking.bl_number.ilike(like),
-                    ContainerTracking.booking_no.ilike(like),
-                ))
-            return q.count()
-
     def get_by_id(self, record_id: int) -> Optional[ContainerTracking]:
-        """يُرجع ContainerTracking مع تحميل العلاقات داخل الـ session."""
+        """يُرجع البوليصة مع كل علاقاتها بما فيها الكونتينرات."""
         from sqlalchemy.orm import make_transient
         with self.get_session() as session:
             obj = session.query(ContainerTracking).options(
-                joinedload(ContainerTracking.transaction),
                 joinedload(ContainerTracking.client),
+                joinedload(ContainerTracking.transaction),
+                joinedload(ContainerTracking.containers),
             ).filter(ContainerTracking.id == record_id).first()
             if obj is None:
                 return None
-            # تحميل العلاقات بشكل صريح داخل الـ session
-            _ = obj.client       # force-load
-            _ = obj.transaction  # force-load
-            # حفظ بيانات العلاقات كـ plain attributes قبل إغلاق الـ session
+            _ = obj.client
+            _ = obj.transaction
+            _ = obj.containers
             if obj.client:
                 obj._client_name_ar = getattr(obj.client, "name_ar", "") or ""
                 obj._client_name_en = getattr(obj.client, "name_en", "") or ""
-                obj._client_name_tr = getattr(obj.client, "name_tr", "") or ""
             if obj.transaction:
                 obj._transaction_no = getattr(obj.transaction, "transaction_no", "") or ""
+            # نسخ بيانات الكونتينرات كـ plain dicts قبل إغلاق الـ session
+            obj._containers_data = [
+                {
+                    "id":           c.id,
+                    "container_no": c.container_no or "",
+                    "seal_no":      c.seal_no      or "",
+                    "recipient":    c.recipient    or "",
+                }
+                for c in (obj.containers or [])
+            ]
             session.expunge(obj)
             make_transient(obj)
             return obj
@@ -125,41 +127,84 @@ class ContainerTrackingCRUD(BaseCRUD):
                 .all()
             )
 
+    def count(
+        self, search: str = "",
+        status: Optional[str] = None,
+        office_id: Optional[int] = None,
+    ) -> int:
+        with self.get_session() as session:
+            q = session.query(ContainerTracking)
+            if status:
+                q = q.filter(ContainerTracking.status == status)
+            if office_id:
+                q = q.filter(ContainerTracking.office_id == office_id)
+            if search:
+                like = f"%{search}%"
+                q = q.filter(or_(
+                    ContainerTracking.bl_number.ilike(like),
+                    ContainerTracking.shipping_line.ilike(like),
+                ))
+            return q.count()
+
     # ── إنشاء / تحديث / حذف ──────────────────────────────────────────────────
 
     def create(self, data: dict, current_user=None) -> ContainerTracking:
-        """ينشئ كونتينر جديد من dict — يبني الـ instance أولاً ثم يحفظه."""
+        """ينشئ بوليصة جديدة مع كونتينراتها اختيارياً."""
+        containers_data = data.pop("containers", [])
         obj = ContainerTracking(
-            container_no      = data.get("container_no"),
-            bl_number         = data.get("bl_number"),
-            booking_no        = data.get("booking_no"),
-            shipping_line     = data.get("shipping_line"),
-            vessel_name       = data.get("vessel_name"),
-            voyage_no         = data.get("voyage_no"),
-            port_of_loading   = data.get("port_of_loading"),
-            port_of_discharge = data.get("port_of_discharge"),
-            final_destination = data.get("final_destination"),
-            etd               = data.get("etd"),
-            eta               = data.get("eta"),
-            atd               = data.get("atd"),
-            ata               = data.get("ata"),
-            customs_date      = data.get("customs_date"),
-            delivery_date     = data.get("delivery_date"),
-            status            = data.get("status", "booked"),
-            notes             = data.get("notes"),
-            client_id         = data.get("client_id"),
-            transaction_id    = data.get("transaction_id"),
-            office_id         = data.get("office_id") or _get_current_office_id(),
+            bl_number          = data.get("bl_number"),
+            shipping_line      = data.get("shipping_line"),
+            cargo_type         = data.get("cargo_type"),
+            quantity           = data.get("quantity"),
+            origin_country     = data.get("origin_country"),
+            port_of_discharge  = data.get("port_of_discharge"),
+            containers_count   = data.get("containers_count"),
+            docs_delivered     = bool(data.get("docs_delivered", False)),
+            cargo_tracking     = data.get("cargo_tracking"),
+            docs_received_date = data.get("docs_received_date"),
+            bl_status          = data.get("bl_status"),
+            eta                = data.get("eta"),
+            status             = data.get("status", "booked"),
+            notes              = data.get("notes"),
+            client_id          = data.get("client_id"),
+            transaction_id     = data.get("transaction_id"),
+            office_id          = data.get("office_id") or _get_current_office_id(),
         )
+        # إضافة الكونتينرات
+        for c in containers_data:
+            obj.containers.append(ShipmentContainer(
+                container_no = c.get("container_no") or None,
+                seal_no      = c.get("seal_no")      or None,
+                recipient    = c.get("recipient")    or None,
+            ))
         return self.add(obj, current_user=current_user)
 
     def update(self, record_id: int, data: dict, current_user=None) -> Optional[ContainerTracking]:
-        return super().update(record_id, data, current_user=current_user)
+        """يُحدّث البوليصة — إذا أُرسلت containers تُستبدل بالكاملة."""
+        containers_data = data.pop("containers", None)
+        result = super().update(record_id, data, current_user=current_user)
+        if result is not None and containers_data is not None:
+            self._replace_containers(record_id, containers_data)
+        return result
+
+    def _replace_containers(self, shipment_id: int, containers_data: list):
+        """يحذف الكونتينرات الموجودة ويُعيد إنشاءها من الـ list الجديدة."""
+        with self.get_session() as session:
+            session.query(ShipmentContainer).filter(
+                ShipmentContainer.shipment_id == shipment_id
+            ).delete()
+            for c in containers_data:
+                session.add(ShipmentContainer(
+                    shipment_id  = shipment_id,
+                    container_no = c.get("container_no") or None,
+                    seal_no      = c.get("seal_no")      or None,
+                    recipient    = c.get("recipient")    or None,
+                ))
+            session.commit()
 
     def delete(self, record_id: int, current_user=None) -> bool:
         return super().delete(record_id, current_user=current_user)
 
     def update_status(self, record_id: int, status: str, current_user=None) -> bool:
-        """تحديث الحالة فقط — shortcut."""
         result = super().update(record_id, {"status": status}, current_user=current_user)
         return result is not None

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QLabel,
     QLineEdit, QComboBox, QTextEdit, QDateEdit, QPushButton, QTableWidget,
     QSpinBox, QDoubleSpinBox, QSplitter, QGridLayout, QFrame,
-    QAbstractItemView, QDialogButtonBox, QHeaderView, QSizePolicy
+    QAbstractItemView, QHeaderView, QSizePolicy
 )
 
 from core.base_dialog import BaseDialog
@@ -61,8 +61,8 @@ class AddEntryDialog(BaseDialog):
     # ---------- UI ----------
     def _init_ui(self):
         main = QVBoxLayout(self)
-        main.setContentsMargins(20, 15, 20, 15)
-        main.setSpacing(12)
+        main.setContentsMargins(16, 12, 16, 8)
+        main.setSpacing(10)
 
         splitter = QSplitter(Qt.Orientation.Vertical, self)
         splitter.setChildrenCollapsible(False)
@@ -222,16 +222,25 @@ class AddEntryDialog(BaseDialog):
         splitter.setStretchFactor(1, 3)
 
 
-        # ================= OK / CANCEL =================
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-            parent=self
-        )
+        # ================= Footer =================
+        from PySide6.QtWidgets import QFrame as _QFrame
+        sep_f = _QFrame(); sep_f.setFrameShape(_QFrame.HLine)
+        sep_f.setObjectName("form-dialog-sep"); sep_f.setFixedHeight(1)
 
-        self.buttons.accepted.connect(self._accept)
-        self.buttons.rejected.connect(self.reject)
+        footer_w = QWidget(); footer_w.setObjectName("form-dialog-footer")
+        f_lay = QHBoxLayout(footer_w)
+        f_lay.setContentsMargins(0, 10, 0, 2); f_lay.setSpacing(10)
+        f_lay.addStretch()
+        self.btn_cancel = QPushButton(self._("cancel"))
+        self.btn_cancel.setObjectName("secondary-btn"); self.btn_cancel.setMinimumWidth(90)
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_save = QPushButton(self._("save"))
+        self.btn_save.setObjectName("primary-btn"); self.btn_save.setMinimumWidth(90)
+        self.btn_save.clicked.connect(self._accept)
+        f_lay.addWidget(self.btn_cancel); f_lay.addWidget(self.btn_save)
 
-        main.addWidget(self.buttons)
+        main.addWidget(sep_f)
+        main.addWidget(footer_w)
 
         if self.entry is None:
             self._add_row()
@@ -523,6 +532,4 @@ class AddEntryDialog(BaseDialog):
                     ed.setProperty("variant", "entry")
 
     def _warn(self, msg):
-        block_wheel_in(self)
-        self.set_responsive_size(800, 650)
         self.show_warning("warning", msg)

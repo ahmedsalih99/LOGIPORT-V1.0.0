@@ -6,7 +6,7 @@ class AddCountryDialog(FormDialog):
     def __init__(self, parent=None, country=None):
         self.country = country
         title_key = "add_country" if country is None else "edit_country"
-        super().__init__(parent, title_key=title_key, min_width=420)
+        super().__init__(parent, title_key=title_key, min_width=420, icon="🌍", icon_bg="#EFF6FF")
         self._build_form()
         if country:
             self._populate(country)

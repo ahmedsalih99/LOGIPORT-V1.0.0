@@ -394,6 +394,46 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: container_tracking client_id migration skipped: %s", _e)
 
+    # Migration v2: أعمدة جديدة لـ container_tracking
+    try:
+        _ct_cols = [r[1] for r in conn.execute("PRAGMA table_info(container_tracking)").fetchall()]
+        _ct_new = {
+            "cargo_type":         "VARCHAR(128)",
+            "quantity":           "VARCHAR(64)",
+            "origin_country":     "VARCHAR(128)",
+            "containers_count":   "INTEGER",
+            "docs_delivered":     "INTEGER NOT NULL DEFAULT 0",
+            "cargo_tracking":     "TEXT",
+            "docs_received_date": "DATE",
+            "bl_status":          "VARCHAR(64)",
+        }
+        for col, coldef in _ct_new.items():
+            if col not in _ct_cols:
+                conn.execute(f"ALTER TABLE container_tracking ADD COLUMN {col} {coldef}")
+                logger.info("Bootstrap: added %s to container_tracking", col)
+        # إعادة تسمية: bl_number كان nullable=True، نتحقق فقط
+        conn.commit()
+    except Exception as _e:
+        logger.warning("Bootstrap: container_tracking v2 migration skipped: %s", _e)
+
+    # Migration: جدول shipment_containers (كونتينرات البوليصة)
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS shipment_containers (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                shipment_id  INTEGER NOT NULL REFERENCES container_tracking(id) ON DELETE CASCADE,
+                container_no VARCHAR(32),
+                seal_no      VARCHAR(32),
+                recipient    VARCHAR(128),
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_sc_shipment_id ON shipment_containers(shipment_id)")
+        conn.commit()
+        logger.info("Bootstrap: shipment_containers جاهز")
+    except Exception as _e:
+        logger.warning("Bootstrap: shipment_containers migration skipped: %s", _e)
+
     # Migration: add ForeignKey constraints to client default fields
     try:
         _cl_cols = [r[1] for r in conn.execute("PRAGMA table_info(clients)").fetchall()]

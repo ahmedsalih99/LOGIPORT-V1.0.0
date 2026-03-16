@@ -6,7 +6,7 @@ class AddDeliveryMethodDialog(FormDialog):
     def __init__(self, parent=None, delivery_method=None):
         self.delivery_method = delivery_method
         title_key = "add_delivery_method" if delivery_method is None else "edit_delivery_method"
-        super().__init__(parent, title_key=title_key, min_width=420)
+        super().__init__(parent, title_key=title_key, min_width=420, icon="🚚", icon_bg="#F0FDF4")
         self._build_form()
         if delivery_method:
             self._populate(delivery_method)

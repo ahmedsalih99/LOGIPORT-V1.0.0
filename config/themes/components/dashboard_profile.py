@@ -143,4 +143,33 @@ def get_styles(theme):
         border: none;
     }}
 
+    /* ── Selection Action Bar ──────────────────────────────────────────── */
+    QFrame#selection-action-bar {{
+        background: {c["primary_light"]};
+        border: 1px solid {c["primary"]};
+        border-radius: 6px;
+        min-height: 36px;
+    }}
+
+    QLabel#sel-count-label {{
+        color: {c["primary"]};
+        font-weight: 700;
+        font-size: 13px;
+    }}
+
+    /* Checkbox في header الجدول */
+    QCheckBox#header-check-all {{
+        spacing: 0px;
+    }}
+
+    QCheckBox#row-checkbox {{
+        spacing: 0px;
+    }}
+
+    /* صف محدد — لون مميز */
+    QTableWidget#data-table::item:selected {{
+        background: {c["primary_light"]};
+        color: {c["text_primary"]};
+    }}
+
     """

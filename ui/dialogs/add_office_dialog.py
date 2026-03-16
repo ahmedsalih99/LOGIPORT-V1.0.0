@@ -26,7 +26,7 @@ class AddOfficeDialog(FormDialog):
     def __init__(self, parent=None, office: dict = None):
         self._office = office
         title_key = "add_office" if office is None else "edit_office"
-        super().__init__(parent, title_key=title_key, min_width=460)
+        super().__init__(parent, title_key=title_key, min_width=460, icon="🏢", icon_bg="#EFF6FF")
         self._build_form()
         if office:
             self._populate(office)
@@ -73,7 +73,7 @@ class AddOfficeDialog(FormDialog):
 
         # ملاحظات
         self.notes_edit = QTextEdit()
-        self.notes_edit.setFixedHeight(70)
+        self.notes_edit.setMinimumHeight(70)
         self.notes_edit.setPlaceholderText(self._("notes"))
         self.add_row(self._("notes"), self.notes_edit)
 

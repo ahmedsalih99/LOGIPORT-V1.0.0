@@ -5,7 +5,7 @@ from database.crud.permissions_crud import RolesCRUD
 
 class AddRoleDialog(FormDialog):
     def __init__(self, parent=None):
-        super().__init__(parent, title_key="add_role", min_width=460)
+        super().__init__(parent, title_key="add_role", min_width=460, icon="🔑", icon_bg="#FFF7ED")
         self._build_form()
 
     def _build_form(self):
@@ -15,7 +15,7 @@ class AddRoleDialog(FormDialog):
         self.edit_label_en = QLineEdit()
         self.edit_label_tr = QLineEdit()
         self.edit_desc     = QTextEdit()
-        self.edit_desc.setFixedHeight(80)
+        self.edit_desc.setMinimumHeight(80)
 
         self.add_row(self._("role_code"),     self.edit_name)
         self.add_section("role_labels")

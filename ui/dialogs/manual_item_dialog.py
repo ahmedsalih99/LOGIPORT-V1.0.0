@@ -2,8 +2,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDoubleValidator
 from core.base_dialog import BaseDialog
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
-    QDialogButtonBox, QLabel
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
+    QPushButton, QFrame, QWidget, QLabel, QSizePolicy
 )
 
 from core.translator import TranslationManager
@@ -69,7 +69,8 @@ class ManualItemDialog(BaseDialog):
         self.edt_unit_price = QLineEdit(); self.edt_unit_price.setObjectName("edt_unit_price")
         self.cmb_currency = QComboBox(); self.cmb_currency.setObjectName("cmb_currency")
         self.cmb_origin = QComboBox(); self.cmb_origin.setObjectName("cmb_origin")
-        self.txt_notes = QTextEdit(); self.txt_notes.setObjectName("txt_notes"); self.txt_notes.setFixedHeight(64)
+        self.txt_notes = QTextEdit(); self.txt_notes.setObjectName("txt_notes"); self.txt_notes.setMinimumHeight(64)
+        self.txt_notes.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         # Validators for numeric inputs
         for le in (self.edt_qty, self.edt_gross, self.edt_net, self.edt_unit_price):
@@ -91,11 +92,21 @@ class ManualItemDialog(BaseDialog):
 
         v.addLayout(form)
 
-        # Buttons
-        btns = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        v.addWidget(btns)
+        # Footer
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine)
+        sep.setObjectName("form-dialog-sep"); sep.setFixedHeight(1)
+        footer = QWidget(); footer.setObjectName("form-dialog-footer")
+        f_lay = QHBoxLayout(footer)
+        f_lay.setContentsMargins(0, 10, 0, 2); f_lay.setSpacing(10)
+        f_lay.addStretch()
+        self.btn_cancel = QPushButton(self._("cancel"))
+        self.btn_cancel.setObjectName("secondary-btn"); self.btn_cancel.setMinimumWidth(90)
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_save = QPushButton(self._("save"))
+        self.btn_save.setObjectName("primary-btn"); self.btn_save.setMinimumWidth(90)
+        self.btn_save.clicked.connect(self._on_accept)
+        f_lay.addWidget(self.btn_cancel); f_lay.addWidget(self.btn_save)
+        v.addWidget(sep); v.addWidget(footer)
 
     # ------------------------------------------------------------------ Lookups
     def _fill_lookups(self):
@@ -242,4 +253,3 @@ class ManualItemDialog(BaseDialog):
 
     def _attr(self, obj, key, default=None):
         return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
-        block_wheel_in(self)

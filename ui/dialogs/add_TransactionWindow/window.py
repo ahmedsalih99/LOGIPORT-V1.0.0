@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QDate, Signal, QSize
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLineEdit, QDateEdit, QComboBox, QTextEdit, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QComboBox, QPushButton,
     QTabWidget, QFrame, QMessageBox, QSplitter, QLabel
 )
 from PySide6.QtGui import QShortcut, QKeySequence, QIcon
@@ -44,6 +44,14 @@ except Exception:
     SettingsManager = _DummyS
 
 # ---- Mixins --------------------------------------------------------------
+try:
+    from ui.dialogs.mixins.general_tab import GeneralTabMixin
+except Exception:
+    class GeneralTabMixin:
+        def _build_tab_general(self): pass
+        def prefill_general(self, *_): pass
+        def get_general_data(self) -> dict: return {}
+
 try:
     from ui.dialogs.mixins.parties_geo_tab import PartiesGeoTabMixin
 except Exception:
@@ -94,7 +102,7 @@ import re
 
 
 # ---- Window --------------------------------------------------------------
-class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, TransportTabMixin, BaseWindow):
+class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, TransportTabMixin, BaseWindow):
     saved = Signal(int)
 
     def __init__(self, parent=None, current_user=None, transaction=None):
@@ -210,79 +218,10 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.status_bar.setVisible(False)
         top_layout.addWidget(self.status_bar)
 
-        # General card
-        card = QFrame(top)
-        card.setObjectName("general-info-card")
-        card_lay = QVBoxLayout(card)
-        card_lay.setContentsMargins(20, 12, 20, 12)
-        card_lay.setSpacing(8)
-
-        # ── سطر أول: رقم المعاملة + التاريخ ────────────────────────────────
-        row1 = QHBoxLayout()
-        row1.setSpacing(24)
-
-        col_no = QVBoxLayout()
-        col_no.setSpacing(4)
-        lbl_no = QLabel(self._("transaction_no"))
-        lbl_no.setObjectName("field-label")
-        self.txt_trx_no = QLineEdit()
-        self.txt_trx_no.setObjectName("transaction-number-input")
-        self.txt_trx_no.setFixedHeight(34)
-        try:
-            self.txt_trx_no.setPlaceholderText(self._generate_placeholder_number())
-        except Exception:
-            pass
-        col_no.addWidget(lbl_no)
-        col_no.addWidget(self.txt_trx_no)
-
-        col_date = QVBoxLayout()
-        col_date.setSpacing(4)
-        lbl_date = QLabel(self._("transaction_date"))
-        lbl_date.setObjectName("field-label")
-        self.dt_trx_date = QDateEdit()
-        self.dt_trx_date.setObjectName("transaction-date-input")
-        self.dt_trx_date.setFixedHeight(34)
-        self.dt_trx_date.setDisplayFormat("yyyy-MM-dd")
-        self.dt_trx_date.setCalendarPopup(True)
-        self.dt_trx_date.setDate(QDate.currentDate())
-        col_date.addWidget(lbl_date)
-        col_date.addWidget(self.dt_trx_date)
-
-        row1.addLayout(col_no, 1)
-        row1.addLayout(col_date, 1)
-        card_lay.addLayout(row1)
-
-        # ── سطر ثاني: نوع المعاملة + الملاحظات ─────────────────────────────
-        row2 = QHBoxLayout()
-        row2.setSpacing(24)
-
-        col_type = QVBoxLayout()
-        col_type.setSpacing(4)
-        lbl_type = QLabel(self._("transaction_type"))
-        lbl_type.setObjectName("field-label")
-        self.cmb_trx_type = QComboBox()
-        self.cmb_trx_type.setObjectName("transaction-type-combo")
-        self.cmb_trx_type.setFixedHeight(34)
-        self._fill_trx_types()
-        col_type.addWidget(lbl_type)
-        col_type.addWidget(self.cmb_trx_type)
-
-        col_notes = QVBoxLayout()
-        col_notes.setSpacing(4)
-        lbl_notes = QLabel(self._("notes"))
-        lbl_notes.setObjectName("field-label")
-        self.txt_notes = QTextEdit()
-        self.txt_notes.setObjectName("transaction-notes-input")
-        self.txt_notes.setFixedHeight(50)
-        self.txt_notes.setPlaceholderText(self._("enter_notes_optional"))
-        col_notes.addWidget(lbl_notes)
-        col_notes.addWidget(self.txt_notes)
-
-        row2.addLayout(col_type, 1)
-        row2.addLayout(col_notes, 1)
-        card_lay.addLayout(row2)
-
-        top_layout.addWidget(card)
+        # General card — مبني بواسطة GeneralTabMixin
+        self.cmb_trx_type = QComboBox()   # يجب إنشاؤه قبل _build_tab_general
+        general_card = self._build_tab_general()
+        top_layout.addWidget(general_card)
 
         # ── Horizontal splitter: tabs (يسار/وسط) + docs panel (يمين) ──────────
         h_splitter = QSplitter(Qt.Horizontal)
@@ -293,10 +232,6 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         self.tabs.setObjectName("transaction-tabs")
         try:
             self._build_parties_geo_tab()
-        except Exception:
-            pass
-        try:
-            self._build_pricing_tab()
         except Exception:
             pass
         try:
@@ -392,11 +327,6 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
         if hasattr(self, 'status_bar'):
             self.status_bar.setVisible(False)
 
-    def _fill_trx_types(self):
-        self.cmb_trx_type.clear()
-        for label, code in ((self._("import"), "import"), (self._("export"), "export"), (self._("transit"), "transit")):
-            self.cmb_trx_type.addItem(label, code)
-
     def _prefill_if_edit(self):
         if not self.transaction:
             try:
@@ -406,30 +336,10 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
             self.txt_trx_no.clear()
             return
 
-        get = (lambda o, k, d=None: o.get(k, d) if isinstance(o, dict) else getattr(o, k, d))
-        no = get(self.transaction, "transaction_no", "") or ""
-        if no:
-            self.txt_trx_no.setText(str(no))
         try:
-            dt = get(self.transaction, "transaction_date", None)
-            if dt:
-                if hasattr(dt, "year"):
-                    self.dt_trx_date.setDate(QDate(dt.year, dt.month, dt.day))
-                else:
-                    from datetime import datetime
-                    dt_obj = datetime.fromisoformat(str(dt))
-                    self.dt_trx_date.setDate(QDate(dt_obj.year, dt_obj.month, dt_obj.day))
+            self.prefill_general(self.transaction)
         except Exception:
             pass
-        tt = get(self.transaction, "transaction_type", None)
-        if tt:
-            for i in range(self.cmb_trx_type.count()):
-                if self.cmb_trx_type.itemData(i) == tt:
-                    self.cmb_trx_type.setCurrentIndex(i)
-                    break
-
-        self.txt_notes.setPlainText(str(get(self.transaction, "notes", "") or ""))
-
         try:
             self.prefill_parties_geo(self.transaction)
         except Exception:
@@ -547,8 +457,7 @@ class AddTransactionWindow(PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin,
             data.update(self.get_parties_data() or {})
         if hasattr(self, "get_geography_data"):
             data.update(self.get_geography_data() or {})
-        if hasattr(self, "get_pricing_data"):
-            data.update(self.get_pricing_data() or {})
+        # get_pricing_data: محجوزة للمستقبل — لا توجد حالياً
         transport_data = {}
         if hasattr(self, "get_transport_data"):
             transport_data = self.get_transport_data().get("transport", {})

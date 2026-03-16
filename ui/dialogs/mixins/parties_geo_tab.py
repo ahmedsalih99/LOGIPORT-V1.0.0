@@ -214,25 +214,27 @@ class PartiesGeoTabMixin:
         return (name or "").strip() or f"#{c.id}"
 
     # ── قوائم ثابتة (دول + طرق التسليم — قصيرة لا تحتاج بحث) ───────────────
+    def _best_label(self, obj) -> str:
+        """يعيد أفضل اسم للـ object حسب اللغة الحالية."""
+        lang = getattr(self, "_lang", "ar") or "ar"
+        for f in (f"name_{lang}", "name_ar", "name_en", "name_tr", "name"):
+            if hasattr(obj, f) and getattr(obj, f):
+                return str(getattr(obj, f))
+        return str(getattr(obj, "id", "?"))
+
+    def _fill_static_combo(self, combo, rows, *, map_store: dict):
+        """يملأ QComboBox ثابتة (دول / طرق تسليم) ويبني خريطة للبحث بالنص."""
+        combo.clear()
+        combo.addItem(self._("select"), None)
+        for r in rows:
+            label = self._best_label(r)
+            rid   = getattr(r, "id", None)
+            combo.addItem(label, rid)
+            map_store[label.strip().lower()] = rid
+
     def _load_static_lists(self):
         self._country_map  = {}
         self._delivery_map = {}
-
-        def best_label(obj):
-            lang = getattr(self, "_lang", "ar") or "ar"
-            for f in (f"name_{lang}", "name_ar", "name_en", "name_tr", "name"):
-                if hasattr(obj, f) and getattr(obj, f):
-                    return str(getattr(obj, f))
-            return str(getattr(obj, "id", "?"))
-
-        def fill_combo(combo, rows, *, map_store):
-            combo.clear()
-            combo.addItem(self._("select"), None)
-            for r in rows:
-                label = best_label(r)
-                rid   = getattr(r, "id", None)
-                combo.addItem(label, rid)
-                map_store[label.strip().lower()] = rid
 
         SessionLocal = get_session_local()
         with SessionLocal() as s:
@@ -244,9 +246,9 @@ class PartiesGeoTabMixin:
             except Exception:
                 delivery_methods = []
 
-        fill_combo(self.cmb_origin_country,  countries,        map_store=self._country_map)
-        fill_combo(self.cmb_dest_country,    countries,        map_store=self._country_map)
-        fill_combo(self.cmb_delivery_method, delivery_methods, map_store=self._delivery_map)
+        self._fill_static_combo(self.cmb_origin_country,  countries,        map_store=self._country_map)
+        self._fill_static_combo(self.cmb_dest_country,    countries,        map_store=self._country_map)
+        self._fill_static_combo(self.cmb_delivery_method, delivery_methods, map_store=self._delivery_map)
 
     # backward-compat: بعض الأماكن تستدعي _load_parties_geo_lists مباشرة
     def _load_parties_geo_lists(self):

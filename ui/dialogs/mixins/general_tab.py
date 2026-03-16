@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QFrame, QFormLayout, QLineEdit, QDateEdit, QComboBox, QTextEdit, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QFrame, QFormLayout, QHBoxLayout, QVBoxLayout, QLineEdit, QDateEdit, QComboBox, QTextEdit, QLabel
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import QSizePolicy
 from ui.utils.wheel_blocker import block_wheel_in
@@ -14,59 +14,95 @@ class GeneralTabMixin:
     """
 
     def _build_tab_general(self) -> QWidget:
-        tab = QWidget(self)
+        """
+        يبني الـ general info card ويرجعه كـ QWidget.
+        يُضاف مباشرةً في top_layout بالـ window.
 
-        v = QVBoxLayout(tab)
-        v.setContentsMargins(16, 16, 16, 16)
-        v.setSpacing(12)
+        يتوقع وجود self.cmb_trx_type (ينشئها تلقائياً إذا لم تكن موجودة).
+        """
+        from PySide6.QtWidgets import QComboBox as _CB
+        # أنشئ cmb_trx_type إذا لم تكن موجودة بعد
+        if not hasattr(self, "cmb_trx_type") or self.cmb_trx_type is None:
+            self.cmb_trx_type = _CB()
 
-        card = QFrame(tab)
+        card = QFrame()
         card.setObjectName("general-info-card")
 
-        form = QFormLayout(card)
-        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        form.setHorizontalSpacing(16)
-        form.setVerticalSpacing(12)
+        card_lay = QVBoxLayout(card)
+        card_lay.setContentsMargins(20, 12, 20, 12)
+        card_lay.setSpacing(8)
 
-        # Transaction number
+        # ── سطر 1: رقم المعاملة + التاريخ ──────────────────────────────────
+        row1 = QHBoxLayout()
+        row1.setSpacing(24)
+
+        col_no = QVBoxLayout()
+        col_no.setSpacing(4)
+        lbl_no = QLabel(self._("transaction_no"))
+        lbl_no.setObjectName("field-label")
         self.txt_trx_no = QLineEdit()
         self.txt_trx_no.setObjectName("transaction-number-input")
-        self.txt_trx_no.setMinimumHeight(36)
+        self.txt_trx_no.setMinimumHeight(34)
         try:
             self.txt_trx_no.setPlaceholderText(self._generate_placeholder_number())
         except Exception:
             pass
+        col_no.addWidget(lbl_no)
+        col_no.addWidget(self.txt_trx_no)
 
-        # Date
+        col_date = QVBoxLayout()
+        col_date.setSpacing(4)
+        lbl_date = QLabel(self._("transaction_date"))
+        lbl_date.setObjectName("field-label")
         self.dt_trx_date = QDateEdit()
         self.dt_trx_date.setObjectName("transaction-date-input")
-        self.dt_trx_date.setMinimumHeight(36)
+        self.dt_trx_date.setMinimumHeight(34)
         self.dt_trx_date.setDisplayFormat("yyyy-MM-dd")
         self.dt_trx_date.setCalendarPopup(True)
         self.dt_trx_date.setDate(QDate.currentDate())
+        col_date.addWidget(lbl_date)
+        col_date.addWidget(self.dt_trx_date)
 
-        # Type
+        row1.addLayout(col_no, 1)
+        row1.addLayout(col_date, 1)
+        card_lay.addLayout(row1)
+
+        # ── سطر 2: نوع المعاملة + الملاحظات ────────────────────────────────
+        row2 = QHBoxLayout()
+        row2.setSpacing(24)
+
+        col_type = QVBoxLayout()
+        col_type.setSpacing(4)
+        lbl_type = QLabel(self._("transaction_type"))
+        lbl_type.setObjectName("field-label")
         self.cmb_trx_type.setObjectName("transaction-type-combo")
-        self.cmb_trx_type.setMinimumHeight(36)
+        self.cmb_trx_type.setMinimumHeight(34)
         self.cmb_trx_type.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.cmb_trx_type.setMaximumWidth(240)
         self._fill_trx_types()
+        col_type.addWidget(lbl_type)
+        col_type.addWidget(self.cmb_trx_type)
 
-        # Notes
+        col_notes = QVBoxLayout()
+        col_notes.setSpacing(4)
+        lbl_notes = QLabel(self._("notes"))
+        lbl_notes.setObjectName("field-label")
         self.txt_notes = QTextEdit()
         self.txt_notes.setObjectName("transaction-notes-input")
-        self.txt_notes.setMinimumHeight(80)
-        self.txt_notes.setMaximumHeight(120)
+        self.txt_notes.setMinimumHeight(50)
+        self.txt_notes.setMaximumHeight(100)
+        try:
+            self.txt_notes.setPlaceholderText(self._("enter_notes_optional"))
+        except Exception:
+            pass
+        col_notes.addWidget(lbl_notes)
+        col_notes.addWidget(self.txt_notes)
 
-        form.addRow(self._("transaction_no"), self.txt_trx_no)
-        form.addRow(self._("transaction_date"), self.dt_trx_date)
-        form.addRow(self._("transaction_type"), self.cmb_trx_type)
-        form.addRow(self._("notes"), self.txt_notes)
+        row2.addLayout(col_type, 1)
+        row2.addLayout(col_notes, 1)
+        card_lay.addLayout(row2)
 
-        v.addWidget(card)
-        v.addStretch()
-
-        return tab
+        return card
 
     # ------------------------ helpers ------------------------
     def _fill_trx_types(self):

@@ -7,14 +7,16 @@ Base class for all add/edit dialogs.
   - Header: عنوان + subtitle اختياري
   - Scrollable form body (QFormLayout)
   - Footer: أزرار Cancel + Save
+  - Inline validation: show_field_error / clear_field_error / clear_all_errors
   - إعادة ترجمة تلقائية عند تغيير اللغة — بدون أي كود في الـ subclass
 
-كيف تعمل الترجمة التلقائية:
-  - add_row(label_key, widget)  ← يحتفظ بـ label_key
-  - add_section(title_key)      ← يحتفظ بـ title_key
-  - عند تغيير اللغة → retranslate_ui() تُعيد ترجمة كل شيء تلقائياً
-
-الـ subclass يمكنه دائماً تجاوز retranslate_ui() لو أراد سلوكاً مخصصاً.
+كيف يعمل الـ inline validation:
+  - add_row(..., required=True)          → يضيف * حمراء على الـ label
+  - show_field_error(widget, "رسالة")   → يُلوّن border الحقل + يظهر النص تحته
+  - clear_field_error(widget)            → يُعيد الحقل لوضعه الطبيعي
+  - clear_all_errors()                   → يُنظف كل الأخطاء دفعة واحدة
+  - validate_required(widget, key)       → True/False ويعرض الخطأ تلقائياً
+  - validate_email(widget)               → True/False ويعرض الخطأ تلقائياً
 """
 from __future__ import annotations
 from typing import Optional
@@ -32,39 +34,50 @@ from core.base_dialog import BaseDialog
 
 class FormDialog(BaseDialog):
     """
-    Unified form dialog with automatic retranslation on language change.
+    Unified form dialog with automatic retranslation and inline validation.
 
     Usage:
         class MyDialog(FormDialog):
             def __init__(self, parent=None):
                 super().__init__(parent, title_key="my_dialog_title")
                 self.name_field = QLineEdit()
-                self.add_row("name_label_key", self.name_field)
+                self.add_row("name_label_key", self.name_field, required=True)
+
+            def accept(self):
+                self.clear_all_errors()
+                if not self.validate_required(self.name_field, "name_label_key"):
+                    return
+                super().accept()
     """
 
     def __init__(
         self,
         parent=None,
-        title_key: str = "",        # مفتاح الترجمة للعنوان (يُترجم تلقائياً)
-        subtitle_key: str = "",     # مفتاح الترجمة للـ subtitle (اختياري)
-        title: str = "",            # نص ثابت للعنوان (للتوافق الخلفي)
-        subtitle: str = "",         # نص ثابت للـ subtitle (للتوافق الخلفي)
+        title_key: str = "",
+        subtitle_key: str = "",
+        title: str = "",
+        subtitle: str = "",
         min_width: int = 440,
-        save_key: str = "save",     # مفتاح ترجمة زر الحفظ (قابل للتخصيص)
-        cancel_key: str = "cancel", # مفتاح ترجمة زر الإلغاء
+        save_key: str = "save",
+        cancel_key: str = "cancel",
+        icon: str = "",          # emoji / unicode للأيقونة في الـ header
+        icon_bg: str = "",       # لون خلفية الأيقونة (اختياري)
     ):
-        # نحتفظ بالمفاتيح قبل super().__init__ لأن _build_shell يحتاجها
         self._title_key_form    = title_key
         self._subtitle_key_form = subtitle_key
-        self._title_static      = title       # توافق خلفي
-        self._subtitle_static   = subtitle    # توافق خلفي
+        self._title_static      = title
+        self._subtitle_static   = subtitle
         self._min_width         = min_width
         self._save_key          = save_key
         self._cancel_key        = cancel_key
+        self._icon              = icon
+        self._icon_bg           = icon_bg
 
-        # سجل الـ rows: قائمة من (QLabel | None, translation_key | None)
-        # None = row بدون label (مثل spacer أو section)
+        # سجل الـ rows للترجمة التلقائية
         self._row_registry: list[_RowEntry] = []
+
+        # خريطة id(widget) → QLabel (رسالة الخطأ)
+        self._error_labels: dict[int, QLabel] = {}
 
         super().__init__(parent)
         self._build_shell()
@@ -84,25 +97,39 @@ class FormDialog(BaseDialog):
         # ── Header ────────────────────────────────────────────────────────
         self._header = QWidget()
         self._header.setObjectName("form-dialog-header")
-        h_lay = QVBoxLayout(self._header)
-        h_lay.setContentsMargins(24, 20, 24, 16)
-        h_lay.setSpacing(4)
+
+        # صف أفقي: أيقونة (اختياري) + عنوان/subtitle
+        h_outer = QHBoxLayout(self._header)
+        h_outer.setContentsMargins(24, 18, 24, 14)
+        h_outer.setSpacing(12)
+
+        # أيقونة contextual — تظهر فقط إذا أُعطيت
+        self._header_icon_lbl = QLabel()
+        self._header_icon_lbl.setObjectName("form-dialog-icon")
+        self._header_icon_lbl.setFixedSize(36, 36)
+        self._header_icon_lbl.setAlignment(Qt.AlignCenter)
+        self._header_icon_lbl.setVisible(False)
+        h_outer.addWidget(self._header_icon_lbl)
+
+        # عمود: عنوان + subtitle
+        h_text = QVBoxLayout()
+        h_text.setSpacing(2)
 
         self._lbl_title = QLabel()
         self._lbl_title.setObjectName("form-dialog-title")
         font = QFont()
-        font.setPointSize(14)
+        font.setPointSize(13)
         font.setWeight(QFont.Bold)
         self._lbl_title.setFont(font)
-        h_lay.addWidget(self._lbl_title)
+        h_text.addWidget(self._lbl_title)
 
-        # subtitle — يُنشأ دائماً لكن يُخفى إذا لم يكن هناك نص
         self._lbl_subtitle = QLabel()
         self._lbl_subtitle.setObjectName("form-dialog-subtitle")
         self._lbl_subtitle.setVisible(False)
-        h_lay.addWidget(self._lbl_subtitle)
+        h_text.addWidget(self._lbl_subtitle)
 
-        # separator
+        h_outer.addLayout(h_text, 1)
+
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setObjectName("form-dialog-sep")
@@ -119,7 +146,7 @@ class FormDialog(BaseDialog):
         self._body.setObjectName("form-dialog-body")
         self._form_layout = QFormLayout(self._body)
         self._form_layout.setContentsMargins(24, 20, 24, 20)
-        self._form_layout.setSpacing(16)
+        self._form_layout.setSpacing(12)
         self._form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._form_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
         self._form_layout.setRowWrapPolicy(QFormLayout.WrapAllRows)
@@ -158,32 +185,56 @@ class FormDialog(BaseDialog):
         root.addWidget(sep2)
         root.addWidget(footer)
 
-        # ترجمة أولية
         self.retranslate_ui()
+
+        # تطبيق الأيقونة إذا أُعطيت عند الإنشاء
+        if self._icon:
+            self.set_header_icon(self._icon, self._icon_bg)
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public helpers — add rows to form
     # ─────────────────────────────────────────────────────────────────────────
 
-    def add_row(self, label_key: str, widget: QWidget) -> QWidget:
+    def add_row(self, label_key: str, widget: QWidget, *, required: bool = False) -> QWidget:
         """
         أضف row بـ label مترجم + widget.
 
-        label_key: مفتاح الترجمة (مثل "arabic_name") أو نص ثابت.
-        الـ label يُترجم تلقائياً عند تغيير اللغة.
+        label_key : مفتاح الترجمة أو نص ثابت.
+        required  : إذا True يُضاف * حمراء بجانب الـ label.
         """
+        # container: field + error label
+        container = QWidget()
+        container.setObjectName("form-field-container")
+        c_lay = QVBoxLayout(container)
+        c_lay.setContentsMargins(0, 0, 0, 0)
+        c_lay.setSpacing(2)
+
+        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        c_lay.addWidget(widget)
+
+        # Error label — مخفي افتراضياً
+        err_lbl = QLabel()
+        err_lbl.setObjectName("form-field-error")
+        err_lbl.setVisible(False)
+        err_lbl.setWordWrap(True)
+        c_lay.addWidget(err_lbl)
+
+        self._error_labels[id(widget)] = err_lbl
+
+        # label مع * اختياري
         lbl = QLabel()
         lbl.setObjectName("form-dialog-label")
-        font = lbl.font()
-        font.setWeight(QFont.DemiBold)
-        lbl.setFont(font)
-        self._form_layout.addRow(lbl, widget)
-        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        f = lbl.font()
+        f.setWeight(QFont.DemiBold)
+        lbl.setFont(f)
 
-        # سجّل للترجمة التلقائية
-        self._row_registry.append(_RowEntry(kind="row", label=lbl, key=label_key))
-        # ترجم فوراً
-        lbl.setText(self._(label_key))
+        self._form_layout.addRow(lbl, container)
+
+        self._row_registry.append(_RowEntry(
+            kind="row", label=lbl, key=label_key, required=required
+        ))
+        self._apply_label_text(lbl, label_key, required)
 
         return widget
 
@@ -195,10 +246,7 @@ class FormDialog(BaseDialog):
         self._row_registry.append(_RowEntry(kind="spacer"))
 
     def add_section(self, title_key: str):
-        """
-        أضف فاصل قسم بعنوان مترجم.
-        title_key: مفتاح الترجمة أو نص ثابت.
-        """
+        """أضف فاصل قسم بعنوان مترجم."""
         sep_widget = QWidget()
         sep_lay = QVBoxLayout(sep_widget)
         sep_lay.setContentsMargins(0, 8, 0, 4)
@@ -219,54 +267,131 @@ class FormDialog(BaseDialog):
         sep_lay.addWidget(line)
         self._form_layout.addRow(sep_widget)
 
-        # سجّل للترجمة التلقائية
         self._row_registry.append(_RowEntry(kind="section", label=lbl, key=title_key))
-        # ترجم فوراً
         lbl.setText(self._(title_key))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Inline validation API
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def show_field_error(self, widget: QWidget, message: str) -> None:
+        """
+        أظهر رسالة خطأ inline تحت الحقل وألوّن border بالأحمر.
+        """
+        widget.setProperty("has_error", True)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+
+        err_lbl = self._error_labels.get(id(widget))
+        if err_lbl:
+            err_lbl.setText(message)
+            err_lbl.setVisible(True)
+
+        try:
+            widget.setFocus()
+        except Exception:
+            pass
+
+    def clear_field_error(self, widget: QWidget) -> None:
+        """أعد الحقل لوضعه الطبيعي."""
+        widget.setProperty("has_error", False)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+
+        err_lbl = self._error_labels.get(id(widget))
+        if err_lbl:
+            err_lbl.setVisible(False)
+            err_lbl.setText("")
+
+    def clear_all_errors(self) -> None:
+        """أزل جميع رسائل الخطأ — استدعِه أول شيء في accept()."""
+        for err_lbl in self._error_labels.values():
+            err_lbl.setVisible(False)
+            err_lbl.setText("")
+        from PySide6.QtWidgets import QWidget as _W
+        for child in self._body.findChildren(_W):
+            if child.property("has_error"):
+                child.setProperty("has_error", False)
+                child.style().unpolish(child)
+                child.style().polish(child)
+
+    def validate_required(self, widget: QWidget, label_key: str) -> bool:
+        """
+        تحقق من أن الحقل غير فارغ.
+        يعرض الخطأ inline تلقائياً ويعيد False إذا كان فارغاً.
+        """
+        value = self._get_widget_value(widget)
+        if value:
+            self.clear_field_error(widget)
+            return True
+        field_name = self._(label_key)
+        msg_template = self._("field_required_msg")
+        if "{field}" in msg_template:
+            msg = msg_template.format(field=field_name)
+        else:
+            msg = f"{field_name}: {self._('required')}"
+        self.show_field_error(widget, msg)
+        return False
+
+    def validate_email(self, widget: QLineEdit) -> bool:
+        """
+        تحقق من صحة البريد الإلكتروني.
+        يعيد True إذا كان فارغاً (اختياري) أو صالحاً.
+        """
+        value = (widget.text() or "").strip()
+        if not value:
+            return True
+        if "@" in value and "." in value.split("@")[-1]:
+            self.clear_field_error(widget)
+            return True
+        self.show_field_error(widget, self._("invalid_email"))
+        return False
 
     # ─────────────────────────────────────────────────────────────────────────
     # Convenience setters (backward-compatible API)
     # ─────────────────────────────────────────────────────────────────────────
 
+    def set_header_icon(self, svg_or_emoji: str, bg_color: str = "") -> None:
+        """
+        أضف أيقونة contextual في الـ header بجانب العنوان.
+
+        svg_or_emoji : نص Unicode / emoji (مثل "👤" "📦" "🏢")
+                       أو HTML مثل '<img src="...">'
+        bg_color     : لون خلفية الأيقونة (اختياري، مثل "#EFF6FF")
+        """
+        lbl = self._header_icon_lbl
+        lbl.setText(svg_or_emoji)
+        lbl.setTextFormat(Qt.RichText)
+        style = "border-radius: 8px; font-size: 18px;"
+        if bg_color:
+            style += f" background: {bg_color};"
+        lbl.setStyleSheet(style)
+        lbl.setVisible(True)
+
     def set_title(self, text: str):
-        """
-        ضع نصاً ثابتاً للعنوان (بدون ترجمة تلقائية).
-        استخدم title_key في __init__ للترجمة التلقائية.
-        """
         self._title_static = text
-        self._title_key_form = ""   # يوقف الترجمة التلقائية للعنوان
+        self._title_key_form = ""
         self._lbl_title.setText(text)
 
     def set_save_text(self, text: str):
-        """
-        ضع نصاً ثابتاً لزر الحفظ (بدون ترجمة تلقائية).
-        استخدم save_key في __init__ للترجمة التلقائية.
-        """
-        self._save_key = ""   # يوقف الترجمة التلقائية للزر
+        self._save_key = ""
         self.btn_save.setText(text)
 
     def set_title_key(self, key: str):
-        """غيّر مفتاح ترجمة العنوان وطبّقه فوراً (مفيد لـ add/edit)."""
         self._title_key_form = key
         self._lbl_title.setText(self._(key))
         self.setWindowTitle(self._(key))
 
     def set_save_key(self, key: str):
-        """غيّر مفتاح ترجمة زر الحفظ وطبّقه فوراً."""
         self._save_key = key
         self.btn_save.setText(self._(key))
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Retranslation — يُستدعى تلقائياً من BaseDialog عند تغيير اللغة
+    # Retranslation
     # ─────────────────────────────────────────────────────────────────────────
 
     def retranslate_ui(self):
-        """
-        يُعيد ترجمة كل عناصر FormDialog تلقائياً.
-        يُستدعى من BaseDialog._retranslate_ui() عند تغيير اللغة.
-        الـ subclass يمكنه تجاوزه لكن يجب استدعاء super().retranslate_ui() أولاً.
-        """
-        # ── ضبط محاذاة الـ label حسب اللغة RTL/LTR ─────────────────────
+        """يُعيد ترجمة كل عناصر FormDialog تلقائياً."""
         try:
             lang = self.translator.get_current_language()
             if lang.startswith("ar"):
@@ -276,7 +401,6 @@ class FormDialog(BaseDialog):
         except Exception:
             pass
 
-        # ── العنوان ──────────────────────────────────────────────────────
         if self._title_key_form:
             text = self._(self._title_key_form)
             self._lbl_title.setText(text)
@@ -284,7 +408,6 @@ class FormDialog(BaseDialog):
         elif self._title_static:
             self._lbl_title.setText(self._title_static)
 
-        # ── الـ subtitle ──────────────────────────────────────────────────
         if self._subtitle_key_form:
             text = self._(self._subtitle_key_form)
             self._lbl_subtitle.setText(text)
@@ -293,32 +416,66 @@ class FormDialog(BaseDialog):
             self._lbl_subtitle.setText(self._subtitle_static)
             self._lbl_subtitle.setVisible(True)
 
-        # ── أزرار Footer ──────────────────────────────────────────────────
         if self._save_key:
             self.btn_save.setText(self._(self._save_key))
         if self._cancel_key:
             self.btn_cancel.setText(self._(self._cancel_key))
 
-        # ── كل الـ rows المسجّلة ──────────────────────────────────────────
         for entry in self._row_registry:
             if entry.label is not None and entry.key:
-                entry.label.setText(self._(entry.key))
+                if entry.kind == "row":
+                    self._apply_label_text(entry.label, entry.key, entry.required)
+                else:
+                    entry.label.setText(self._(entry.key))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Internal helpers
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _apply_label_text(self, lbl: QLabel, key: str, required: bool) -> None:
+        text = self._(key)
+        if required:
+            lbl.setText(f'{text} <span style="color:#EF4444;">*</span>')
+            lbl.setTextFormat(Qt.RichText)
+        else:
+            lbl.setText(text)
+            lbl.setTextFormat(Qt.AutoText)
+
+    def _get_widget_value(self, widget: QWidget) -> str:
+        """استخرج قيمة نصية من أي نوع widget شائع."""
+        from PySide6.QtWidgets import (
+            QLineEdit as _LE, QTextEdit as _TE,
+            QPlainTextEdit as _PTE, QComboBox as _CB, QAbstractSpinBox as _SB,
+        )
+        if isinstance(widget, _LE):
+            return (widget.text() or "").strip()
+        if isinstance(widget, (_TE, _PTE)):
+            return (widget.toPlainText() or "").strip()
+        if isinstance(widget, _CB):
+            return "" if widget.currentData() is None else str(widget.currentData())
+        if isinstance(widget, _SB):
+            return str(widget.value())
+        if hasattr(widget, "current_value"):
+            v = widget.current_value()
+            return "" if v is None else str(v)
+        return ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Internal data class — لتسجيل كل row مع مفتاحه
+# Internal data class
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _RowEntry:
-    """سجل داخلي يربط QLabel بمفتاح الترجمة."""
-    __slots__ = ("kind", "label", "key")
+    __slots__ = ("kind", "label", "key", "required")
 
     def __init__(
         self,
-        kind: str,                      # "row" | "section" | "spacer"
+        kind: str,
         label: Optional[QLabel] = None,
         key: Optional[str] = None,
+        required: bool = False,
     ):
-        self.kind  = kind
-        self.label = label
-        self.key   = key
+        self.kind     = kind
+        self.label    = label
+        self.key      = key
+        self.required = required

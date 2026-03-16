@@ -6,7 +6,7 @@ class AddPackagingTypeDialog(FormDialog):
     def __init__(self, parent=None, packaging_type=None):
         self.packaging_type = packaging_type
         title_key = "add_packaging_type" if packaging_type is None else "edit_packaging_type"
-        super().__init__(parent, title_key=title_key, min_width=420)
+        super().__init__(parent, title_key=title_key, min_width=420, icon="📦", icon_bg="#FFF7ED")
         self._build_form()
         if packaging_type:
             self._populate(packaging_type)

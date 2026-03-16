@@ -267,47 +267,73 @@ QDialog QLineEdit:focus {{
 
     /* ========== FORM DIALOG ========== */
 
+    /* ── Header: بسيط بدون gradient ─────────────────────────────── */
     QWidget#form-dialog-header {{
-        background: qlineargradient(
-            x1: 0, y1: 0, x2: 1, y2: 0,
-            stop: 0 {c["primary"]},
-            stop: 1 {c["primary_hover"]}
-        );
+        background: {c["bg_card"]};
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
     }}
 
     QLabel#form-dialog-title {{
-        color: #ffffff;
+        color: {c["text_primary"]};
         font-weight: 700;
     }}
 
     QLabel#form-dialog-subtitle {{
-        color: rgba(255, 255, 255, 0.82);
-        font-weight: 500;
+        color: {c["text_secondary"]};
+        font-weight: 400;
     }}
 
+    /* ── Labels ───────────────────────────────────────────────────── */
     QLabel#form-dialog-label {{
-        color: {c["text_primary"]};
+        color: {c["text_secondary"]};
         font-weight: 600;
     }}
 
+    /* ── Section separator ────────────────────────────────────────── */
     QLabel#form-section-title {{
         color: {c["primary"]};
         font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }}
 
+    /* ── Header icon ──────────────────────────────────────────────── */
+    QLabel#form-dialog-icon {{
+        border-radius: 8px;
+    }}
+
+    /* ── Separators ───────────────────────────────────────────────── */
     QFrame#form-dialog-sep {{
-        background: rgba(255, 255, 255, 0.25);
+        background: {c["border_subtle"]};
         border: none;
     }}
 
+    /* ── Body & Footer ────────────────────────────────────────────── */
     QWidget#form-dialog-body {{
         background: {c["bg_main"]};
     }}
 
     QWidget#form-dialog-footer {{
         background: {c["bg_card"]};
+        border-top: 1px solid {c["border_subtle"]};
+    }}
+
+    /* ── Focus state: حقل active يأخذ bg مختلف ───────────────────── */
+    QDialog QLineEdit:focus {{
+        border: 2px solid {c["border_focus"]};
+        background: {c["bg_input"]};
+    }}
+
+    QDialog QTextEdit:focus {{
+        border: 2px solid {c["border_focus"]};
+        background: {c["bg_input"]};
+    }}
+
+    QDialog QComboBox:focus {{
+        border: 2px solid {c["border_focus"]};
+        background: {c["bg_input"]};
     }}
 
     QScrollArea#form-dialog-scroll {{
@@ -319,7 +345,44 @@ QDialog QLineEdit:focus {{
         background: {c["bg_main"]};
     }}
 
-    
-    
-    
+    /* ========== INLINE VALIDATION ========== */
+
+    /* Error message label under a field */
+    QLabel#form-field-error {{
+        color: {c["danger"]};
+        font-size: 11px;
+        padding: 0px 2px;
+    }}
+
+    /* Field with error — QLineEdit */
+    QDialog QLineEdit[has_error="true"] {{
+        border: 1px solid {c["danger"]};
+        background: {c["danger_light"]};
+        color: {c["text_primary"]};
+    }}
+
+    QDialog QLineEdit[has_error="true"]:focus {{
+        border: 2px solid {c["danger"]};
+        background: {c["danger_light"]};
+    }}
+
+    /* Field with error — QComboBox */
+    QDialog QComboBox[has_error="true"] {{
+        border: 1px solid {c["danger"]};
+        background: {c["danger_light"]};
+        color: {c["text_primary"]};
+    }}
+
+    /* Field with error — QTextEdit */
+    QDialog QTextEdit[has_error="true"] {{
+        border: 1px solid {c["danger"]};
+        background: {c["danger_light"]};
+        color: {c["text_primary"]};
+    }}
+
+    /* Container that holds field + error label */
+    QWidget#form-field-container {{
+        background: transparent;
+    }}
+
     """

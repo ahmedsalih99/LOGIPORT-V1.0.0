@@ -62,21 +62,20 @@ class ItemsTabMixin:
     tabs: "QTabWidget"  # يملك addTab(...)
     _lang: str = "ar"
 
-    # 0 source | 1 truck | 2 material | 3 packaging | 4 qty | 5 gross | 6 net | 7 prod | 8 exp
-    # 9 currency | 10 pricing_type | 11 unit_price | 12 total
-    COL_SOURCE = 0;
-    COL_TRUCK = 1;
-    COL_MATERIAL = 2;
-    COL_PACK = 3;
-    COL_QTY = 4;
-    COL_GROSS = 5;
-    COL_NET = 6;
-    COL_PROD = 7;
-    COL_EXP = 8;
-    COL_CURR = 9;
-    COL_PTYPE = 10;
-    COL_UNIT_PRICE = 11;
-    COL_TOTAL = 12
+    # أعمدة الجدول
+    COL_SOURCE     = 0
+    COL_TRUCK      = 1
+    COL_MATERIAL   = 2
+    COL_PACK       = 3
+    COL_QTY        = 4
+    COL_GROSS      = 5
+    COL_NET        = 6
+    COL_PROD       = 7
+    COL_EXP        = 8
+    COL_CURR       = 9
+    COL_PTYPE      = 10
+    COL_UNIT_PRICE = 11
+    COL_TOTAL      = 12
 
     # نُعرّف خصائص الـ instance هنا لتفادي تحذير "defined outside __init__"
     _updating: bool = False
@@ -84,19 +83,6 @@ class ItemsTabMixin:
     _packs: List[tuple] = []
     _currencies: List[tuple] = []
     _pricing_types: List[tuple] = []
-
-    # Fallback مترجم حتى لو ما كان عندك self._ في الأب
-    def _(self, key: str) -> str:  # noqa: D401
-        try:
-            t = getattr(self, "translate", None)
-            if callable(t):
-                return t(key)  # type: ignore[misc]
-            tr = getattr(self, "translator", None)
-            if tr and callable(getattr(tr, "translate", None)):
-                return tr.translate(key)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        return key
 
     # ----------------------------- build UI -----------------------------
     def _build_items_tab(self) -> None:

@@ -389,6 +389,39 @@ class BaseTab(QWidget):
 
         self._layout.addLayout(self.top_bar)
 
+        # ── Selection Action Bar (مخفي افتراضياً — يظهر عند التحديد) ──
+        self._sel_bar = QFrame()
+        self._sel_bar.setObjectName("selection-action-bar")
+        sel_lay = QHBoxLayout(self._sel_bar)
+        sel_lay.setContentsMargins(12, 6, 12, 6)
+        sel_lay.setSpacing(8)
+
+        self._lbl_sel_count = QLabel()
+        self._lbl_sel_count.setObjectName("sel-count-label")
+        sel_lay.addWidget(self._lbl_sel_count)
+        sel_lay.addStretch()
+
+        self._btn_sel_delete = QPushButton()
+        self._btn_sel_delete.setObjectName("danger-btn")
+        self._btn_sel_delete.setMinimumWidth(90)
+        self._btn_sel_delete.clicked.connect(self._on_sel_bar_delete)
+        sel_lay.addWidget(self._btn_sel_delete)
+
+        self._btn_sel_export = QPushButton()
+        self._btn_sel_export.setObjectName("secondary-btn")
+        self._btn_sel_export.setMinimumWidth(100)
+        self._btn_sel_export.clicked.connect(self._on_sel_bar_export)
+        sel_lay.addWidget(self._btn_sel_export)
+
+        self._btn_sel_clear = QPushButton()
+        self._btn_sel_clear.setObjectName("secondary-btn")
+        self._btn_sel_clear.setMinimumWidth(80)
+        self._btn_sel_clear.clicked.connect(self.clear_selection)
+        sel_lay.addWidget(self._btn_sel_clear)
+
+        self._sel_bar.setVisible(False)
+        self._layout.addWidget(self._sel_bar)
+
         # ── الجدول ────────────────────────────────────────────────────
         self.table = QTableWidget(0, 0, self)
         self.table.setObjectName("data-table")
@@ -482,6 +515,7 @@ class BaseTab(QWidget):
         # ── signals ─────────────────────────────────────────────────────
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
+        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         # ── تحديث الفونت عند تغيير الثيم ──────────────────────────────
         try:
@@ -573,11 +607,40 @@ class BaseTab(QWidget):
     def set_columns(self, columns: list):
         """تعيين الأعمدة مباشرة."""
         self.columns = columns or []
-        self.table.setColumnCount(len(self.columns))
-        self.table.setHorizontalHeaderLabels([
-            self._(c.get("label", "")) if c.get("label") else ""
-            for c in self.columns
-        ])
+        # عمود الـ checkbox (col 0) + بقية الأعمدة
+        self.table.setColumnCount(len(self.columns) + 1)
+        # header col 0: checkbox لـ select-all
+        self._setup_checkbox_header()
+        self.table.setHorizontalHeaderLabels(
+            [""] + [self._(c.get("label", "")) if c.get("label") else "" for c in self.columns]
+        )
+        self.table.setColumnWidth(0, 36)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+
+    def _setup_checkbox_header(self):
+        """يضع QCheckBox في header العمود 0 لـ select/deselect all."""
+        chk = QCheckBox()
+        chk.setObjectName("header-check-all")
+        chk.setToolTip(self._("select_all"))
+        chk.stateChanged.connect(self._on_header_checkbox_changed)
+        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
+        self._header_checkbox = chk
+        # نُغلّف في widget مُوسَّط
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setAlignment(Qt.AlignCenter)
+        lay.addWidget(chk)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.table.setColumnWidth(0, 36)
+        self.table.horizontalHeader().setMinimumSectionSize(36)
+
+    def _on_header_checkbox_changed(self, state):
+        """Select all / deselect all من الـ header."""
+        if state == Qt.Checked:
+            self.table.selectAll()
+        elif state == Qt.Unchecked:
+            self.table.clearSelection()
 
     def set_columns_for_role(self, base_columns: list, admin_columns: list = None):
         """تعيين الأعمدة الأساسية وأعمدة الأدمن الاختيارية."""
@@ -679,13 +742,16 @@ class BaseTab(QWidget):
         try:
             self.table.setRowCount(len(page_rows))
             for i, row in enumerate(page_rows):
+                # col 0: checkbox
+                self._set_row_checkbox(i)
+                # col 1+: البيانات
                 for j, col in enumerate(self.columns):
                     key  = col.get("key", "")
                     val  = row.get(key, "")
                     item = QTableWidgetItem(str(val) if val is not None else "")
                     item.setTextAlignment(col.get("align", Qt.AlignCenter))
                     item.setFont(_BOLD_ITEM_FONT)
-                    self.table.setItem(i, j, item)
+                    self.table.setItem(i, j + 1, item)
         finally:
             self.table.setUpdatesEnabled(True)
             self.table.setSortingEnabled(True)
@@ -726,19 +792,23 @@ class BaseTab(QWidget):
         try:
             self.table.setRowCount(len(page_rows))
             for row_idx, row in enumerate(page_rows):
+                # col 0: checkbox
+                self._set_row_checkbox(row_idx)
+                # col 1+: البيانات
                 for col_idx, col in enumerate(self.columns):
                     key = col.get("key", "")
+                    real_col = col_idx + 1   # offset بسبب checkbox
                     if key == "actions":
                         if not show_actions:
                             continue
                         obj = row.get("actions")
-                        self._set_action_cell(row_idx, col_idx, obj, can_edit, can_delete)
+                        self._set_action_cell(row_idx, real_col, obj, can_edit, can_delete)
                     else:
                         val  = row.get(key, "")
                         item = QTableWidgetItem(str(val) if val is not None else "")
                         item.setTextAlignment(col.get("align", Qt.AlignCenter))
                         item.setFont(_BOLD_ITEM_FONT)
-                        self.table.setItem(row_idx, col_idx, item)
+                        self.table.setItem(row_idx, real_col, item)
         finally:
             self.table.setUpdatesEnabled(True)
             self.table.setSortingEnabled(True)
@@ -788,10 +858,16 @@ class BaseTab(QWidget):
         hdr = self.table.horizontalHeader()
         # أولاً: اضبط كل عمود حسب محتواه (header + cells)
         hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
-        # ثانياً: حوّل للوضع Interactive حتى يبقى التعديل اليدوي ممكناً
-        # نؤخّر التحويل حتى تنتهي Qt من حساب الأحجام
-        QTimer.singleShot(0, lambda: hdr.setSectionResizeMode(QHeaderView.Interactive)
-                          if not self.table.isHidden() else None)
+        # ثانياً: حوّل للوضع Interactive — مع حماية عمود checkbox (col 0)
+        def _finish():
+            if self.table.isHidden():
+                return
+            hdr.setSectionResizeMode(QHeaderView.Interactive)
+            # أعد تثبيت عرض عمود الـ checkbox
+            if self.table.columnCount() > 0:
+                hdr.setSectionResizeMode(0, QHeaderView.Fixed)
+                self.table.setColumnWidth(0, 36)
+        QTimer.singleShot(0, _finish)
 
     def set_row_height(self, height: int):
         """
@@ -912,8 +988,109 @@ class BaseTab(QWidget):
         if hasattr(self, "search_bar"):
             self.search_bar.clear()
 
+    # ─────────────────────────────────────────────────────────────────────
+    # SELECTION ACTION BAR
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _on_selection_changed(self, *_):
+        """يُحدَّث عند كل تغيير في التحديد — يُظهر/يُخفي الـ action bar."""
+        rows  = self.get_selected_rows()
+        count = len(rows)
+        if count == 0:
+            self._sel_bar.setVisible(False)
+            return
+
+        # نص العداد
+        self._lbl_sel_count.setText(
+            self._("selected_rows_count").format(count=count)
+        )
+        # نص زر الحذف
+        self._btn_sel_delete.setText(
+            f"{self._('delete')}  ({count})"
+        )
+        # نص تصدير
+        self._btn_sel_export.setText(self._("export_selected"))
+        # نص إلغاء تحديد
+        self._btn_sel_clear.setText(self._("clear_selection"))
+
+        # صلاحية الحذف
+        can_del = _has_perm(self.current_user,
+                            self.required_permissions.get("delete"))                   or self.is_admin
+        self._btn_sel_delete.setVisible(can_del)
+
+        self._sel_bar.setVisible(True)
+        # زامن checkboxes الصفوف
+        try:
+            self._sync_row_checkboxes()
+        except Exception:
+            pass
+
+    def _on_sel_bar_delete(self):
+        """زر الحذف في الـ action bar."""
+        rows = self.get_selected_rows()
+        if rows:
+            self.request_delete.emit(rows)
+
+    def _on_sel_bar_export(self):
+        """تصدير الصفوف المحددة فقط إلى Excel."""
+        rows = self.get_selected_rows()
+        if not rows:
+            return
+        self._export_rows(row_indices=rows)
+
+    def _export_rows(self, row_indices: list | None = None):
+        """
+        تصدير صفوف محددة أو كل الجدول حسب row_indices.
+        None = كل الصفوف.
+        """
+        # نستدعي export_table_to_excel مع تمرير المعلومة
+        self._export_selected_indices = row_indices
+        self.export_table_to_excel()
+        self._export_selected_indices = None
+
     def get_selected_rows(self) -> list:
         return [idx.row() for idx in self.table.selectionModel().selectedRows()]
+
+    def _set_row_checkbox(self, row: int):
+        """يضع checkbox في col 0 للصف المحدد — الـ selection يحكمه التحديد الفعلي."""
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setAlignment(Qt.AlignCenter)
+        chk = QCheckBox()
+        chk.setObjectName("row-checkbox")
+        # ربط الـ checkbox بالتحديد في الجدول
+        chk.stateChanged.connect(lambda state, r=row: self._on_row_checkbox_changed(r, state))
+        lay.addWidget(chk)
+        self.table.setCellWidget(row, 0, w)
+
+    def _on_row_checkbox_changed(self, row: int, state: int):
+        """عند تغيير checkbox الصف — يتزامن مع selection الجدول."""
+        from PySide6.QtCore import QItemSelectionModel, QItemSelection
+        if state == Qt.Checked:
+            self.table.selectRow(row)
+        else:
+            # deselect الصف كاملاً
+            sel_model = self.table.selectionModel()
+            top_left  = self.table.model().index(row, 0)
+            bot_right = self.table.model().index(row, self.table.columnCount() - 1)
+            selection = QItemSelection(top_left, bot_right)
+            sel_model.select(
+                selection,
+                QItemSelectionModel.SelectionFlag.Deselect
+            )
+
+    def _sync_row_checkboxes(self):
+        """يُزامن checkboxes الصفوف مع الـ selection الحالي."""
+        selected = {idx.row() for idx in self.table.selectionModel().selectedRows()}
+        for row in range(self.table.rowCount()):
+            w = self.table.cellWidget(row, 0)
+            if w:
+                chk = w.findChild(QCheckBox)
+                if chk:
+                    chk.blockSignals(True)
+                    chk.setChecked(row in selected)
+                    chk.blockSignals(False)
 
     def _table_has_focus(self) -> bool:
         focused = QApplication.focusWidget()
@@ -931,7 +1108,9 @@ class BaseTab(QWidget):
         menu  = QMenu(self)
 
         if count > 1:
-            title = menu.addAction(f"✓  {count}  {self._('selected_rows_count')}")
+            title = menu.addAction(
+                "✓  " + self._("selected_rows_count").format(count=count)
+            )
             title.setEnabled(False)
             menu.addSeparator()
 
@@ -1103,12 +1282,15 @@ class BaseTab(QWidget):
             self._lbl_rows_per_page.setText(self._("rows_per_page"))
             self._lbl_empty_text.setText(self._("no_data_available"))
             self._update_pagination_label()
-            # هيدر الجدول
-            if self.columns and self.table.columnCount() == len(self.columns):
+            # هيدر الجدول — col 0 هو checkbox، col 1+ هي الأعمدة
+            if self.columns and self.table.columnCount() == len(self.columns) + 1:
                 for i, col in enumerate(self.columns):
-                    h = self.table.horizontalHeaderItem(i)
+                    h = self.table.horizontalHeaderItem(i + 1)
                     if h:
                         h.setText(self._(col.get("label", "")) if col.get("label") else "")
+            # sel bar — أعد ترجمة النصوص الثابتة فقط إذا ظاهر
+            if self._sel_bar.isVisible():
+                self._on_selection_changed()
         except Exception as e:
             logger.warning(f"BaseTab retranslate_ui failed: {e}")
 
