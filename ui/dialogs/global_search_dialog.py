@@ -3,10 +3,11 @@ ui/dialogs/global_search_dialog.py
 =====================================
 نافذة البحث العام — Spotlight-style popup
 
-المرحلة 4 — التحسينات:
-  + الكونتينرات في نتائج البحث (BL، container_no، ...)
-  + سجل آخر 5 عمليات بحث مع زر مسح
-  + Ctrl+K كاختصار إضافي بجانب Ctrl+F
+الإصلاحات v2:
+  - c غير معرّفة في _show_results → أصبحت instance variable
+  - لا يمكن الخروج → أُضيف focusOutEvent + closeEvent صحيح
+  - FramelessWindowHint + WindowStaysOnTopHint
+  - Escape يعمل دائماً حتى لو الـ focus على results_list
 """
 from __future__ import annotations
 
@@ -15,16 +16,18 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QWidget,
     QFrame, QApplication, QPushButton,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QThread, QObject
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QObject, QEvent
 from PySide6.QtGui import QFont, QKeyEvent, QColor
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
+from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
 
 _MAX_HISTORY = 5
 
 
-# ─── Worker thread للبحث غير المتزامن ─────────────────────────────────────
+# ─── Worker ───────────────────────────────────────────────────────────────────
 
 class _SearchWorker(QObject):
     results_ready = Signal(list)
@@ -45,18 +48,15 @@ class _SearchWorker(QObject):
         self.finished.emit()
 
 
-# ─── نافذة البحث ──────────────────────────────────────────────────────────
+# ─── Dialog ───────────────────────────────────────────────────────────────────
 
-from core.base_dialog import BaseDialog
-from ui.utils.wheel_blocker import block_wheel_in
-class GlobalSearchDialog(BaseDialog):
+class GlobalSearchDialog(QDialog):
     """
     Spotlight-style search dialog.
-    Signal navigate_to(entity_key, record_id) يُصدَر عند اختيار نتيجة.
+    يُغلق بـ: Escape | Click خارج النافذة | اختيار نتيجة
     """
-    navigate_to = Signal(str, int)   # (tab_key, record_id)
+    navigate_to = Signal(str, int)
 
-    # سجل البحث مشترك بين كل النوافذ في الجلسة الواحدة
     _history: list[str] = []
 
     def __init__(self, parent=None):
@@ -70,38 +70,65 @@ class GlobalSearchDialog(BaseDialog):
         self._thread = None
         self._worker = None
 
+        # ألوان الـ theme — معرّفة هنا لتكون متاحة في كل الـ methods
+        self._colors = self._load_colors()
+
         self._setup_window()
         self._build_ui()
-        block_wheel_in(self)
         self._apply_style()
+        block_wheel_in(self)
 
-    # ─── Window setup ────────────────────────────────────────────────────────
+    # ─── Colors ───────────────────────────────────────────────────────────────
+
+    def _load_colors(self) -> dict:
+        try:
+            from config.themes import ThemeBuilder
+            theme_name = SettingsManager.get_instance().get("theme", "light")
+            theme = ThemeBuilder(theme_name)
+            return dict(theme.colors)
+        except Exception:
+            return {
+                "bg_card":      "#FFFFFF",
+                "border":       "#E0E0E0",
+                "text_primary": "#212529",
+                "text_muted":   "#6C757D",
+                "text_secondary":"#6C757D",
+                "bg_hover":     "#F0F7FF",
+                "accent":       "#2563EB",
+                "primary":      "#2563EB",
+            }
+
+    def _c(self, key: str, fallback: str = "#666") -> str:
+        return self._colors.get(key, fallback)
+
+    # ─── Window ───────────────────────────────────────────────────────────────
 
     def _setup_window(self):
-        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setModal(True)
-        self.setMinimumWidth(580)
-        self.setMaximumWidth(700)
-
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.setGeometry(
-            screen.center().x() - 310,
-            screen.top() + int(screen.height() * 0.18),
-            620,
-            460,
+        self.setWindowFlags(
+            Qt.Dialog |
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint
         )
+        # لا WA_TranslucentBackground — يسبب خلفية داكنة على بعض الـ DEs
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
+        self.setModal(True)
+        self.setFixedWidth(560)
 
-    # ─── UI ──────────────────────────────────────────────────────────────────
+        try:
+            screen = QApplication.primaryScreen().availableGeometry()
+            self.move(
+                screen.center().x() - 280,
+                screen.top() + int(screen.height() * 0.13),
+            )
+        except Exception:
+            pass
+
+    # ─── UI ───────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-
-        # ── Primary header ───────────────────────────────────────
-        _hdr, _sep = self._build_primary_header(self.windowTitle())
-        outer.addWidget(_hdr)
-        outer.addWidget(_sep)
+        outer.setSpacing(0)
 
         self.card = QFrame()
         self.card.setObjectName("search-card")
@@ -109,9 +136,9 @@ class GlobalSearchDialog(BaseDialog):
         card_lay.setContentsMargins(0, 0, 0, 0)
         card_lay.setSpacing(0)
 
-        # ── حقل البحث ──────────────────────────────────────────────────────
+        # ── حقل البحث ─────────────────────────────────────────────────────────
         search_row = QHBoxLayout()
-        search_row.setContentsMargins(16, 12, 16, 12)
+        search_row.setContentsMargins(16, 14, 16, 14)
         search_row.setSpacing(10)
 
         icon = QLabel("🔍")
@@ -128,37 +155,34 @@ class GlobalSearchDialog(BaseDialog):
         self.search_input.returnPressed.connect(self._select_first)
         search_row.addWidget(self.search_input, 1)
 
-        # تلميح الاختصار
-        hint_lbl = QLabel("Ctrl+K / Ctrl+F")
+        hint_lbl = QLabel("Esc  " + self._("close"))
         hint_lbl.setObjectName("kbd-hint")
         search_row.addWidget(hint_lbl)
 
         card_lay.addLayout(search_row)
 
-        # فاصل
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setObjectName("separator")
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("separator")
         card_lay.addWidget(sep)
 
-        # ── منطقة المحتوى (history + نتائج) ───────────────────────────────
+        # ── History + Results ──────────────────────────────────────────────────
         self._content_widget = QWidget()
-        self._content_lay = QVBoxLayout(self._content_widget)
+        self._content_lay    = QVBoxLayout(self._content_widget)
         self._content_lay.setContentsMargins(0, 0, 0, 0)
         self._content_lay.setSpacing(0)
 
-        # ── history panel ──────────────────────────────────────────────────
+        # history
         self._history_panel = QWidget()
         hist_lay = QVBoxLayout(self._history_panel)
         hist_lay.setContentsMargins(16, 10, 16, 6)
         hist_lay.setSpacing(4)
 
         hist_header = QHBoxLayout()
-        hist_title = QLabel(self._("search_recent_title"))
+        hist_title  = QLabel(self._("search_recent_title"))
         hist_title.setObjectName("text-muted")
         hist_title.setFont(QFont("Tajawal", 9, QFont.Bold))
         hist_header.addWidget(hist_title)
         hist_header.addStretch()
+
         self._clear_btn = QPushButton(self._("search_recent_clear"))
         self._clear_btn.setObjectName("link-btn")
         self._clear_btn.setFont(QFont("Tajawal", 9))
@@ -174,10 +198,9 @@ class GlobalSearchDialog(BaseDialog):
         self._history_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history_list.itemClicked.connect(self._on_history_clicked)
         hist_lay.addWidget(self._history_list)
-
         self._content_lay.addWidget(self._history_panel)
 
-        # ── قائمة النتائج ──────────────────────────────────────────────────
+        # results
         self.results_list = QListWidget()
         self.results_list.setObjectName("search-results-list")
         self.results_list.setFrameShape(QFrame.NoFrame)
@@ -186,47 +209,38 @@ class GlobalSearchDialog(BaseDialog):
         self.results_list.itemActivated.connect(self._on_item_activated)
         self.results_list.itemClicked.connect(self._on_item_activated)
         self._content_lay.addWidget(self.results_list)
-
         card_lay.addWidget(self._content_widget)
 
-        # ── شريط الحالة السفلي ─────────────────────────────────────────────
+        # footer
         footer = QHBoxLayout()
-        footer.setContentsMargins(16, 8, 16, 10)
-
+        footer.setContentsMargins(16, 8, 16, 12)
         self.status_lbl = QLabel(self._("search_hint"))
         self.status_lbl.setObjectName("text-muted")
         self.status_lbl.setFont(QFont("Tajawal", 9))
         footer.addWidget(self.status_lbl)
         footer.addStretch()
-
         nav_hint = QLabel("↑↓  " + self._("navigate") + "   ↵  " + self._("open"))
         nav_hint.setObjectName("text-muted")
         nav_hint.setFont(QFont("Tajawal", 9))
         footer.addWidget(nav_hint)
-
         card_lay.addLayout(footer)
+
         outer.addWidget(self.card)
 
-    # ─── Style ───────────────────────────────────────────────────────────────
+    # ─── Style ────────────────────────────────────────────────────────────────
 
     def _apply_style(self):
-        try:
-            from config.themes import ThemeBuilder
-            theme_name = SettingsManager.get_instance().get("theme", "light")
-            theme = ThemeBuilder(theme_name)
-            c = theme.colors
-            bg       = c.get("bg_card", "#FFFFFF")
-            border_c = c.get("border", "#E0E0E0")
-            text_c   = c.get("text_primary", "#212529")
-            text_muted = c.get("text_muted", "#6C757D")
-            hover_bg = c.get("bg_hover", "#F0F7FF")
-            accent   = c.get("accent", "#2563EB")
-        except Exception:
-            bg = "#FFFFFF"; border_c = "#E0E0E0"
-            text_c = "#212529"; text_muted = "#6C757D"
-            hover_bg = "#F0F7FF"; accent = "#2563EB"
+        bg        = self._c("bg_card",      "#FFFFFF")
+        border_c  = self._c("border",       "#E0E0E0")
+        text_c    = self._c("text_primary",  "#212529")
+        text_muted= self._c("text_secondary","#6C757D")
+        hover_bg  = self._c("bg_hover",     "#F0F7FF")
+        accent    = self._c("primary",      "#2563EB")
 
         self.setStyleSheet(f"""
+            GlobalSearchDialog {{
+                background: {bg};
+            }}
             QFrame#search-card {{
                 background   : {bg};
                 border       : 1px solid {border_c};
@@ -245,14 +259,14 @@ class GlobalSearchDialog(BaseDialog):
                 outline     : none;
                 padding     : 4px 8px;
                 min-height  : 160px;
-                max-height  : 300px;
+                max-height  : 280px;
                 color       : {text_c};
             }}
             QListWidget#search-results-list::item {{
                 border-radius: 8px;
-                padding     : 0;
-                margin      : 1px 0;
-                color       : {text_c};
+                padding      : 0;
+                margin       : 1px 0;
+                color        : {text_c};
             }}
             QListWidget#search-results-list::item:selected,
             QListWidget#search-results-list::item:hover {{
@@ -267,8 +281,8 @@ class GlobalSearchDialog(BaseDialog):
             }}
             QListWidget#history-list::item {{
                 border-radius: 6px;
-                padding     : 2px 8px;
-                color       : {text_c};
+                padding      : 2px 8px;
+                color        : {text_c};
             }}
             QListWidget#history-list::item:hover {{
                 background  : {hover_bg};
@@ -279,12 +293,9 @@ class GlobalSearchDialog(BaseDialog):
                 color       : {accent};
                 padding     : 0 4px;
             }}
-            QPushButton#link-btn:hover {{
-                text-decoration: underline;
-            }}
-            QLabel {{
-                color: {text_c};
-            }}
+            QPushButton#link-btn:hover {{ text-decoration: underline; }}
+            QLabel {{ color: {text_c}; }}
+            QLabel#text-muted {{ color: {text_muted}; }}
             QLabel#kbd-hint {{
                 color        : {text_muted};
                 border       : 1px solid {border_c};
@@ -304,25 +315,21 @@ class GlobalSearchDialog(BaseDialog):
             self._history_panel.setVisible(False)
             return
         self._history_panel.setVisible(True)
-        self._clear_btn.setVisible(True)
         for q in reversed(history):
             item = QListWidgetItem(f"  🕐  {q}")
             item.setData(Qt.UserRole, q)
             item.setFont(QFont("Tajawal", 10))
             self._history_list.addItem(item)
-        rows = min(len(history), _MAX_HISTORY)
-        self._history_list.setFixedHeight(rows * 34)
+        self._history_list.setFixedHeight(min(len(history), _MAX_HISTORY) * 34)
 
     def _add_to_history(self, query: str):
-        h = GlobalSearchDialog._history
         query = query.strip()
         if not query:
             return
-        # ازل التكرار وأضف في الآخر
+        h = GlobalSearchDialog._history
         if query in h:
             h.remove(query)
         h.append(query)
-        # حافظ على 5 فقط
         if len(h) > _MAX_HISTORY:
             GlobalSearchDialog._history = h[-_MAX_HISTORY:]
 
@@ -338,7 +345,7 @@ class GlobalSearchDialog(BaseDialog):
             self.search_input.setText(q)
             self.search_input.setFocus()
 
-    # ─── Search logic ─────────────────────────────────────────────────────────
+    # ─── Search ───────────────────────────────────────────────────────────────
 
     def _on_text_changed(self, text: str):
         self._timer.stop()
@@ -348,7 +355,6 @@ class GlobalSearchDialog(BaseDialog):
             self._refresh_history()
             self.status_lbl.setText(self._("search_hint"))
             return
-        # إخفاء history وإظهار results
         self._history_panel.setVisible(False)
         self.results_list.setVisible(True)
         self._timer.start()
@@ -357,24 +363,25 @@ class GlobalSearchDialog(BaseDialog):
         query = self.search_input.text().strip()
         if not query:
             return
-
         self.status_lbl.setText(self._("searching") + "...")
         self.results_list.clear()
 
         if self._thread and self._thread.isRunning():
             self._thread.quit()
-            self._thread.wait(200)
+            self._thread.wait(300)
 
-        self._thread = QThread()
+        self._thread = QThread(self)
         self._worker = _SearchWorker(query, self._lang)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.results_ready.connect(self._show_results)
         self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
         self._thread.start()
 
-    def _show_results(self, results):
+    def _show_results(self, results: list):
         self.results_list.clear()
+        text_muted = self._c("text_secondary", "#6B7280")
 
         if not results:
             self.status_lbl.setText(self._("no_results"))
@@ -400,21 +407,19 @@ class GlobalSearchDialog(BaseDialog):
 
         for entity_key, entity_results in grouped.items():
             label, icon = entity_labels.get(entity_key, (entity_key, "📄"))
-
             header = QListWidgetItem(f"  {icon}  {label}")
             header.setFlags(Qt.NoItemFlags)
             header.setFont(QFont("Tajawal", 9, QFont.Bold))
-            header.setForeground(QColor(c.get("text_muted", "#6B7280")))
+            header.setForeground(QColor(text_muted))
             self.results_list.addItem(header)
-
             for r in entity_results:
                 item = self._make_item(r)
                 self.results_list.addItem(item)
                 self.results_list.setItemWidget(item, self._make_item_widget(r))
 
-        count = len(results)
-        self.status_lbl.setText(f"{count} {self._('results_found')}")
+        self.status_lbl.setText(f"{len(results)} {self._('results_found')}")
 
+        # حدد أول نتيجة قابلة للاختيار
         for i in range(self.results_list.count()):
             it = self.results_list.item(i)
             if it and (it.flags() & Qt.ItemIsEnabled):
@@ -429,7 +434,7 @@ class GlobalSearchDialog(BaseDialog):
         return item
 
     def _make_item_widget(self, result) -> QWidget:
-        w = QWidget()
+        w   = QWidget()
         lay = QHBoxLayout(w)
         lay.setContentsMargins(12, 6, 12, 6)
         lay.setSpacing(10)
@@ -465,7 +470,7 @@ class GlobalSearchDialog(BaseDialog):
         w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         return w
 
-    # ─── Navigation ──────────────────────────────────────────────────────────
+    # ─── Navigation ───────────────────────────────────────────────────────────
 
     def _select_first(self):
         for i in range(self.results_list.count()):
@@ -479,46 +484,68 @@ class GlobalSearchDialog(BaseDialog):
         if not data:
             return
         entity_key, record_id = data
-        # احفظ query في السجل
         self._add_to_history(self.search_input.text().strip())
+        self._cleanup_thread()
         self.accept()
         self.navigate_to.emit(entity_key, record_id)
 
-    # ─── Keyboard ────────────────────────────────────────────────────────────
+    # ─── Keyboard & Focus ─────────────────────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
         if key == Qt.Key_Escape:
-            self.reject()
-        elif key in (Qt.Key_Down, Qt.Key_Up):
-            self._move_selection(1 if key == Qt.Key_Down else -1)
-        elif key == Qt.Key_Return:
+            self._safe_close()
+        elif key == Qt.Key_Down:
+            self._move_selection(1)
+        elif key == Qt.Key_Up:
+            self._move_selection(-1)
+        elif key == Qt.Key_Return or key == Qt.Key_Enter:
             cur = self.results_list.currentItem()
-            if cur:
+            if cur and (cur.flags() & Qt.ItemIsEnabled):
                 self._on_item_activated(cur)
+            else:
+                self._select_first()
         else:
+            # أي حرف آخر → أعد الـ focus للـ search_input
+            if not event.text().strip() == "":
+                self.search_input.setFocus()
             super().keyPressEvent(event)
+
+    def changeEvent(self, event):
+        """يُغلق عند فقدان الـ activation (مثل الضغط خارج النافذة)."""
+        if event.type() == QEvent.ActivationChange:
+            if not self.isActiveWindow():
+                self._safe_close()
+        super().changeEvent(event)
 
     def _move_selection(self, direction: int):
         count = self.results_list.count()
         if count == 0:
             return
         cur = self.results_list.currentRow()
-        idx = cur
+        idx = cur if cur >= 0 else -1
         for _ in range(count):
             idx = (idx + direction) % count
-            it = self.results_list.item(idx)
+            it  = self.results_list.item(idx)
             if it and (it.flags() & Qt.ItemIsEnabled):
                 self.results_list.setCurrentRow(idx)
                 break
 
-    # ─── Lifecycle ───────────────────────────────────────────────────────────
+    # ─── Lifecycle ────────────────────────────────────────────────────────────
 
-    def closeEvent(self, event):
+    def _safe_close(self):
+        """إغلاق آمن — ينظف الـ thread ويرفض الـ dialog."""
+        self._cleanup_thread()
+        self.reject()
+
+    def _cleanup_thread(self):
         self._timer.stop()
         if self._thread and self._thread.isRunning():
             self._thread.quit()
-            self._thread.wait(300)
+            self._thread.wait(400)
+
+    def closeEvent(self, event):
+        self._cleanup_thread()
         super().closeEvent(event)
 
     def showEvent(self, event):

@@ -122,12 +122,13 @@ class DocumentsTab(BaseTab):
       footer:   pagination bar
     """
 
-    COL_DOCNO       = 0
-    COL_TRANSACTION = 1
-    COL_TYPE        = 2
-    COL_LANG        = 3
-    COL_PATH        = 4
-    COL_ACTIONS     = 5
+    # col 0 محجوز لـ checkbox من BaseTab — الأعمدة تبدأ من 1
+    COL_DOCNO       = 1
+    COL_TRANSACTION = 2
+    COL_TYPE        = 3
+    COL_LANG        = 4
+    COL_PATH        = 5
+    COL_ACTIONS     = 6
 
     required_permissions: dict = {
         "view":    ["view_documents"],
@@ -426,6 +427,9 @@ class DocumentsTab(BaseTab):
             for r, rec in enumerate(rows):
                 file_missing = rec.get("_file_missing", False)
 
+                # col 0: checkbox (مطلوب من BaseTab لتفعيل السيليكشن)
+                self._set_row_checkbox(r)
+
                 item_doc = QTableWidgetItem(_fmt(rec.get("doc_no")))
                 item_doc.setData(Qt.UserRole, rec)
                 item_doc.setTextAlignment(Qt.AlignCenter)
@@ -689,8 +693,9 @@ class DocumentsTab(BaseTab):
                 self.cmb_lang.setItemText(3, _tr("turkish"))
             if hasattr(self, "_date_bar"):
                 self._date_bar.retranslate()
-            if hasattr(self, "table") and self.table.columnCount() == 6:
+            if hasattr(self, "table") and self.table.columnCount() == 7:
                 self.table.setHorizontalHeaderLabels([
+                    "",                      # col 0: checkbox
                     _tr("doc_no"),
                     _tr("transaction_no"),
                     _tr("doc_type"),

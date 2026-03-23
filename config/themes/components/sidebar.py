@@ -1,11 +1,7 @@
 """
-Sidebar Component Styles - RTL-Aware Blue Modern
-=================================================
-إصلاحات:
-  - active border على الجانب الأيمن (RTL) بدل الأيسر
-  - hover gradient صحيح الاتجاه
-  - active state أوضح مع خلفية solid خفيفة
-  - logo box gradient محسّن
+sidebar.py (theme) — Floating Pill Navigation Styles
+======================================================
+Styles للـ FloatingPillNav — شريط التنقل الأفقي العائم.
 """
 
 from ..spacing import Spacing
@@ -13,85 +9,71 @@ from ..border_radius import BorderRadius
 
 
 def get_styles(theme):
-    """Generate RTL-correct Sidebar styles"""
     c = theme.colors
     s = theme.sizes
 
     return f"""
-    /* ========== SIDEBAR CONTAINER ========== */
+    /* ── Floating Pill container ─────────────────────────────────── */
 
-    QFrame#Sidebar {{
-        background  : {c["bg_sidebar"]};
-        border-left : 1px solid rgba(255, 255, 255, 0.08);
+    QFrame#FloatingPill {{
+        background   : transparent;
+        border       : none;
     }}
 
-    /* ========== SIDEBAR BUTTONS ========== */
+    QFrame#pill-inner {{
+        background   : {c["bg_card"]};
+        border       : 1px solid {c["border"]};
+        border-radius: 40px;
+    }}
+
+    /* ── Tab buttons ─────────────────────────────────────────────── */
+
+    QToolButton#pill-tab-btn {{
+        background   : transparent;
+        border       : none;
+        border-radius: 12px;
+        padding      : 6px 10px;
+        color        : {c["text_secondary"]};
+        font-size    : {s["sm"]}px;
+        font-weight  : 500;
+        min-width    : 68px;
+    }}
+
+    QToolButton#pill-tab-btn:hover {{
+        background : {c["bg_hover"]};
+        color      : {c["text_primary"]};
+    }}
+
+    QToolButton#pill-tab-btn:checked {{
+        background : {c["primary"]};
+        color      : #FFFFFF;
+        font-weight: 700;
+    }}
+
+    QToolButton#pill-tab-btn:checked:hover {{
+        background : {c["primary_hover"]};
+    }}
+
+    /* ── backward compat — لو في مكان يستخدم sidebar-btn ────────── */
 
     QToolButton#sidebar-btn {{
         background   : transparent;
         border       : none;
         border-radius: {BorderRadius.LG};
         padding      : {Spacing.SM} {Spacing.MD};
-        color        : {c["sidebar_text"]};
-        text-align   : right;
+        color        : {c["text_secondary"]};
         font-size    : {s["base"]}px;
         font-weight  : 500;
     }}
 
-    /* Hover - RTL-friendly gradient */
     QToolButton#sidebar-btn:hover {{
-        background: rgba(255, 255, 255, 0.12);
-        color     : {c["sidebar_text_hover"]};
-        border-radius: {BorderRadius.MD};
+        background: {c["bg_hover"]};
+        color     : {c["text_primary"]};
     }}
 
-    /* Active/Checked - solid bg + right border (RTL) */
     QToolButton#sidebar-btn:checked {{
-        background  : rgba(255, 255, 255, 0.22);
-        color       : {c["sidebar_text"]};
-        font-weight : 700;
-        border-right: 3px solid {c["text_white"]};
-        border-top-right-radius   : 0px;
-        border-bottom-right-radius: 0px;
-    }}
-
-    /* ========== TOGGLE BUTTON ========== */
-
-    QPushButton#sidebar-toggle-btn {{
-        background   : rgba(255, 255, 255, 0.15);
-        border       : 1.5px solid rgba(255, 255, 255, 0.4);
-        border-radius: 50%;
-    }}
-
-    QPushButton#sidebar-toggle-btn:hover {{
-        background: rgba(255, 255, 255, 0.25);
-        border    : 1.5px solid rgba(255, 255, 255, 0.7);
-    }}
-
-    QPushButton#sidebar-toggle-btn:pressed {{
-        background: rgba(255, 255, 255, 0.35);
-    }}
-
-    /* ========== LOGO BOX ========== */
-
-    QFrame#SidebarLogoBox {{
-        background   : rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 0px;
-    }}
-
-    QLabel#sidebar-app-name {{
-        color         : {c["sidebar_text"]};
-        font-size     : {s["xl"]}px;
-        font-weight   : 900;
-        letter-spacing: 2px;
-    }}
-
-    /* ========== SEPARATOR ========== */
-
-    QFrame#sidebar-separator {{
-        background: rgba(255, 255, 255, 0.12);
-        border    : none;
-        max-height: 1px;
+        background: {c["bg_sidebar"]};
+        color     : {c["text_white"]};
+        font-weight: 700;
     }}
     """

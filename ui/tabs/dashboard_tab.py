@@ -275,7 +275,8 @@ class DashboardTab(QWidget):
         bottom.setSpacing(18)
         bottom.addWidget(self._build_activities_panel(), stretch=2)
         bottom.addWidget(self._build_transactions_panel(), stretch=3)
-        main.addLayout(bottom, stretch=1)
+        main.addLayout(bottom)
+        main.addStretch()  # يدفع كل شيء للأعلى ويترك مساحة في الأسفل
 
         scroll.setWidget(container)
         outer = QVBoxLayout(self)
@@ -340,6 +341,7 @@ class DashboardTab(QWidget):
     def _build_activities_panel(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("card")
+        frame.setMinimumHeight(380)
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(18, 16, 18, 16)
         lay.setSpacing(10)
@@ -371,6 +373,7 @@ class DashboardTab(QWidget):
     def _build_transactions_panel(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("card")
+        frame.setMinimumHeight(380)
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(18, 16, 18, 16)
         lay.setSpacing(10)

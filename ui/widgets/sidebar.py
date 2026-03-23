@@ -1,94 +1,82 @@
 """
-Sidebar - Fully Responsive Professional Design
-===============================================
-
-Features:
-- Width adapts to screen size
-- All elements scale proportionally
-- Smooth animations
-- New theme system compatible
+sidebar.py — LOGIPORT  (Floating Pill Navigation)
+===================================================
+شريط تنقل أفقي عائم يحل محل السايدبار الجانبي.
+- كل تاب: أيقونة كبيرة + اسم تحتها
+- التاب النشط: خلفية primary + نص وأيقونة بيضاء
+- يحتفظ بنفس الـ API: section_changed Signal + change_section()
+- الـ pill لا يتجاوز عرض الشاشة أبداً (أزرار تتقلص أو تختبئ)
 """
 
 from PySide6.QtWidgets import (
-    QFrame, QVBoxLayout, QPushButton, QSizePolicy, QLabel,
-    QHBoxLayout, QSpacerItem, QWidget, QToolButton, QApplication
+    QFrame, QHBoxLayout, QToolButton, QSizePolicy, QApplication,
 )
-from PySide6.QtCore import Qt, Signal, QSize, QPropertyAnimation
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QIcon
+
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from database.crud.permissions_crud import allowed_tabs
-from core.paths import resource_path
-from ui.utils.svg_icons import get_sidebar_icon, refresh_sidebar_icons, get_icon, QSize as _QSize
+from ui.utils.svg_icons import get_sidebar_icon, refresh_sidebar_icons
 
 ICON_PATHS = {
-    "dashboard":         "icons/dashboard.png",
-    "materials":         "icons/materials.png",
-    "clients":           "icons/clients.png",
-    "companies":         "icons/companies.png",
-    "pricing":           "icons/pricing.png",
-    "entries":           "icons/entries.png",
-    "transactions":      "icons/transactions.png",
-    "container_tracking":"icons/container.png",
-    "tasks":             "icons/tasks.png",
-    "documents":         "icons/documents.png",
-    "values":            "icons/values.png",
-    "offices":           "icons/settings.png",      # offices tab — يستخدم settings icon مؤقتاً
-    "audit_trail":       "icons/audit_trail.png",
-    "control_panel":     "icons/settings.png",
-    "users_permissions": "icons/users.png",
+    "dashboard":          "icons/dashboard.png",
+    "materials":          "icons/materials.png",
+    "clients":            "icons/clients.png",
+    "companies":          "icons/companies.png",
+    "pricing":            "icons/pricing.png",
+    "entries":            "icons/entries.png",
+    "transactions":       "icons/transactions.png",
+    "container_tracking": "icons/container.png",
+    "tasks":              "icons/tasks.png",
+    "documents":          "icons/documents.png",
+    "values":             "icons/values.png",
+    "offices":            "icons/settings.png",
+    "audit_trail":        "icons/audit_trail.png",
+    "control_panel":      "icons/settings.png",
+    "users_permissions":  "icons/users.png",
+}
+
+_EMOJI_FALLBACK = {
+    "dashboard":          "🏠",
+    "materials":          "📦",
+    "clients":            "👥",
+    "companies":          "🏢",
+    "pricing":            "💱",
+    "entries":            "📥",
+    "transactions":       "📋",
+    "container_tracking": "🚢",
+    "tasks":              "✅",
+    "documents":          "📄",
+    "values":             "💰",
+    "offices":            "🏬",
+    "audit_trail":        "🕵️",
+    "control_panel":      "⚙️",
+    "users_permissions":  "🔑",
 }
 
 
-class Sidebar(QFrame):
-    """
-    Fully responsive sidebar.
-
-    Width and all components scale based on screen size.
-    """
+class FloatingPillNav(QFrame):
+    """شريط تنقل أفقي عائم."""
 
     section_changed = Signal(str)
-    sidebar_toggled = Signal(bool)
+    sidebar_toggled = Signal(bool)   # backward compat
 
     def __init__(self):
         super().__init__()
-        self.setObjectName("Sidebar")
+        self.setObjectName("FloatingPill")
 
-        self._ = TranslationManager.get_instance().translate
+        self._        = TranslationManager.get_instance().translate
         self.settings = SettingsManager.get_instance()
+        self.buttons: dict = {}
+        self.btn_keys: list = []
+        self._active_key = ""
 
-        # ✅ حالة التوسيع - الأحجام responsive
-        self._set_responsive_widths()
+        self._build()
 
-        self.expanded = True
-        self.setMinimumWidth(self.expanded_width)
-        self.setMaximumWidth(self.expanded_width)
-        # يمتد لكامل ارتفاع النافذة
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-
-        # لياوت رئيسي
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setSpacing(0)
-
-        # ✅ Margins proportional
-        margin_bottom = max(10, int(self.expanded_width * 0.06))  # 6% of width
-        self.main_layout.setContentsMargins(0, 0, 0, margin_bottom)
-
-        # شعـار + اسم
-        self._build_header()
-
-        # الأزرار تبدأ مباشرة بعد الهيدر
-        self.main_layout.addSpacing(4)
-        self._build_buttons_from_permissions()
-        self.main_layout.addStretch(1)   # مسافة مرنة تحت فقط
-
-        self._build_footer_toggle()
-
-        # إشعارات الترجمة/الإعدادات
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
         self.settings.setting_changed.connect(self._on_setting_changed)
 
-        # Theme change → أعد رسم أيقونات السايدبار فور تطبيق الثيم الجديد
         try:
             from core.theme_manager import ThemeManager
             ThemeManager.get_instance().theme_changed.connect(
@@ -97,297 +85,139 @@ class Sidebar(QFrame):
         except Exception:
             pass
 
-        # اتجاه أولي حسب اللغة
         self.retranslate_ui()
-
-        # اختر أول تبويب
         if self.btn_keys:
             self.change_section(self.btn_keys[0])
 
-        self._sidebar_animation = None
+    # ─── Build ────────────────────────────────────────────────────────────────
 
-    def _set_responsive_widths(self):
-        """Set sidebar widths based on screen size"""
-        screen = QApplication.primaryScreen()
-        screen_width = screen.availableGeometry().width()
-
-        # ✅ Sidebar widths = نسبة من الشاشة
-        if screen_width < 1366:  # Small screens
-            self.expanded_width = max(180, int(screen_width * 0.15))  # 15%
-            self.collapsed_width = max(50, int(screen_width * 0.04))  # 4%
-        elif screen_width < 1920:  # Medium screens (HD)
-            self.expanded_width = 210
-            self.collapsed_width = 54
-        else:  # Large screens (Full HD+)
-            self.expanded_width = max(220, int(screen_width * 0.12))  # 12%
-            self.collapsed_width = max(60, int(screen_width * 0.03))  # 3%
-
-        # Store for children
-        self.screen_width = screen_width
-
-    # ==================== UI Parts ====================
-
-    def _build_header(self):
-        """Logo (أيقونة) فوق + اسم التطبيق تحته — عمودي مريح"""
-        self.logo_box = QFrame(self)
-        self.logo_box.setObjectName("SidebarLogoBox")
-        self.logo_box.setFixedHeight(136)
-
-        logo_layout = QVBoxLayout(self.logo_box)
-        logo_layout.setContentsMargins(0, 16, 0, 16)
-        logo_layout.setSpacing(10)
-        logo_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-
-        # Logo image
-        self.logo_img = QLabel()
-        self.logo_img.setObjectName("sidebar-logo-img")
-        pix = QPixmap(resource_path("icons", "logo.png"))
-        if not pix.isNull():
-            self.logo_img.setPixmap(
-                pix.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            )
-        self.logo_img.setFixedSize(80, 80)
-        self.logo_img.setAlignment(Qt.AlignCenter)
-        logo_layout.addWidget(self.logo_img, 0, Qt.AlignHCenter)
-
-        # App name
-        self.logo_label = QLabel(self._("app_name"))
-        self.logo_label.setObjectName("sidebar-app-name")
-        self.logo_label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        logo_layout.addWidget(self.logo_label, 0, Qt.AlignHCenter)
-
-        self.main_layout.addWidget(self.logo_box)
-
-        # Separator
-        line = QFrame()
-        line.setObjectName("sidebar-separator")
-        line.setFrameShape(QFrame.HLine)
-        line.setFixedHeight(1)
-        self.main_layout.addWidget(line)
-
-    def _build_footer_toggle(self):
-        """Build toggle button at bottom"""
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addItem(QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
-
-        self.toggle_btn = QPushButton()
-        self.toggle_btn.setObjectName("sidebar-toggle-btn")
-
-        # ✅ Toggle button size proportional
-        toggle_size = max(36, int(self.expanded_width * 0.19))  # 19% of width
-        self.toggle_btn.setFixedSize(toggle_size, toggle_size)
-
-        self.toggle_btn.setCursor(Qt.PointingHandCursor)
-
-        # ✅ Icon size proportional — يجب تعريفها قبل الاستخدام
-        icon_size = max(20, int(toggle_size * 0.6))  # 60% of button size
-        _toggle_svg = get_icon("menu_burger", icon_size)
-        if not _toggle_svg.isNull():
-            self.toggle_btn.setIcon(_toggle_svg)
-        else:
-            self.toggle_btn.setIcon(QIcon(resource_path("icons", "menu_burger.png")))
-        self.toggle_btn.setIconSize(QSize(icon_size, icon_size))
-
-        self.toggle_btn.setToolTip(self._("toggle_sidebar"))
-        self.toggle_btn.clicked.connect(self.toggle_sidebar)
-
-        row.addWidget(self.toggle_btn)
-        row.addItem(QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        self.main_layout.addLayout(row)
-
-    # ==================== Behavior ====================
-
-    def add_button(self, key, label, icon_path=None):
-        """Add a button to the sidebar"""
-
-        btn = QToolButton()
-        btn.setObjectName("sidebar-btn")
-        btn.setCheckable(True)
-        btn.setAutoRaise(True)
-        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setToolTip(label)
-
-        # ✅ Button height proportional
-        btn_height = max(38, int(self.expanded_width * 0.18))  # 18% of width
-        btn.setMinimumHeight(btn_height)
-
-        # ✅ Icon size proportional
-        icon_size = max(18, int(btn_height * 0.6))  # 60% of button height
-        btn.setIconSize(QSize(icon_size, icon_size))
-
-        if self.expanded:
-            btn.setText(label)
-
-        # SVG icon — fallback to PNG if not available
-        svg_icon = get_sidebar_icon(key, icon_size)
-        if not svg_icon.isNull():
-            btn.setIcon(svg_icon)
-        elif icon_path:
-            btn.setIcon(QIcon(resource_path(*icon_path.split("/"))))
-
-        lang = self.settings.get("language", "ar")
-        is_rtl = (lang == "ar")
-        # ✅ setLayoutDirection على الزر الفردي فقط (ليس على الـ Sidebar container)
-        btn.setLayoutDirection(Qt.RightToLeft if is_rtl else Qt.LeftToRight)
-        btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-
-        btn.clicked.connect(lambda checked=False, k=key: self.change_section(k))
-        self.main_layout.addWidget(btn)
-
-        if not hasattr(self, 'buttons'):
-            self.buttons = {}
-
-        self.buttons[key] = btn
-
-    def change_section(self, key):
-        """Change active section"""
-        for k, b in self.buttons.items():
-            b.setChecked(k == key)
-        self.section_changed.emit(key)
-
-    def toggle_sidebar(self):
-        """Toggle sidebar expanded/collapsed with safe width animation"""
-
-        self.expanded = not self.expanded
-
-        target_width = (
-            self.expanded_width if self.expanded
-            else self.collapsed_width
-        )
-
-        # نوقف أي أنيميشن سابق
-        if self._sidebar_animation and self._sidebar_animation.state():
-            self._sidebar_animation.stop()
-
-        # نحرر القيود قبل بدء الحركة
+    def _build(self):
+        # الـ FloatingPillNav يمتد أفقياً — ارتفاع ثابت
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setFixedHeight(122)
+        # مهم: لا يُسبّب minimum width على النافذة
         self.setMinimumWidth(0)
 
-        # أنيميشن آمن على maximumWidth فقط
-        self._sidebar_animation = QPropertyAnimation(self, b"maximumWidth")
-        self._sidebar_animation.setDuration(220)
-        self._sidebar_animation.setStartValue(self.width())
-        self._sidebar_animation.setEndValue(target_width)
+        # Layout خارجي يُمركز الـ pill
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(16, 8, 16, 8)
+        outer.setSpacing(0)
+        outer.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
-        # بعد انتهاء الأنيميشن نثبت العرض بشكل نظيف
-        def finalize_width():
-            self.setFixedWidth(target_width)
+        # الـ pill — frame مستدير يحمل الأزرار مباشرة
+        self._pill = QFrame()
+        self._pill.setObjectName("pill-inner")
+        # Preferred: يأخذ ما يحتاج لكن لا يتجاوز الـ outer
+        self._pill.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self._pill.setFixedHeight(106)
+        self._pill.setMinimumWidth(0)
 
-        self._sidebar_animation.finished.connect(finalize_width)
-        self._sidebar_animation.start()
+        self._pill_layout = QHBoxLayout(self._pill)
+        self._pill_layout.setContentsMargins(8, 4, 8, 4)
+        self._pill_layout.setSpacing(2)
 
-        # تحديث عناصر الواجهة
-        self.logo_label.setVisible(self.expanded)
-        self._apply_expand_state_to_buttons()
+        # نضيف الـ pill للـ outer بدون stretch — يتمركز طبيعياً
+        outer.addWidget(self._pill)
 
-        # إشعار المين ويندو
-        self.sidebar_toggled.emit(self.expanded)
+        self._build_buttons()
 
-    def _apply_expand_state_to_buttons(self):
-        """Update button appearance when expanding/collapsing"""
+    def _build_buttons(self):
+        for btn in self.buttons.values():
+            try:
+                btn.setParent(None)
+                btn.deleteLater()
+            except Exception:
+                pass
+        self.buttons = {}
+        self.btn_keys = []
 
-        lang = self.settings.get("language", "ar")
-        is_rtl = (lang == "ar")
+        user         = self.settings.get("user", None)
+        allowed_list = allowed_tabs(user) or []
+        allowed_set  = set(allowed_list)
+        ordered_keys = [k for k in ICON_PATHS if k in allowed_set]
 
-        for key, btn in self.buttons.items():
-            label = self._(key)
+        for key in ordered_keys:
+            self._add_pill_btn(key)
 
-            if self.expanded:
-                btn.setText(label)
-                # ✅ setLayoutDirection على الزر الفردي فقط (ليس على الـ Sidebar)
-                # هذا يُحرّك الأيقونة ليمين والنص ليساره عند RTL
-                # بدون أن يُعكس الـ Sidebar container نفسه
-                btn.setLayoutDirection(Qt.RightToLeft if is_rtl else Qt.LeftToRight)
-                btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-            else:
-                btn.setText("")
-                btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.btn_keys = ordered_keys
 
-            # ✅ Icon size stays proportional
-            btn_height = btn.minimumHeight()
-            icon_size = max(18, int(btn_height * 0.6))
-            btn.setIconSize(QSize(icon_size, icon_size))
+        # بعد بناء الأزرار: احسب الحجم الطبيعي ثم اضبط maximum width
+        self._pill.adjustSize()
+        try:
+            screen_w = QApplication.primaryScreen().availableGeometry().width()
+            # الـ pill لا يتجاوز عرض الشاشة - 40px هامش
+            self._pill.setMaximumWidth(screen_w - 40)
+        except Exception:
+            self._pill.setMaximumWidth(1600)
 
-            # Dynamic property for theme
-            btn.setProperty("layout_dir", "rtl" if is_rtl else "ltr")
+    def _add_pill_btn(self, key: str):
+        btn = QToolButton()
+        btn.setObjectName("pill-tab-btn")
+        btn.setCheckable(True)
+        btn.setAutoRaise(True)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        # Preferred: يأخذ مساحة متساوية مع بقية الأزرار
+        btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        btn.setMinimumWidth(0)
 
-            # Refresh style
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+        icon_size = 72
+        svg_icon  = get_sidebar_icon(key, icon_size)
+        if not svg_icon.isNull():
+            btn.setIcon(svg_icon)
+        else:
+            btn.setIcon(QIcon())
+        btn.setIconSize(QSize(icon_size, icon_size))
+        btn.setText(self._(key))
+        btn.setToolTip(self._(key))
 
-            btn.setToolTip(label)
+        btn.clicked.connect(lambda _=False, k=key: self.change_section(k))
+        self._pill_layout.addWidget(btn)
+        self.buttons[key] = btn
 
-    # ==================== Direction / i18n ====================
+    # ─── Navigation ───────────────────────────────────────────────────────────
 
-    def retranslate_ui(self):
-        """Update UI text when language changes"""
+    def change_section(self, key: str):
+        for k, b in self.buttons.items():
+            b.setChecked(k == key)
+            b.setProperty("active", k == key)
+            b.style().unpolish(b)
+            b.style().polish(b)
+        self._active_key = key
+        self.section_changed.emit(key)
+        try:
+            refresh_sidebar_icons(self)
+        except Exception:
+            pass
 
-        # Update translations
-        self._ = TranslationManager.get_instance().translate
-        self.logo_label.setText(self._("app_name"))
-        self.toggle_btn.setToolTip(self._("toggle_sidebar"))
+    # ─── backward compat ──────────────────────────────────────────────────────
 
-        if hasattr(self, 'buttons'):
-            for key, btn in self.buttons.items():
-                btn.setToolTip(self._(key))
-
-        # *** لا نستخدم self.setLayoutDirection هنا ***
-        # سبب المشكلة: setLayoutDirection(RTL) على الـ Sidebar يعكس ترتيب
-        # icon+text داخل كل QToolButton، فتظهر الأيقونة بعد النص أو تختفي.
-        # موضع الـ Sidebar (يمين/يسار) يُتحكم به حصراً من _reposition_sidebar()
-        # في MainWindow. محتوى الأزرار الداخلي (نص RTL) يُضبط بـ _apply_expand_state_to_buttons
-
-        self._apply_expand_state_to_buttons()
-
-        # Refresh icons with current theme color
-        refresh_sidebar_icons(self)
-
-        # Refresh stylesheet
-        self.refresh_stylesheet()
-
-    def _on_setting_changed(self, key, value):
-        """Handle settings changes"""
-        if key in ("language", "direction"):
-            self.retranslate_ui()
+    def toggle_sidebar(self):
+        pass
 
     def refresh_stylesheet(self):
-        """Refresh theme stylesheet"""
         self.setStyleSheet("")
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
 
-    def _build_buttons_from_permissions(self):
-        """Build sidebar buttons based on user permissions"""
+    # ─── i18n ─────────────────────────────────────────────────────────────────
 
-        # Clear old buttons
-        if hasattr(self, 'buttons'):
-            for btn in self.buttons.values():
-                try:
-                    btn.setParent(None)
-                except Exception:
-                    pass
+    def retranslate_ui(self):
+        self._ = TranslationManager.get_instance().translate
+        for key, btn in self.buttons.items():
+            btn.setText(self._(key))
+            btn.setToolTip(self._(key))
+        refresh_sidebar_icons(self)
+        self.refresh_stylesheet()
 
-        self.buttons = {}
+    def _on_setting_changed(self, key, value):
+        if key in ("language", "direction"):
+            self._build_buttons()
+            self.retranslate_ui()
+            if self._active_key and self._active_key in self.buttons:
+                self.change_section(self._active_key)
 
-        # Get current user
-        user = self.settings.get("user", None)
 
-        # Get allowed tabs
-        allowed_list = allowed_tabs(user) or []
-        try:
-            allowed_set = set(allowed_list)
-        except Exception:
-            allowed_set = set()
-
-        # Order by ICON_PATHS and filter allowed
-        ordered_keys = [k for k in ICON_PATHS.keys() if k in allowed_set]
-
-        # Create buttons
-        for key in ordered_keys:
-            self.add_button(key, self._(key), ICON_PATHS.get(key))
-
-        # Store visible keys
-        self.btn_keys = ordered_keys
+# backward compat alias
+Sidebar = FloatingPillNav

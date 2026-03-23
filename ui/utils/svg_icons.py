@@ -184,6 +184,11 @@ _ICONS: dict[str, str] = {
         <path d="M17 10v10"/>
         <path d="M6 4l3-3h6l3 3"/>
     </svg>""",
+
+    "tasks": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>""",
 }
 
 # fallback text للـ SVG إذا QtSvg غير متوفر
@@ -213,6 +218,29 @@ _FALLBACK_TEXT: dict[str, str] = {
     "offices":           "⊞",
     "sync":              "↻",
     "container_tracking":"⊡",
+    "tasks":             "✓",
+}
+
+
+# ── ألوان كل أيقونة في الـ Floating Pill ────────────────────────────────────
+# كل تاب له لون مميز — هذه الألوان تُستخدم في الحالة الغير نشطة
+# الحالة النشطة دائماً أبيض (على خلفية primary)
+_PILL_ICON_COLORS: dict[str, str] = {
+    "dashboard":          "#2563EB",   # أزرق
+    "materials":          "#7C3AED",   # بنفسجي
+    "clients":            "#059669",   # أخضر
+    "companies":          "#0891B2",   # سماوي
+    "pricing":            "#D97706",   # ذهبي
+    "entries":            "#DC2626",   # أحمر
+    "transactions":       "#2563EB",   # أزرق
+    "container_tracking": "#0369A1",   # أزرق داكن
+    "tasks":              "#16A34A",   # أخضر
+    "documents":          "#7C3AED",   # بنفسجي
+    "values":             "#D97706",   # ذهبي
+    "offices":            "#64748B",   # رمادي
+    "audit_trail":        "#DC2626",   # أحمر
+    "control_panel":      "#64748B",   # رمادي
+    "users_permissions":  "#0891B2",   # سماوي
 }
 
 
@@ -299,29 +327,42 @@ def refresh_icons(topbar) -> None:
 
 
 def get_sidebar_icon(key: str, size: int = 20, color: str | None = None) -> QIcon:
-    """يُعيد QIcon لزر السايدبار — أبيض دائماً لأن خلفية السايدبار دائماً داكنة."""
-    # يجب استخدام hex وليس rgba — SVG لا يفهم rgba في stroke attribute
-    sidebar_icon_color = color or "#FFFFFF"
-    return get_icon(key, size, sidebar_icon_color)
+    """
+    يُعيد QIcon لزر التنقل.
+    - إذا مُرر color: يستخدمه مباشرة
+    - وإلا: يقرأ لون text_primary من الـ theme الحالي
+    """
+    icon_color = color or _get_icon_color()
+    return get_icon(key, size, icon_color)
 
 
 def refresh_sidebar_icons(sidebar) -> None:
-    """يُعيد رسم أيقونات السايدبار — أبيض دائماً."""
+    """يُعيد رسم أيقونات التنقل — ملونة في الـ Pill، بيضاء في السايدبار القديم."""
     if not hasattr(sidebar, "buttons"):
         return
-    color = "#FFFFFF"  # hex — SVG لا يقبل rgba في stroke
-    btn_height = max(32, getattr(sidebar, "expanded_width", 210) * 16 // 100)
-    icon_size = max(18, int(btn_height * 0.6))
+    is_pill   = sidebar.objectName() == "FloatingPill"
+    icon_size = 72 if is_pill else max(
+        18, int(max(32, getattr(sidebar, "expanded_width", 210) * 16 // 100) * 0.6)
+    )
     for key, btn in sidebar.buttons.items():
-        icon = get_icon(key, icon_size, color)
+        if is_pill:
+            if getattr(btn, "isChecked", lambda: False)():
+                # نشط: أبيض على خلفية primary
+                btn_color = "#FFFFFF"
+            else:
+                # غير نشط: لون مميز لكل تاب
+                btn_color = _PILL_ICON_COLORS.get(key, _get_icon_color())
+        else:
+            btn_color = "#FFFFFF"
+        icon = get_icon(key, icon_size, btn_color)
         if not icon.isNull():
             btn.setIcon(icon)
             btn.setIconSize(QSize(icon_size, icon_size))
-    # toggle button
+    # toggle button للـ sidebar القديم
     toggle = getattr(sidebar, "toggle_btn", None)
     if toggle:
-        toggle_size = max(20, int(getattr(sidebar, "expanded_width", 210) * 0.19 * 0.6))
-        icon = get_icon("menu_burger", toggle_size, color)
+        sz   = max(20, int(getattr(sidebar, "expanded_width", 210) * 0.19 * 0.6))
+        icon = get_icon("menu_burger", sz, "#FFFFFF")
         if not icon.isNull():
             toggle.setIcon(icon)
-            toggle.setIconSize(QSize(toggle_size, toggle_size))
+            toggle.setIconSize(QSize(sz, sz))
