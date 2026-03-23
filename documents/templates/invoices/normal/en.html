@@ -4,53 +4,74 @@
 <meta charset="UTF-8">
 <title>Invoice</title>
 <style>
+@page {
+  size: A4;
+  margin: 10mm 12mm 14mm 12mm;
+  @bottom-center {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt; color: #666;
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    color: #1a1a1a; background: #fff; font-size: 10pt; direction: ltr;
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  color: #1a1a1a; background: #fff; font-size: 10pt;
+  direction: ltr; line-height: 1.5;
 }
-.page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 18mm; background: #fff; }
-.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #1a3a5c; padding-bottom: 14px; }
-.company-name { font-size: 16pt; font-weight: 700; color: #1a3a5c; }
-.company-sub  { font-size: 8.5pt; color: #555; line-height: 1.6; margin-top: 4px; }
-.doc-block    { text-align: right; min-width: 160px; }
-.doc-title    { font-size: 18pt; font-weight: 700; color: #1a3a5c; margin-bottom: 6px; }
-.doc-meta     { font-size: 9pt; color: #333; line-height: 1.8; }
+.header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 12px; border-bottom: 2px solid #1a3a5c; padding-bottom: 10px;
+}
+.company-name { font-size: 15pt; font-weight: 700; color: #1a3a5c; }
+.company-sub  { font-size: 8pt; color: #555; line-height: 1.6; margin-top: 3px; }
+.doc-block    { text-align: right; min-width: 140px; }
+.doc-title    { font-size: 17pt; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
+.doc-meta     { font-size: 8.5pt; color: #333; line-height: 1.8; }
 .doc-meta b   { display: inline-block; width: 90px; }
-.parties { display: flex; gap: 14px; margin-bottom: 14px; }
-.party-box { flex: 1; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
-.party-title { font-size: 8pt; font-weight: 700; color: #fff; background: #1a3a5c; margin: -8px -10px 6px; padding: 3px 10px; border-radius: 3px 3px 0 0; }
-.party-name { font-size: 10pt; font-weight: 700; margin-bottom: 3px; }
-.party-detail { font-size: 8.5pt; color: #444; line-height: 1.6; }
-.shipment-bar { display: flex; flex-wrap: wrap; gap: 6px; background: #f4f6f9; border: 1px solid #dde; border-radius: 4px; padding: 7px 12px; margin-bottom: 14px; font-size: 8.5pt; }
-.ship-item b { color: #1a3a5c; }
-.ship-item + .ship-item { border-left: 1px solid #bbc; padding-left: 6px; margin-left: 2px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 9pt; }
-thead tr { background: #1a3a5c; color: #fff; }
-thead th { padding: 7px 6px; font-weight: 600; border: 1px solid #1a3a5c; }
+.parties { display: flex; gap: 10px; margin-bottom: 10px; }
+.party-box  { flex: 1; border: 1px solid #ccd; border-radius: 3px; overflow: hidden; }
+.party-title{ font-size: 8pt; font-weight: 700; color: #fff; background: #1a3a5c; padding: 3px 8px; }
+.party-body { padding: 6px 8px; }
+.party-name { font-size: 9.5pt; font-weight: 700; margin-bottom: 2px; }
+.party-detail{ font-size: 8pt; color: #444; line-height: 1.55; }
+.ship-bar {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border: 1px solid #dde; border-radius: 3px;
+  background: #f4f6f9; margin-bottom: 10px; font-size: 8pt; overflow: hidden;
+}
+.ship-item { padding: 4px 10px; border-right: 1px solid #dde; }
+.ship-item:last-child { border-right: none; }
+.ship-item b { color: #1a3a5c; display: block; font-size: 7.5pt; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 8.5pt; table-layout: fixed; }
+thead tr  { background: #1a3a5c; color: #fff; }
+thead th  { padding: 5px 4px; font-weight: 600; border: 1px solid #1a3a5c; font-size: 8pt; }
 tbody tr:nth-child(even) { background: #f8f9fb; }
-tbody td { padding: 6px; border: 1px solid #ccd; vertical-align: middle; }
-tfoot tr { background: #eef1f6; font-weight: 700; }
-tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
-.center { text-align: center; }
-.footer-row { display: flex; gap: 14px; margin-bottom: 12px; }
-.words-box { flex: 2; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
-.words-title { font-size: 8pt; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
-.words-text  { font-size: 9.5pt; }
-.totals-box  { flex: 1; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
-.tot-row { display: flex; justify-content: space-between; font-size: 8.5pt; padding: 3px 0; border-bottom: 1px dashed #e0e0e0; }
-.tot-row:last-child { border: none; font-weight: 700; font-size: 10pt; color: #1a3a5c; padding-top: 5px; }
-.bank-box { border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; font-size: 8.5pt; margin-bottom: 12px; }
-.bank-title { font-size: 8pt; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
-.notes-box { border-top: 1px dashed #ccc; padding-top: 8px; font-size: 8.5pt; color: #555; margin-bottom: 12px; }
-.sig-row { display: flex; justify-content: space-between; margin-top: 24px; font-size: 8.5pt; }
-.sig-block { text-align: center; width: 140px; }
-.sig-line  { border-top: 1px solid #666; padding-top: 4px; margin-top: 30px; color: #555; }
+tbody td  { padding: 5px 4px; border: 1px solid #ccd; vertical-align: middle; }
+tfoot td  { padding: 5px 4px; border: 1px solid #bbc; background: #eef1f6; font-weight: 700; font-size: 8.5pt; }
+.num  { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ctr  { text-align: center; }
+tr, td, th { page-break-inside: avoid; }
+.words-box  { border: 1px solid #ccd; border-radius: 3px; padding: 7px 10px; margin-bottom: 8px; }
+.words-title{ font-size: 7.5pt; font-weight: 700; color: #1a3a5c; margin-bottom: 3px; }
+.words-text { font-size: 9pt; text-align: left; direction: ltr; }
+.totals-box { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.totals-inner{ border: 1px solid #ccd; border-radius: 3px; padding: 6px 10px; min-width: 200px; }
+.tot-row {
+  display: flex; justify-content: space-between; gap: 20px;
+  font-size: 8pt; padding: 2px 0; border-bottom: 1px dashed #e0e0e0;
+}
+.tot-row:last-child { border: none; font-weight: 700; font-size: 9.5pt; color: #1a3a5c; padding-top: 4px; margin-top: 2px; }
+.tot-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.bank-box  { border: 1px solid #ccd; border-radius: 3px; padding: 6px 10px; font-size: 8pt; margin-bottom: 8px; }
+.bank-title{ font-size: 7.5pt; font-weight: 700; color: #1a3a5c; margin-bottom: 3px; }
+.notes-box { border-top: 1px dashed #ccc; padding-top: 6px; font-size: 8pt; color: #555; margin-bottom: 8px; }
+.sig-row   { display: flex; justify-content: space-between; margin-top: 18px; }
+.sig-block { text-align: center; width: 120px; }
+.sig-line  { border-top: 1px solid #666; padding-top: 3px; margin-top: 28px; font-size: 8pt; color: #555; }
 </style>
 </head>
 <body>
-<div class="page">
 
 {% set exp  = exporter  or {} %}
 {% set con  = consignee or importer or {} %}
@@ -81,55 +102,64 @@ tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
 <div class="parties">
   <div class="party-box">
     <div class="party-title">Exporter / Seller</div>
-    <div class="party-name">{{ exp.name or '' }}</div>
-    <div class="party-detail">
-      {% if exp.addr or exp.address %}{{ exp.addr or exp.address }}<br>{% endif %}
-      {% if exp.phone %}Tel: {{ exp.phone }}<br>{% endif %}
-      {% if exp.email %}{{ exp.email }}<br>{% endif %}
-      {% if exp.tax_id %}Tax ID: {{ exp.tax_id }}{% endif %}
+    <div class="party-body">
+      <div class="party-name">{{ exp.name or '' }}</div>
+      <div class="party-detail">
+        {% if exp.addr or exp.address %}{{ exp.addr or exp.address }}<br>{% endif %}
+        {% if exp.phone %}Tel: {{ exp.phone }}<br>{% endif %}
+        {% if exp.email %}{{ exp.email }}<br>{% endif %}
+        {% if exp.tax_id %}Tax ID: {{ exp.tax_id }}{% endif %}
+      </div>
     </div>
   </div>
   <div class="party-box">
     <div class="party-title">Importer / Buyer</div>
-    <div class="party-name">{{ con.name or '' }}</div>
-    <div class="party-detail">
-      {% if con.addr or con.address %}{{ con.addr or con.address }}<br>{% endif %}
-      {% if con.phone %}Tel: {{ con.phone }}<br>{% endif %}
-      {% if con.email %}{{ con.email }}<br>{% endif %}
-      {% if con.tax_id %}Tax ID: {{ con.tax_id }}{% endif %}
+    <div class="party-body">
+      <div class="party-name">{{ con.name or '' }}</div>
+      <div class="party-detail">
+        {% if con.addr or con.address %}{{ con.addr or con.address }}<br>{% endif %}
+        {% if con.phone %}Tel: {{ con.phone }}<br>{% endif %}
+        {% if con.email %}{{ con.email }}<br>{% endif %}
+        {% if con.tax_id %}Tax ID: {{ con.tax_id }}{% endif %}
+      </div>
     </div>
   </div>
 </div>
 
-{% if ship.delivery_method or ship.origin_country or ship.destination or ship.transport_ref %}
-<div class="shipment-bar">
-  {% if ship.delivery_method %}<span class="ship-item"><b>Incoterms:</b> {{ ship.delivery_method }}</span>{% endif %}
-  {% if ship.origin_country %}<span class="ship-item"><b>Country of Origin:</b> {{ ship.origin_country }}</span>{% endif %}
-  {% if ship.destination %}<span class="ship-item"><b>Destination:</b> {{ ship.destination }}</span>{% endif %}
-  {% if ship.transport_ref %}<span class="ship-item"><b>Reference:</b> {{ ship.transport_ref }}</span>{% endif %}
-  {% if pricing_type and pricing_type.name %}<span class="ship-item"><b>Pricing:</b> {{ pricing_type.name }}</span>{% endif %}
+{% if ship.delivery_method or ship.origin_country or ship.destination or ship.transport_ref or (pricing_type and pricing_type.name) %}
+<div class="ship-bar">
+  {% if ship.delivery_method %}<div class="ship-item"><b>Incoterms</b>{{ ship.delivery_method }}</div>{% endif %}
+  {% if ship.origin_country  %}<div class="ship-item"><b>Country of Origin</b>{{ ship.origin_country }}</div>{% endif %}
+  {% if ship.destination     %}<div class="ship-item"><b>Destination</b>{{ ship.destination }}</div>{% endif %}
+  {% if ship.transport_ref   %}<div class="ship-item"><b>Reference</b>{{ ship.transport_ref }}</div>{% endif %}
+  {% if pricing_type and pricing_type.name %}<div class="ship-item"><b>Pricing</b>{{ pricing_type.name }}</div>{% endif %}
 </div>
 {% endif %}
 
 <table>
+  <colgroup>
+    <col style="width:5%"><col style="width:28%"><col style="width:10%">
+    <col style="width:9%"><col style="width:12%"><col style="width:12%">
+    <col style="width:12%"><col style="width:12%">
+  </colgroup>
   <thead>
     <tr>
-      <th class="center" style="width:28px">#</th>
+      <th class="ctr">#</th>
       <th>Description</th>
-      <th class="center" style="width:60px">Packaging</th>
-      <th class="num"   style="width:60px">Qty</th>
-      <th class="num"   style="width:65px">Net Wt (kg)</th>
-      <th class="num"   style="width:65px">Gross Wt (kg)</th>
-      <th class="num"   style="width:75px">Unit Price ({{ cur_code }})</th>
-      <th class="num"   style="width:75px">Amount ({{ cur_code }})</th>
+      <th class="ctr">Packaging</th>
+      <th class="num">Qty</th>
+      <th class="num">Net Wt&nbsp;(kg)</th>
+      <th class="num">Gross Wt&nbsp;(kg)</th>
+      <th class="num">Unit Price&nbsp;({{ cur_code }})</th>
+      <th class="num">Amount&nbsp;({{ cur_code }})</th>
     </tr>
   </thead>
   <tbody>
   {% for it in items or [] %}
     <tr>
-      <td class="center">{{ loop.index }}</td>
+      <td class="ctr">{{ loop.index }}</td>
       <td>{{ it.description or '' }}</td>
-      <td class="center">{{ it.packaging or '' }}</td>
+      <td class="ctr">{{ it.packaging or '' }}</td>
       <td class="num">{{ it.qty or 0 }}{% if it.unit %} {{ it.unit }}{% endif %}</td>
       <td class="num">{{ it.net_kg or it.net or 0 }}</td>
       <td class="num">{{ it.gross_kg or it.gross or 0 }}</td>
@@ -140,7 +170,7 @@ tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
   </tbody>
   <tfoot>
     <tr>
-      <td colspan="3" style="text-align:left; font-weight:700;">Totals</td>
+      <td colspan="3" style="text-align:left; padding-left:8px; font-weight:700;">Totals</td>
       <td class="num">{{ tots.qty or '' }}</td>
       <td class="num">{{ tots.net or '' }}</td>
       <td class="num">{{ tots.gross or '' }}</td>
@@ -150,14 +180,15 @@ tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
   </tfoot>
 </table>
 
-<div class="footer-row">
-  {% if amount_in_words %}
-  <div class="words-box">
-    <div class="words-title">Amount in Words</div>
-    <div class="words-text">{{ amount_in_words }}</div>
-  </div>
-  {% endif %}
-  <div class="totals-box">
+{% if amount_in_words %}
+<div class="words-box">
+  <div class="words-title">Amount in Words</div>
+  <div class="words-text">{{ amount_in_words }}</div>
+</div>
+{% endif %}
+
+<div class="totals-box">
+  <div class="totals-inner">
     <div class="tot-row"><span>Total Quantity</span><span>{{ tots.qty or '' }}</span></div>
     <div class="tot-row"><span>Net Weight (kg)</span><span>{{ tots.net or '' }}</span></div>
     <div class="tot-row"><span>Gross Weight (kg)</span><span>{{ tots.gross or '' }}</span></div>
@@ -181,6 +212,5 @@ tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
   <div class="sig-block"><div class="sig-line">Importer's Stamp &amp; Signature</div></div>
 </div>
 
-</div>
 </body>
 </html>

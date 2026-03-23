@@ -6,6 +6,15 @@
 <title>Commercial Invoice</title>
 
 <style>
+@page {
+  size: A4;
+  margin: 10mm 12mm 14mm 12mm;
+  @bottom-center {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt; color: #666;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+}
 body{
     font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     margin:0;
@@ -15,12 +24,10 @@ body{
     font-size:10pt;
 }
 .invoice-container{
-    width:210mm;
-    min-height:297mm;
+    width:100%; max-width:186mm;
     margin:0 auto;
-    padding:20mm;
+    padding:0;
     box-sizing:border-box;
-    border:1px solid #eee;
     background:#fff;
 }
 

@@ -4,7 +4,15 @@
   <meta charset="utf-8" />
   <title>Packing List (With Line ID)</title>
   <style>
-    @page { size: A4; margin: 18mm; }
+    @page {
+  size: A4;
+  margin: 10mm 12mm 14mm 12mm;
+  @bottom-center {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 8pt; color: #666;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+}
     html { color:#000; background:#fff; }
     body { font: 11pt/1.5 "Segoe UI", Arial, sans-serif; }
     .row { display: flex; gap: 10pt; } .col { flex: 1 1 0; }

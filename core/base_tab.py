@@ -1065,16 +1065,20 @@ class BaseTab(QWidget):
         self.table.setCellWidget(row, 0, w)
 
     def _on_row_checkbox_changed(self, row: int, state: int):
-        """عند تغيير checkbox الصف — يتزامن مع selection الجدول."""
+        """عند تغيير checkbox الصف — يضيف/يزيل الصف من التحديد بدون مسح الآخرين."""
         from PySide6.QtCore import QItemSelectionModel, QItemSelection
-        if state == Qt.Checked:
-            self.table.selectRow(row)
+        # state قد يكون int أو Qt.CheckState enum — نحوّله لـ int للمقارنة الآمنة
+        checked = int(state) == 2  # Qt.Checked == 2
+        sel_model = self.table.selectionModel()
+        top_left  = self.table.model().index(row, 0)
+        bot_right = self.table.model().index(row, self.table.columnCount() - 1)
+        selection = QItemSelection(top_left, bot_right)
+        if checked:
+            sel_model.select(
+                selection,
+                QItemSelectionModel.SelectionFlag.Select
+            )
         else:
-            # deselect الصف كاملاً
-            sel_model = self.table.selectionModel()
-            top_left  = self.table.model().index(row, 0)
-            bot_right = self.table.model().index(row, self.table.columnCount() - 1)
-            selection = QItemSelection(top_left, bot_right)
             sel_model.select(
                 selection,
                 QItemSelectionModel.SelectionFlag.Deselect

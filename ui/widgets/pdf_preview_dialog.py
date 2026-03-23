@@ -161,6 +161,20 @@ class PdfPreviewDialog(BaseDialog):
         if _has_webengine():
             from PySide6.QtWebEngineWidgets import QWebEngineView
             self._view = QWebEngineView()
+            # السماح بتحميل الملفات المحلية — أسماء الـ enum تختلف بين إصدارات PySide6
+            try:
+                from PySide6.QtWebEngineCore import QWebEngineSettings
+                wa = QWebEngineSettings.WebAttribute
+                s  = self._view.settings()
+                # PySide6 >= 6.7
+                _set = lambda name, val: s.setAttribute(getattr(wa, name), val) if hasattr(wa, name) else None
+                _set("LocalContentCanAccessLocalUrls",  True)
+                _set("LocalContentCanAccessRemoteUrls", True)
+                _set("LocalContentCanAccessFileUrls",   True)
+                _set("AllowRunningInsecureContent",     True)
+                _set("PluginsEnabled",                  True)
+            except Exception:
+                pass
             self._view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self._view.loadFinished.connect(self._on_load_finished)
             self._view.loadStarted.connect(lambda: self._progress.setVisible(True))

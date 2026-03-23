@@ -273,11 +273,21 @@ class MaterialsTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            failed = []
             for row in rows:
                 m = self.data[row]["actions"]
-                self._delete_single(m, confirm=False)
-            QMessageBox.information(self, self._("deleted"), self._("material_deleted_success"))
-            DataBus.get_instance().emit('materials')
+                ok, err = self._delete_single(m, confirm=False)
+                if not ok:
+                    name = getattr(m, "name_ar", None) or getattr(m, "name_en", None) or str(getattr(m, "id", "?"))
+                    failed.append(f"{name}: {err}")
+            if failed:
+                QMessageBox.warning(
+                    self, self._("error"),
+                    self._("material_in_use_cannot_delete") + "\n" + "\n".join(failed)
+                )
+            else:
+                QMessageBox.information(self, self._("deleted"), self._("material_deleted_success"))
+            DataBus.get_instance().emit("materials")
             self.reload_data()
 
     def _delete_single(self, material, confirm=True):
@@ -287,8 +297,19 @@ class MaterialsTab(BaseTab):
                 QMessageBox.Yes | QMessageBox.No,
             )
             if reply != QMessageBox.Yes:
-                return
-        self.materials_crud.delete(material.id)
+                return False, "cancelled"
+        try:
+            self.materials_crud.delete(material.id)
+            return True, None
+        except Exception as e:
+            err_str = str(e)
+            if "FOREIGN KEY" in err_str or "IntegrityError" in err_str:
+                msg = self._("material_in_use_cannot_delete")
+            else:
+                msg = err_str
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
 
     # Double-click → details
     def on_row_double_clicked(self, row_index):

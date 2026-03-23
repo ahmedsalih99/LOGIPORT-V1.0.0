@@ -308,6 +308,8 @@ class DocumentsTab(BaseTab):
         self.table.customContextMenuRequested.connect(self._table_context_menu)
         self.table.doubleClicked.connect(self._on_table_double_click)
         self.btn_generate.clicked.connect(self._on_generate)
+        # ربط حذف المحدد من الـ action bar
+        self.request_delete.connect(self.delete_selected_items)
 
     # ------------------------------------------------------------------
     # BaseTab overrides
@@ -571,6 +573,75 @@ class DocumentsTab(BaseTab):
             subprocess.Popen(["open", "-R", path])
         else:
             subprocess.Popen(["xdg-open", folder])
+
+    def delete_selected_items(self, rows=None):
+        """حذف جماعي — يُستدعى من زر الحذف في الـ action bar."""
+        if rows is None:
+            rows = self.get_selected_rows()
+        if not rows:
+            return
+
+        # اجمع الـ rec من كل صف محدد عبر UserRole
+        recs = []
+        for row in rows:
+            item = self.table.item(row, self.COL_DOCNO)
+            if item:
+                rec = item.data(Qt.UserRole)
+                if rec:
+                    recs.append(rec)
+
+        if not recs:
+            return
+
+        count = len(recs)
+        reply = QMessageBox.question(
+            self,
+            _tr("confirm_delete"),
+            _tr("confirm_delete_docs_bulk").format(count=count),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        user_id = None
+        try:
+            u = getattr(self, "current_user", None)
+            user_id = u.get("id") if isinstance(u, dict) else getattr(u, "id", None)
+        except Exception:
+            pass
+
+        errors = []
+        for rec in recs:
+            try:
+                path = rec.get("path", "")
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception as fe:
+                        errors.append(f"{rec.get('doc_no','?')}: {fe}")
+
+                doc_id = rec.get("id")
+                if doc_id:
+                    from database.crud.documents_crud import DocumentsCRUD
+                    DocumentsCRUD().delete_document(int(doc_id), user_id=user_id)
+                elif path:
+                    from sqlalchemy import text as _sql
+                    from database.models import get_session_local as _gs
+                    with _gs()() as s:
+                        s.execute(_sql("DELETE FROM documents WHERE file_path = :p"), {"p": path})
+                        s.commit()
+            except Exception as e:
+                errors.append(f"{rec.get('doc_no','?')}: {e}")
+
+        if errors:
+            QMessageBox.warning(
+                self, _tr("error"),
+                "\n".join(errors)
+            )
+
+        self.reload_data()
+        DataBus.get_instance().emit("documents")
 
     def _delete_document(self, rec: Dict[str, Any]):
         doc_no = rec.get("doc_no", "")
