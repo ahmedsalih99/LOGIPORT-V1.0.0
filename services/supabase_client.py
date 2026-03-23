@@ -128,7 +128,7 @@ class SupabaseClient:
             table,
             body=rows,
             extra_headers={
-                "Prefer": f"resolution=merge-duplicates,return=representation",
+                "Prefer": "resolution=merge-duplicates,return=representation",
                 "on_conflict": on_conflict,
             },
         )

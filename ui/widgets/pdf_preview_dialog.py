@@ -191,25 +191,22 @@ class PdfPreviewDialog(BaseDialog):
             theme_name = SettingsManager.get_instance().get("theme", "light")
             theme = ThemeBuilder(theme_name)
             c = theme.colors
-            bg      = c.get("bg_card", "#FFFFFF")
-            toolbar_bg = c.get("bg_secondary", "#F8F9FA")
-            border  = c.get("border", "#E0E0E0")
         except Exception:
-            bg = "#FFFFFF"; toolbar_bg = "#F8F9FA"; border = "#E0E0E0"
+            pass
 
-        self.setStyleSheet(f"""
+        self.setStyleSheet("""
             /* toolbar now uses form-dialog-header CSS from theme */
-            QLabel#form-dialog-title {{
+            QLabel#form-dialog-title {
                 color: #ffffff;
                 font-weight: 700;
-            }}
-            QProgressBar#loading-bar {{
+            }
+            QProgressBar#loading-bar {
                 border: none;
                 background: transparent;
-            }}
-            QProgressBar#loading-bar::chunk {{
+            }
+            QProgressBar#loading-bar::chunk {
                 background: #2563EB;
-            }}
+            }
         """)
 
     # ─── Content Loading ──────────────────────────────────────────────────────
@@ -218,10 +215,11 @@ class PdfPreviewDialog(BaseDialog):
         if not self._view:
             return
 
+        from PySide6.QtCore import QUrl  # مطلوب في كل مسارات التحميل
+
         if self._html_string:
             # عرض HTML string مباشرة
             if self._base_url:
-                from PySide6.QtCore import QUrl
                 base = QUrl.fromLocalFile(str(Path(self._base_url).resolve()) + "/")
                 self._view.setHtml(self._html_string, base)
             else:

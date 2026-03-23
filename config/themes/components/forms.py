@@ -24,7 +24,7 @@ def get_styles(theme):
 
     # ── padding يعوّض الفرق بين 1px و 2px حتى لا يتحرك النص عند الفوكس ──────
     PAD_NORMAL = f"{Spacing.SM} {Spacing.MD}"          # 8px 12px
-    PAD_FOCUS  = f"7px 11px"                           # 8-1  12-1  (يعوّض الـ 2px)
+    PAD_FOCUS  = "7px 11px"                            # 8-1  12-1  (يعوّض الـ 2px)
 
     return f"""
     /* =======================================================================

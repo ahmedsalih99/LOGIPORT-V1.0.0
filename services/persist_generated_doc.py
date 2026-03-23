@@ -2,12 +2,23 @@
 from __future__ import annotations
 from typing import Optional, Dict
 import json
+from decimal import Decimal
 from datetime import date
 
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from database.models import get_session_local
+
+
+class _DecimalEncoder(json.JSONEncoder):
+    """يحوّل Decimal وDate لأنواع JSON-safe."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, date):
+            return obj.isoformat()
+        return super().default(obj)
 
 # ----------------------------------------------------------------------------
 # Mapping template-code -> document_types.code in DB (no assumptions)
@@ -156,8 +167,8 @@ def persist_document(
                 raise RuntimeError("فشل إنشاء doc_groups بعد عدة محاولات.")
 
         # 5) UPSERT في documents بناءً على (group_id, document_type_id, language)
-        totals_json = json.dumps(totals or {}, ensure_ascii=False)
-        data_json   = json.dumps(data   or {}, ensure_ascii=False)
+        totals_json = json.dumps(totals or {}, ensure_ascii=False, cls=_DecimalEncoder)
+        data_json   = json.dumps(data   or {}, ensure_ascii=False, cls=_DecimalEncoder)
 
         s.execute(text("""
             INSERT INTO documents

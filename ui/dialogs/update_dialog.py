@@ -6,7 +6,7 @@ ui/dialogs/update_dialog.py — LOGIPORT
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QProgressBar, QTextEdit, QWidget
+    QPushButton, QProgressBar, QTextEdit, QWidget, QFrame
 )
 from PySide6.QtCore import Qt, Signal, QThread, Q_ARG
 from PySide6.QtGui import QFont

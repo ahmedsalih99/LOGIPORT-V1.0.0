@@ -9,7 +9,7 @@ from documents.builders._shared import (
     country_name   as _country_name,
     company_obj    as _company_obj,
     client_obj     as _client_obj,
-    get_bank_info,
+    get_bank_info  as _get_bank_info,
     tafqit_amount  as _tafqit_amount,
     num_words      as _num_words,
     unit_word      as _unit_word,
@@ -125,7 +125,7 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
                    ti.quantity AS qty,
                    ti.net_weight_kg  AS net,
                    ti.gross_weight_kg AS gross,
-                   ti.unit_label     AS unit_label,
+                   pt.price_unit     AS unit_label,
                    m.name_{lang}     AS material,
                    pk.name_{lang}    AS packaging,
                    pt.code           AS pricing_code,
@@ -153,20 +153,20 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             _ensure(r["packaging"], f"سطر {r['id']} بلا نوع تغليف (packaging_type).")
             _ensure(r["pricing_code"], f"سطر {r['id']} بلا نوع تسعير (pricing_type).")
             _ensure(r["unit_price"], f"سطر {r['id']} بلا سعر وحدة.")
-            _ensure(r["unit_label"], f"سطر {r['id']} بلا وحدة قياس.")
 
             qty = Decimal(str(r["qty"] or "0"))
             net = Decimal(str(r["net"] or "0"))
             gross = Decimal(str(r["gross"] or "0"))
             price = Decimal(str(r["unit_price"] or "0"))
             amount = qty * price
+            unit_label = (r["unit_label"] or "").strip() or None
 
             items.append({
                 "no": r["id"],
                 "description": r["material"],
                 "packaging": r["packaging"],
                 "qty": qty,
-                "unit": r["unit_label"],
+                "unit": unit_label,
                 "net_kg": net,
                 "gross_kg": gross,
                 "unit_price": _money(price),
@@ -184,8 +184,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         # تفقيط (اختياري إن كانت الخدمة مجهزة)
         amount_in_words = ""
         try:
-            from services.tafqit_service import tafqit_amount as _tafqit_amount
-            amount_in_words = _tafqit_amount(total_value, currency_code, lang)
+            from services.tafqit_service import tafqit_amount as _tafqit_svc
+            amount_in_words = _tafqit_svc(total_value, currency_code, lang)
         except Exception:
             # لا افتراضات نصية؛ نتركها فارغة إذا الخدمة غير متوفرة
             amount_in_words = ""
@@ -194,8 +194,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             "title": None,  # العنوان من القالب
             "date": t["transaction_date"],
             "exporter": {"name": exp["name"], "addr": exp["address"],
-                         "bank_info": _get_bank_info(t["exporter_company_id"])},
-            "bank_info": _get_bank_info(t["exporter_company_id"]),
+                         "bank_info": _get_bank_info(s, t["exporter_company_id"])},
+            "bank_info": _get_bank_info(s, t["exporter_company_id"]),
             "consignee": {"name": consignee["name"], "addr": consignee["address"]},
             "importer": {"name": imp["name"], "addr": imp["address"]} if imp else None,
             "shipment": {

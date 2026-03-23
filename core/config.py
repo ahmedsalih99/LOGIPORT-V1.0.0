@@ -251,7 +251,7 @@ class Config(metaclass=SingletonMeta):
 
         if errors:
             raise ConfigurationError(
-                f"Configuration validation failed:\n" + "\n".join(f"- {e}" for e in errors)
+                "Configuration validation failed:\n" + "\n".join(f"- {e}" for e in errors)
             )
 
     def all(self) -> Dict[str, Any]:

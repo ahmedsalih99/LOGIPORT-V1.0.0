@@ -56,7 +56,7 @@ def log_audit(
         )
 
         session.add(audit_log)
-        logger.debug(f"Audit log added successfully")
+        logger.debug("Audit log added successfully")
         return True
 
     except Exception as e:

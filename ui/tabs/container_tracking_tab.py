@@ -174,6 +174,12 @@ class ContainerTrackingTab(QWidget):
         self._all_rows: list = []
         TranslationManager.get_instance().language_changed.connect(self.retranslate_ui)
         self._build_ui()
+        # تحديث تلقائي عند تغيير بيانات الحاويات من أي مكان
+        try:
+            from core.data_bus import DataBus
+            DataBus.get_instance().subscribe("containers", self._load_data)
+        except Exception:
+            pass
 
     # ── Build ─────────────────────────────────────────────────────────────────
 

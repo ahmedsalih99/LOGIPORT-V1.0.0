@@ -363,7 +363,7 @@ class SyncService:
         SessionLocal = get_session_local()
         with SessionLocal() as s:
             # نبني SQL ديناميكي آمن
-            where = f"updated_at > :cursor"
+            where = "updated_at > :cursor"
             if has_office:
                 where += " AND (office_id = :oid OR office_id IS NULL)"
 

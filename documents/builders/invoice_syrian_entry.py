@@ -269,7 +269,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         tafqit_total_value_en = (_tafqit_amount(total_value, currency_code, "en") or "").strip()
         tafqit_total_value_tr = (_tafqit_amount(total_value, currency_code, "tr") or "").strip()
 
-        template_rel = f"documents/templates/invoices/syrian/entry/{{'ar' if is_ar else ('tr' if is_tr else 'en')}}.html"
+        _lang_key = "ar" if is_ar else ("tr" if is_tr else "en")
+        template_rel = f"documents/templates/invoices/syrian/entry/{_lang_key}.html"
 
         ctx: Dict[str, Any] = {
             "template_rel": template_rel,

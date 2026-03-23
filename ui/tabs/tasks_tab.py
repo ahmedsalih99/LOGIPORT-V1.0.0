@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
 )
 
 from core.translator import TranslationManager
-from core.data_bus import DataBus
 
 def _get_priority_colors():
     """ألوان الأولوية — تتكيف مع الثيم."""

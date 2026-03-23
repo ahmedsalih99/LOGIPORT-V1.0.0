@@ -1,50 +1,186 @@
-<!-- templates/invoices/normal/ar.html -->
-{% extends "_partials/base.html" %}
-{% block content %}
-<header>
-  <h1>فاتورة</h1>
-  <div>رقم: {{ invoice_no }}</div>
-  <div>التاريخ: {{ date }}</div>
-</header>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>فاتورة</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', 'Amiri', Arial, sans-serif;
+    color: #1a1a1a; background: #fff; font-size: 10pt; direction: rtl;
+}
+.page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 18mm; background: #fff; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #1a3a5c; padding-bottom: 14px; }
+.company-name { font-size: 16pt; font-weight: 700; color: #1a3a5c; }
+.company-sub  { font-size: 8.5pt; color: #555; line-height: 1.6; margin-top: 4px; }
+.doc-block    { text-align: left; min-width: 160px; }
+.doc-title    { font-size: 18pt; font-weight: 700; color: #1a3a5c; margin-bottom: 6px; }
+.doc-meta     { font-size: 9pt; color: #333; line-height: 1.8; }
+.doc-meta b   { display: inline-block; width: 80px; }
+.parties { display: flex; gap: 14px; margin-bottom: 14px; }
+.party-box { flex: 1; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
+.party-title { font-size: 8pt; font-weight: 700; color: #fff; background: #1a3a5c; margin: -8px -10px 6px; padding: 3px 10px; border-radius: 3px 3px 0 0; }
+.party-name { font-size: 10pt; font-weight: 700; margin-bottom: 3px; }
+.party-detail { font-size: 8.5pt; color: #444; line-height: 1.6; }
+.shipment-bar { display: flex; flex-wrap: wrap; gap: 6px; background: #f4f6f9; border: 1px solid #dde; border-radius: 4px; padding: 7px 12px; margin-bottom: 14px; font-size: 8.5pt; }
+.ship-item b { color: #1a3a5c; }
+.ship-item + .ship-item { border-right: 1px solid #bbc; padding-right: 6px; margin-right: 2px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 9pt; }
+thead tr { background: #1a3a5c; color: #fff; }
+thead th { padding: 7px 6px; font-weight: 600; border: 1px solid #1a3a5c; }
+tbody tr:nth-child(even) { background: #f8f9fb; }
+tbody td { padding: 6px; border: 1px solid #ccd; vertical-align: middle; }
+tfoot tr { background: #eef1f6; font-weight: 700; }
+tfoot td { padding: 7px 6px; border: 1px solid #bbc; }
+.num { text-align: left; font-variant-numeric: tabular-nums; }
+.center { text-align: center; }
+.footer-row { display: flex; gap: 14px; margin-bottom: 12px; }
+.words-box { flex: 2; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
+.words-title { font-size: 8pt; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
+.words-text  { font-size: 9.5pt; }
+.totals-box  { flex: 1; border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; }
+.tot-row { display: flex; justify-content: space-between; font-size: 8.5pt; padding: 3px 0; border-bottom: 1px dashed #e0e0e0; }
+.tot-row:last-child { border: none; font-weight: 700; font-size: 10pt; color: #1a3a5c; padding-top: 5px; }
+.bank-box { border: 1px solid #ccd; border-radius: 4px; padding: 8px 10px; font-size: 8.5pt; margin-bottom: 12px; }
+.bank-title { font-size: 8pt; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
+.notes-box { border-top: 1px dashed #ccc; padding-top: 8px; font-size: 8.5pt; color: #555; margin-bottom: 12px; }
+.sig-row { display: flex; justify-content: space-between; margin-top: 24px; font-size: 8.5pt; }
+.sig-block { text-align: center; width: 140px; }
+.sig-line  { border-top: 1px solid #666; padding-top: 4px; margin-top: 30px; color: #555; }
+</style>
+</head>
+<body>
+<div class="page">
 
-<section>
-  <div>المصدّر: {{ exporter.name }}</div>
-  <div>المستلم: {{ consignee.name }}</div>
-</section>
+{% set exp  = exporter  or {} %}
+{% set con  = consignee or importer or {} %}
+{% set ship = shipment  or {} %}
+{% set tots = totals    or {} %}
+{% set cur_code = (currency.code if currency and currency.code else ship.currency or '') %}
+
+<div class="header">
+  <div>
+    <div class="company-name">{{ exp.name or '' }}</div>
+    <div class="company-sub">
+      {% if exp.addr or exp.address %}{{ exp.addr or exp.address }}<br>{% endif %}
+      {% if exp.phone %}هاتف: {{ exp.phone }}&nbsp;&nbsp;{% endif %}
+      {% if exp.email %}{{ exp.email }}&nbsp;&nbsp;{% endif %}
+      {% if exp.tax_id %}الرقم الضريبي: {{ exp.tax_id }}{% endif %}
+    </div>
+  </div>
+  <div class="doc-block">
+    <div class="doc-title">فاتورة</div>
+    <div class="doc-meta">
+      <div><b>رقم الفاتورة:</b> {{ invoice_no or doc_no or '' }}</div>
+      <div><b>التاريخ:</b> {{ date or '' }}</div>
+      {% if cur_code %}<div><b>العملة:</b> {{ cur_code }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="parties">
+  <div class="party-box">
+    <div class="party-title">المصدّر / البائع</div>
+    <div class="party-name">{{ exp.name or '' }}</div>
+    <div class="party-detail">
+      {% if exp.addr or exp.address %}{{ exp.addr or exp.address }}<br>{% endif %}
+      {% if exp.phone %}هاتف: {{ exp.phone }}<br>{% endif %}
+      {% if exp.email %}{{ exp.email }}<br>{% endif %}
+      {% if exp.tax_id %}الرقم الضريبي: {{ exp.tax_id }}{% endif %}
+    </div>
+  </div>
+  <div class="party-box">
+    <div class="party-title">المستورد / المشتري</div>
+    <div class="party-name">{{ con.name or '' }}</div>
+    <div class="party-detail">
+      {% if con.addr or con.address %}{{ con.addr or con.address }}<br>{% endif %}
+      {% if con.phone %}هاتف: {{ con.phone }}<br>{% endif %}
+      {% if con.email %}{{ con.email }}<br>{% endif %}
+      {% if con.tax_id %}الرقم الضريبي: {{ con.tax_id }}{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if ship.delivery_method or ship.origin_country or ship.destination or ship.transport_ref %}
+<div class="shipment-bar">
+  {% if ship.delivery_method %}<span class="ship-item"><b>شروط التسليم:</b> {{ ship.delivery_method }}</span>{% endif %}
+  {% if ship.origin_country %}<span class="ship-item"><b>بلد المنشأ:</b> {{ ship.origin_country }}</span>{% endif %}
+  {% if ship.destination %}<span class="ship-item"><b>الوجهة:</b> {{ ship.destination }}</span>{% endif %}
+  {% if ship.transport_ref %}<span class="ship-item"><b>المرجع:</b> {{ ship.transport_ref }}</span>{% endif %}
+  {% if pricing_type and pricing_type.name %}<span class="ship-item"><b>نوع التسعير:</b> {{ pricing_type.name }}</span>{% endif %}
+</div>
+{% endif %}
 
 <table>
   <thead>
     <tr>
-      <th>البيان</th>
-      <th>الكمية</th>
-      <th>السعر</th>
-      <th>المجموع</th>
+      <th class="center" style="width:28px">#</th>
+      <th>وصف البضاعة</th>
+      <th class="center" style="width:60px">التغليف</th>
+      <th class="num"   style="width:60px">الكمية</th>
+      <th class="num"   style="width:65px">الوزن الصافي&nbsp;(كغ)</th>
+      <th class="num"   style="width:65px">الوزن القائم&nbsp;(كغ)</th>
+      <th class="num"   style="width:75px">سعر الوحدة&nbsp;({{ cur_code }})</th>
+      <th class="num"   style="width:75px">الإجمالي&nbsp;({{ cur_code }})</th>
     </tr>
   </thead>
   <tbody>
-    {% for item in items %}
+  {% for it in items or [] %}
     <tr>
-      <td>{{ item.description }}</td>
-      <td>{{ item.qty }} {{ item.unit }}</td>
-      <td>{{ item.unit_price }}</td>
-      <td>{{ item.amount }}</td>
+      <td class="center">{{ loop.index }}</td>
+      <td>{{ it.description or '' }}</td>
+      <td class="center">{{ it.packaging or '' }}</td>
+      <td class="num">{{ it.qty or 0 }}{% if it.unit %} {{ it.unit }}{% endif %}</td>
+      <td class="num">{{ it.net_kg or it.net or 0 }}</td>
+      <td class="num">{{ it.gross_kg or it.gross or 0 }}</td>
+      <td class="num">{{ it.unit_price or 0 }}</td>
+      <td class="num">{{ it.amount or 0 }}</td>
     </tr>
-    {% endfor %}
+  {% endfor %}
   </tbody>
   <tfoot>
     <tr>
-      <td colspan="3">الإجمالي</td>
-      <td>{{ totals.value }} {{ currency.code }}</td>
+      <td colspan="3" style="text-align:right; font-weight:700;">الإجماليات</td>
+      <td class="num">{{ tots.qty or '' }}</td>
+      <td class="num">{{ tots.net or '' }}</td>
+      <td class="num">{{ tots.gross or '' }}</td>
+      <td></td>
+      <td class="num">{{ tots.value or '' }} {{ cur_code }}</td>
     </tr>
   </tfoot>
 </table>
 
-<div>{{ amount_in_words }}</div>
-
-  {% if bank_info or exporter.bank_info %}
-  <div style="margin-top:16px;padding:10px;border:1px solid #ccc;border-radius:4px;">
-    <div style="font-weight:700;margin-bottom:4px;">بيانات البنك</div>
-    <div>{{ (bank_info or exporter.bank_info) | replace('\n','<br>') | safe }}</div>
+<div class="footer-row">
+  {% if amount_in_words %}
+  <div class="words-box">
+    <div class="words-title">المبلغ كتابةً</div>
+    <div class="words-text">{{ amount_in_words }}</div>
   </div>
   {% endif %}
-{% endblock %}
+  <div class="totals-box">
+    <div class="tot-row"><span>إجمالي الكمية</span><span>{{ tots.qty or '' }}</span></div>
+    <div class="tot-row"><span>الوزن الصافي (كغ)</span><span>{{ tots.net or '' }}</span></div>
+    <div class="tot-row"><span>الوزن القائم (كغ)</span><span>{{ tots.gross or '' }}</span></div>
+    <div class="tot-row"><span>المبلغ الإجمالي</span><span>{{ tots.value or '' }} {{ cur_code }}</span></div>
+  </div>
+</div>
+
+{% if bank_info or exp.bank_info %}
+<div class="bank-box">
+  <div class="bank-title">بيانات البنك</div>
+  <div>{{ (bank_info or exp.bank_info) | replace('\n','<br>') | safe }}</div>
+</div>
+{% endif %}
+
+{% if notes %}
+<div class="notes-box"><b>ملاحظات:</b> {{ notes }}</div>
+{% endif %}
+
+<div class="sig-row">
+  <div class="sig-block"><div class="sig-line">ختم وتوقيع المصدّر</div></div>
+  <div class="sig-block"><div class="sig-line">ختم وتوقيع المستورد</div></div>
+</div>
+
+</div>
+</body>
+</html>

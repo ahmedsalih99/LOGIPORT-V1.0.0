@@ -38,6 +38,8 @@ ENTITIES = [
     "pricing",
     "countries",
     "currencies",
+    "packaging",
+    "delivery_methods",
 ]
 
 

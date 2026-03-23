@@ -216,9 +216,14 @@ def render_document(
     # -------------------------------------------------------------------------
     # Build context
     try:
-        try:
+        import inspect
+        sig = inspect.signature(builder)
+        params = list(sig.parameters.keys())
+        # builders جديدة: (doc_code, transaction_id, lang)
+        # builders قديمة: (transaction_id, lang)
+        if len(params) >= 3 and params[0] not in ("transaction_id", "tx_id"):
             ctx = builder(doc_code, transaction_id, lang)
-        except TypeError:
+        else:
             ctx = builder(transaction_id, lang)
 
         if not isinstance(ctx, dict):
