@@ -126,7 +126,7 @@ def get_styles(theme):
         selection-background-color: {c["primary_light"]};
         selection-color: {c["primary"]};
         outline: none;
-        font-size: 12px;
+        font-size: {s["base"]}px;
     }}
 
     QTableWidget#data-table::item {{
@@ -138,7 +138,7 @@ def get_styles(theme):
         background: {c["bg_hover"]};
         color: {c["text_secondary"]};
         font-weight: 700;
-        font-size: 11px;
+        font-size: {s["sm"]}px;
         padding: 8px 10px;
         border: none;
     }}
@@ -154,7 +154,7 @@ def get_styles(theme):
     QLabel#sel-count-label {{
         color: {c["primary"]};
         font-weight: 700;
-        font-size: 13px;
+        font-size: {s["md"]}px;
     }}
 
     /* Checkbox في header الجدول */

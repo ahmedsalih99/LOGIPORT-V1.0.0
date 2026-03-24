@@ -90,7 +90,7 @@ def get_styles(theme):
 
     QMenu::item {{
         padding          : 9px 20px 9px 16px;
-        border-radius    : 7px;
+        border-radius: {BorderRadius.MD};
         margin           : 2px 4px;
         min-width        : 160px;
         color            : {c["text_primary"]};
@@ -172,7 +172,7 @@ def get_styles(theme):
     QPushButton#filter-preset-btn {{
         background   : transparent;
         border       : 1.5px solid {c["border"]};
-        border-radius: 7px;
+        border-radius: {BorderRadius.MD};
         padding      : 0 10px;
         font-size    : {s["sm"]}px;
         color        : {c["text_secondary"]};
@@ -195,7 +195,7 @@ def get_styles(theme):
         background   : transparent;
         border       : 1.5px solid {c["danger"]}50;
         border-radius : 6px;
-        font-size    : 11px;
+        font-size    : {s["sm"]}px;
         color        : {c["danger"]};
         min-width    : 28px;
         max-width    : 28px;

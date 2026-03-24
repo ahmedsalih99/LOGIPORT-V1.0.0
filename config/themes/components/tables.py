@@ -70,7 +70,7 @@ def get_styles(theme):
         border-right : 1px solid {c["border_subtle"]};
         font-weight  : 700;
         font-size    : {s["sm"]}px;
-        letter-spacing: 0.2px;
+        letter-spacing: 0.3px;
     }}
 
     QHeaderView::section:hover {{
@@ -249,7 +249,7 @@ def get_styles(theme):
 
     QLabel#empty-state-text {{
         color      : {c["text_muted"]};
-        font-size  : 14px;
+        font-size  : {s["lg"]}px;
         font-weight: 500;
     }}
 

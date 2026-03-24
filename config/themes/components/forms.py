@@ -248,7 +248,7 @@ def get_styles(theme):
     QCalendarWidget QToolButton {{
         background   : transparent;
         color        : #FFFFFF;
-        font-size    : 13px;
+        font-size    : {s["md"]}px;
         font-weight  : 700;
         border       : none;
         border-radius: {RS};
@@ -273,7 +273,7 @@ def get_styles(theme):
         border                    : 1px solid rgba(255,255,255,0.35);
         border-radius             : {RS};
         padding                   : 2px 4px;
-        font-size                 : 13px;
+        font-size                 : {s["md"]}px;
         font-weight               : 700;
         min-width : 52px;
         min-height: 0;
@@ -307,7 +307,7 @@ def get_styles(theme):
     QCalendarWidget QHeaderView::section {{
         background : {c["bg_disabled"]};
         color      : {c["text_muted"]};
-        font-size  : 11px;
+        font-size  : {s["sm"]}px;
         font-weight: 600;
         border     : none;
         padding    : 4px 0;
@@ -320,7 +320,7 @@ def get_styles(theme):
         gridline-color            : {c["border_subtle"]};
         outline                   : none;
         border                    : none;
-        font-size                 : 13px;
+        font-size                 : {s["md"]}px;
     }}
 
     /* ═══════════════════════════════════════════════════════════
@@ -424,7 +424,7 @@ def get_styles(theme):
     QRadioButton::indicator {{
         width        : 17px;
         height       : 17px;
-        border-radius: 9px;
+        border-radius: {BorderRadius.MD};
         border       : 1.5px solid {c["border"]};
         background   : {c["bg_card"]};
     }}

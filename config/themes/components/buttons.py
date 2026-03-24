@@ -325,9 +325,9 @@ def get_styles(theme):
         background     : {c["bg_secondary"]};
         color          : {c["text_muted"]};
         border         : 1px solid {c["border"]};
-        border-radius  : 14px;
+        border-radius: {BorderRadius.LG};
         padding        : 3px 12px;
-        font-size      : 11px;
+        font-size      : {s["sm"]}px;
         font-weight    : 400;
     }}
     QPushButton#stats-filter-btn:hover {{

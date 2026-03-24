@@ -8,6 +8,7 @@ def get_styles(theme):
     Generate dialog styles - visual only (no geometry control)
     """
     c = theme.colors
+    s = theme.sizes
 
     return f"""
     /* ========== DIALOGS ========== */
@@ -20,7 +21,7 @@ def get_styles(theme):
     /* Dialog Title */
     QDialog QLabel#title {{
         color: {c["primary"]};
-        font-weight: 800;
+        font-weight: 700;
     }}
     
     QDialog QLabel#subtitle {{
@@ -65,7 +66,7 @@ def get_styles(theme):
     /* Login Dialog Title */
     QDialog#LoginDialog QLabel#title {{
         color: {c["primary"]};
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 2px;
     }}
     
@@ -190,7 +191,7 @@ def get_styles(theme):
     /* Settings Titles */
     QFrame#settings-card QLabel#settings-title {{
         color: {c["primary"]};
-        font-weight: 800;
+        font-weight: 700;
     }}
     
     QFrame#settings-card QLabel#settings-section-title {{
@@ -276,7 +277,7 @@ def get_styles(theme):
     QLabel#form-section-title {{
         color: {c["primary"]};
         font-weight: 700;
-        font-size: 11px;
+        font-size: {s["sm"]}px;
         text-transform: uppercase;
         letter-spacing: 1px;
     }}
@@ -324,7 +325,7 @@ def get_styles(theme):
     /* Error message label under a field */
     QLabel#form-field-error {{
         color: {c["danger"]};
-        font-size: 11px;
+        font-size: {s["sm"]}px;
         padding: 0px 2px;
     }}
 

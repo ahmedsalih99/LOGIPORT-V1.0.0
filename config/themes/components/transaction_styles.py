@@ -12,37 +12,34 @@ from ..border_radius import BorderRadius
 
 def get_styles(theme):
     c = theme.colors
+    s = theme.sizes
     is_dark = getattr(theme, "name", "").lower() == "dark"
 
     # قيم مشتقة حسب الثيم
+    # Use semantic colors — no hardcoded values
+    header_bg      = (
+        f"qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+        f" stop:0 {c['bg_surface_3']}, stop:1 {c['bg_main']})"
+    )
+    card_bg        = c["bg_surface_1"]
+    tab_active_bg  = c["bg_surface_1"]
+    tab_idle_bg    = c["bg_surface_2"]
+    field_focus_bg = c["bg_surface_focus"]
+    divider        = c["border_subtle"]
     if is_dark:
-        header_bg      = "qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #1a2035, stop:1 #111827)"
-        card_bg        = "#1e2535"
-        card_shadow    = "rgba(0,0,0,0.4)"
-        tab_active_bg  = "#1e2535"
-        tab_idle_bg    = "#161d2d"
-        field_focus_bg = "#1a2235"
-        badge_export   = "#1e3a2e"
-        badge_export_t = "#34d399"
-        badge_import   = "#1e2d4a"
-        badge_import_t = "#60a5fa"
-        badge_transit  = "#2d2418"
-        badge_transit_t = "#fbbf24"
-        divider        = "rgba(255,255,255,0.06)"
+        badge_export   = c["success_light"]
+        badge_export_t = c["success"]
+        badge_import   = c["primary_light"]
+        badge_import_t = c["primary"]
+        badge_transit  = c["warning_light"]
+        badge_transit_t = c["warning"]
     else:
-        header_bg      = "qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f8faff, stop:1 #f0f4fc)"
-        card_bg        = "#ffffff"
-        card_shadow    = "rgba(37,99,235,0.08)"
-        tab_active_bg  = "#ffffff"
-        tab_idle_bg    = "#f3f6fb"
-        field_focus_bg = "#f8faff"
-        badge_export   = "#dcfce7"
-        badge_export_t = "#16a34a"
-        badge_import   = "#dbeafe"
-        badge_import_t = "#1d4ed8"
-        badge_transit  = "#fef3c7"
-        badge_transit_t = "#b45309"
-        divider        = "rgba(0,0,0,0.06)"
+        badge_export   = c["success_light"]
+        badge_export_t = c["success_active"]
+        badge_import   = c["primary_light"]
+        badge_import_t = c["primary_active"]
+        badge_transit  = c["warning_light"]
+        badge_transit_t = c["warning_active"]
 
     return f"""
     /* ============================================================================
@@ -111,7 +108,7 @@ def get_styles(theme):
 
     QLabel#status-label {{
         color: {c["text_secondary"]};
-        font-size: 12px;
+        font-size: {s["base"]}px;
     }}
 
     QLabel#status-label[message_type="success"] {{ color: {c["success"]}; }}
@@ -136,10 +133,10 @@ def get_styles(theme):
 
     /* field labels */
     QLabel#field-label {{
-        font-size: 10px;
+        font-size: {s["xs"]}px;
         font-weight: 700;
         color: {c["text_secondary"]};
-        letter-spacing: 0.6px;
+        letter-spacing: 0.5px;
     }}
 
     /* --------------------------------------------------------------------------
@@ -153,7 +150,7 @@ def get_styles(theme):
         border: 1.5px solid {c["border"]};
         border-radius: {BorderRadius.SM};
         color: {c["text_primary"]};
-        font-size: 13px;
+        font-size: {s["md"]}px;
         padding: 2px 10px;
         selection-background-color: {c["accent_soft"]};
     }}
@@ -206,7 +203,7 @@ def get_styles(theme):
         border: 1.5px solid {c["border"]};
         border-radius: {BorderRadius.SM};
         color: {c["text_primary"]};
-        font-size: 13px;
+        font-size: {s["md"]}px;
         padding: 2px 10px;
     }}
 
@@ -271,7 +268,7 @@ def get_styles(theme):
         border-top-right-radius: {BorderRadius.SM};
         padding: 7px 20px;
         margin-right: 3px;
-        font-size: 12px;
+        font-size: {s["base"]}px;
         font-weight: 500;
         min-width: 80px;
     }}
@@ -307,7 +304,7 @@ def get_styles(theme):
         border-right: 1px solid {c["border_subtle"]};
         padding: 6px 10px;
         font-weight: 600;
-        font-size: 11px;
+        font-size: {s["sm"]}px;
         letter-spacing: 0.3px;
     }}
 
@@ -364,20 +361,20 @@ def get_styles(theme):
 
     QLabel#footer-stat-title {{
         color: {c["text_secondary"]};
-        font-size: 10px;
+        font-size: {s["xs"]}px;
         font-weight: 600;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.3px;
     }}
 
     QLabel#footer-stat-value {{
         color: {c["text_primary"]};
-        font-size: 15px;
+        font-size: {s["xl"]}px;
         font-weight: 700;
     }}
 
     QLabel#footer-stat-value-accent {{
         color: {c["accent"]};
-        font-size: 15px;
+        font-size: {s["xl"]}px;
         font-weight: 700;
     }}
 
@@ -392,7 +389,7 @@ def get_styles(theme):
 
     QLabel#docs-panel-title {{
         color: {c["text_primary"]};
-        font-size: 12px;
+        font-size: {s["base"]}px;
         font-weight: 700;
         letter-spacing: 0.3px;
     }}
@@ -401,7 +398,7 @@ def get_styles(theme):
         background: {c["accent"]};
         color: {c["text_white"]};
         border-radius: 10px;
-        font-size: 10px;
+        font-size: {s["xs"]}px;
         font-weight: 700;
         padding: 0 5px;
     }}
@@ -429,7 +426,7 @@ def get_styles(theme):
 
     QCheckBox#doc-checkbox-card {{
         color: {c["text_primary"]};
-        font-size: 11px;
+        font-size: {s["sm"]}px;
         padding: 5px 8px;
         border-radius: {BorderRadius.SM};
         spacing: 8px;
@@ -450,7 +447,7 @@ def get_styles(theme):
 
     QLabel#doc-group-header {{
         color: {c["text_secondary"]};
-        font-size: 10px;
+        font-size: {s["xs"]}px;
         font-weight: 600;
         padding: 8px 4px 2px 4px;
         letter-spacing: 0.5px;
@@ -458,7 +455,7 @@ def get_styles(theme):
 
     QLabel#docs-hint-label {{
         color: {c["text_secondary"]};
-        font-size: 10px;
+        font-size: {s["xs"]}px;
         padding: 8px;
         border: 1px dashed {c["border"]};
         border-radius: {BorderRadius.SM};

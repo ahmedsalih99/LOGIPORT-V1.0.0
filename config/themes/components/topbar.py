@@ -45,7 +45,7 @@ def get_styles(theme):
         padding      : 0 14px;
         background   : {c["bg_hover"]};
         border       : 1px solid {c["border"]};
-        border-radius: 17px;
+        border-radius: {BorderRadius.LG};
         color        : {c["text_muted"]};
         font-size    : {s["sm"]}px;
         text-align   : right;
@@ -79,7 +79,7 @@ def get_styles(theme):
     QFrame#topbar-user-chip {{
         background   : transparent;
         border       : none;
-        border-radius: 18px;
+        border-radius: {BorderRadius.XL};
     }}
     QFrame#topbar-user-chip:hover {{
         background: {c["bg_hover"]};
@@ -96,7 +96,7 @@ def get_styles(theme):
     /* ── backward compat ── */
     QPushButton#topbar-btn      {{ background: transparent; border: none; color: {c["topbar_text"]}; padding: 0 8px; min-height: 32px; }}
     QPushButton#topbar-btn-icon {{ background: transparent; border: none; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; }}
-    QPushButton#topbar-user-widget {{ background: transparent; border: none; border-radius: 18px; min-height: 36px; }}
+    QPushButton#topbar-user-widget {{ background: transparent; border: none; border-radius: {BorderRadius.XL}; min-height: 36px; }}
     QPushButton#topbar-user-widget:hover {{ background: {c["bg_hover"]}; }}
     """
 

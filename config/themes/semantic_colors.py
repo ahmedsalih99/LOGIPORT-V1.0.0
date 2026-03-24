@@ -27,10 +27,10 @@ class SemanticColors:
             "primary_lighter": "rgba(37, 99, 235, 0.05)",
 
             # ========== Success (Green) ==========
-            "success": "#2ECC71",
-            "success_hover": "#48E68B",
-            "success_active": "#27AE60",
-            "success_light": "rgba(46, 204, 113, 0.1)",
+            "success": "#10B981",        # Tailwind emerald-500 — unified green
+            "success_hover": "#34D399",    # emerald-400
+            "success_active": "#059669",   # emerald-600
+            "success_light": "rgba(16, 185, 129, 0.1)",
 
             # ========== Warning (Orange) ==========
             "warning": "#F39C12",
@@ -65,6 +65,12 @@ class SemanticColors:
             "bg_sidebar": "#1B2A4A",           # Navy dark sidebar - Hypernode style
             "bg_topbar": "#FFFFFF",            # White topbar
             "bg_input": "#FFFFFF",
+
+            # ── Surface levels ──────────────────────────────────────
+            "bg_surface_1": "#FFFFFF",         # card bg (same as bg_card in light)
+            "bg_surface_2": "#F3F6FB",         # tab idle / secondary surface
+            "bg_surface_3": "#F8FAFF",         # header gradient stop
+            "bg_surface_focus": "#F8FAFF",     # field focus
 
             # ========== Sidebar Colors ==========
             "sidebar_text": "#FFFFFF",         # White text
@@ -159,10 +165,10 @@ class SemanticColors:
             "primary_lighter": "rgba(61, 109, 179, 0.08)",
 
             # ========== Success (Green) ==========
-            "success": "#2ECC71",
-            "success_hover": "#48E68B",
-            "success_active": "#27AE60",
-            "success_light": "rgba(46, 204, 113, 0.15)",
+            "success": "#10B981",
+            "success_hover": "#34D399",
+            "success_active": "#059669",
+            "success_light": "rgba(16, 185, 129, 0.15)",
 
             # ========== Warning (Orange) ==========
             "warning": "#F39C12",
@@ -197,6 +203,12 @@ class SemanticColors:
             "bg_sidebar": "#1a2332",
             "bg_topbar": "#1F2937",
             "bg_input": "#1e2430",
+
+            # ── Surface levels (used by transaction_styles, cards) ──
+            "bg_surface_1": "#1e2535",   # card bg
+            "bg_surface_2": "#161d2d",   # tab idle / secondary surface
+            "bg_surface_3": "#1a2035",   # header gradient stop
+            "bg_surface_focus": "#1a2235",  # field focus
 
             # ========== Sidebar Colors ==========
             "sidebar_text": "#FFFFFF",
