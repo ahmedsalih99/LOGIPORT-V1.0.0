@@ -183,7 +183,7 @@ class ItemsTabMixin:
         hdr.setStretchLastSection(True)
         hdr.setDefaultAlignment(Qt.AlignCenter)
         hdr.setSectionResizeMode(QHeaderView.Interactive)
-        self.tbl.verticalHeader().setDefaultSectionSize(46)
+        self.tbl.verticalHeader().setDefaultSectionSize(32)
 
         # Context menu
         self.tbl.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -319,6 +319,8 @@ class ItemsTabMixin:
                 if isinstance(orig_widget, QComboBox):
                     new_combo = QComboBox()
                     new_combo.setFocusPolicy(Qt.ClickFocus)
+                    new_combo.setFixedHeight(28)
+                    new_combo.setStyleSheet(orig_widget.styleSheet())
                     for i in range(orig_widget.count()):
                         new_combo.addItem(orig_widget.itemText(i), orig_widget.itemData(i))
                     new_combo.setCurrentIndex(orig_widget.currentIndex())
@@ -327,6 +329,10 @@ class ItemsTabMixin:
                     new_date = QDateEdit()
                     new_date.setFocusPolicy(Qt.ClickFocus)
                     new_date.setDate(orig_widget.date())
+                    new_date.setFixedHeight(28)
+                    new_date.setDisplayFormat("yyyy-MM-dd")
+                    new_date.setCalendarPopup(True)
+                    new_date.setStyleSheet(orig_widget.styleSheet())
                     self.tbl.setCellWidget(new_row, col, new_date)
 
         self._recalc_totals()
@@ -834,7 +840,15 @@ class ItemsTabMixin:
     def _set_combo(self, row: int, col: int, items: List[tuple], selected_id: Any) -> None:
         combo = QComboBox()
         combo.setObjectName("table-combo")
-        combo.setMinimumHeight(38)
+        combo.setFixedHeight(28)
+        combo.setMaximumHeight(28)
+        combo.setStyleSheet(
+            "QComboBox { padding: 1px 6px; font-size: 11px; font-weight: 400;"
+            " border: 1px solid #E0E0E0; border-radius: 4px; background: white; min-height: 0; }"
+            "QComboBox:focus { border: 1px solid #2563EB; }"
+            "QComboBox::drop-down { width: 0; border: none; }"
+            "QComboBox::down-arrow { width: 0; height: 0; border: none; image: none; }"
+        )
         combo.setFocusPolicy(Qt.ClickFocus)  # لا يأخذ focus بالـ hover → يمنع تحديد السطر
 
         for label, rid in items:
@@ -857,11 +871,17 @@ class ItemsTabMixin:
     def _set_date(self, row: int, col: int, date: QDate) -> None:
         de = QDateEdit()
         de.setObjectName("table-date")
-        de.setMinimumHeight(38)
-        de.setFocusPolicy(Qt.ClickFocus)  # نفس السبب — لا يأخذ focus بالـ hover
+        de.setFixedHeight(28)
+        de.setMaximumHeight(28)
+        de.setFocusPolicy(Qt.ClickFocus)  # لا يأخذ focus بالـ hover
         de.setDisplayFormat("yyyy-MM-dd")
         de.setCalendarPopup(True)
         de.setDate(date)
+        de.setStyleSheet(
+            "QDateEdit { padding: 1px 6px; font-size: 11px; font-weight: 400;"
+            " border: 1px solid #E0E0E0; border-radius: 4px; background: white; min-height: 0; }"
+            "QDateEdit:focus { border: 1px solid #2563EB; }"
+        )
         self.tbl.setCellWidget(row, col, de)
 
     def get_items_data(self) -> List[Dict[str, Any]]:

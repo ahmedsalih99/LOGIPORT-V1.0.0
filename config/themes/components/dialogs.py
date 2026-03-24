@@ -15,8 +15,6 @@ def get_styles(theme):
     /* QDialog Base */
     QDialog {{
         background: {c["bg_card"]};
-        border: 1px solid {c["border"]};
-        border-radius: {BorderRadius.XXL};
     }}
     
     /* Dialog Title */
@@ -246,23 +244,7 @@ def get_styles(theme):
         background: {c["border_subtle"]};
     }}
     
-    /* Dialog Input Fields - General */
-QDialog QLineEdit {{
-    background: {c["bg_card"]};
-    color: {c["text_primary"]};
-    border: 1px solid {c["border"]};
-    border-radius: {BorderRadius.MD};
-    padding: 6px 8px;
-}}
-
-QDialog QLineEdit:hover {{
-    border-color: {c["border_hover"]};
-}}
-
-QDialog QLineEdit:focus {{
-    border: 2px solid {c["border_focus"]};
-    background: {c["bg_card"]};
-}}
+    /* Dialog Input Fields - General (مُعرَّف في forms.py، هذا مجرد تعليق) */
 
 
     /* ========== FORM DIALOG ========== */
@@ -320,19 +302,11 @@ QDialog QLineEdit:focus {{
         border-top: 1px solid {c["border_subtle"]};
     }}
 
-    /* ── Focus state: حقل active يأخذ bg مختلف ───────────────────── */
-    QDialog QLineEdit:focus {{
-        border: 2px solid {c["border_focus"]};
-        background: {c["bg_input"]};
-    }}
-
-    QDialog QTextEdit:focus {{
-        border: 2px solid {c["border_focus"]};
-        background: {c["bg_input"]};
-    }}
-
+    /* ── Focus states for dialog fields ─────────────────────────── */
+    QDialog QLineEdit:focus,
+    QDialog QTextEdit:focus,
     QDialog QComboBox:focus {{
-        border: 2px solid {c["border_focus"]};
+        border    : 2px solid {c["border_focus"]};
         background: {c["bg_input"]};
     }}
 

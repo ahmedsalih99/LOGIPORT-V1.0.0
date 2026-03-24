@@ -26,7 +26,7 @@ def get_styles(theme):
     }}
     
     QFrame#card:hover {{
-        border: 1px solid {c["primary"]};
+        border: 1px solid {c["border"]};
         background: {c["bg_hover"]};
     }}
 

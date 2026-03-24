@@ -254,5 +254,32 @@ def get_styles(theme):
         border-radius: 4px;
         padding      : 4px 8px;
     }}
-    
+
+    /* ========== QSplitter ========== */
+
+    QSplitter::handle {{
+        background  : {c["border_subtle"]};
+    }}
+    QSplitter::handle:horizontal {{
+        width : 1px;
+    }}
+    QSplitter::handle:vertical {{
+        height: 1px;
+    }}
+    QSplitter::handle:hover {{
+        background: {c["primary_light"]};
+    }}
+
+    /* ========== QToolTip ========== */
+
+    QToolTip {{
+        background   : {c["bg_card"]};
+        color        : {c["text_primary"]};
+        border       : 1px solid {c["border"]};
+        border-radius: 6px;
+        padding      : 5px 10px;
+        font-size    : {s["sm"]}px;
+        font-weight  : 400;
+    }}
+
     """
