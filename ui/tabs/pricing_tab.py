@@ -295,10 +295,17 @@ class PricingTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            _failed = []
             for row in rows:
                 p = self.data[row]["actions"]
-                self._delete_single(p, confirm=False)
-            QMessageBox.information(self, self._("deleted"), self._("pricing_deleted_success"))
+                ok, err = self._delete_single(p, confirm=False)
+                if not ok:
+                    _name = getattr(p, "name_ar", None) or getattr(p, "name_en", None) or str(getattr(p, "id", "?"))
+                    _failed.append(f"{_name}: {err}")
+            if _failed:
+                QMessageBox.warning(self, self._("error"), "\n".join(_failed))
+            else:
+                QMessageBox.information(self, self._("deleted"), self._("pricing_deleted_success"))
             DataBus.get_instance().emit('pricing')
             self.reload_data()
 
@@ -310,7 +317,18 @@ class PricingTab(BaseTab):
             )
             if reply != QMessageBox.Yes:
                 return
-        self.pricing_crud.delete_pricing(pricing.id)
+        try:
+            self.pricing_crud.delete_pricing(pricing.id)
+            return True, None
+        except Exception as e:
+            err = str(e)
+            if "FOREIGN KEY" in err or "IntegrityError" in err:
+                msg = self._("pricing_in_use_cannot_delete")
+            else:
+                msg = err
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
 
     def on_row_double_clicked(self, row_index):
         try:

@@ -230,9 +230,18 @@ class PackagingTypesTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            _failed = []
             for row in rows:
                 pt = self.data[row]["actions"]
-                self._delete_single(pt, confirm=False)
+                ok, err = self._delete_single(pt, confirm=False)
+                if not ok:
+                    _name = (
+                        getattr(pt, "name_ar", None) or
+                        getattr(pt, "name_en", None) or
+                        (pt.get("username") if isinstance(pt, dict) else None) or
+                        str(getattr(pt, "id", "?"))
+                    )
+                    _failed.append(f"{_name}: {err}")
             QMessageBox.information(self, self._("deleted"), self._("packaging_type_deleted_success"))
             self.reload_data()
             from core.data_bus import DataBus
@@ -246,7 +255,18 @@ class PackagingTypesTab(BaseTab):
             )
             if reply != QMessageBox.Yes:
                 return
-        self.packaging_types_crud.delete(pt.id)
+        try:
+            self.packaging_types_crud.delete(pt.id)
+            return True, None
+        except Exception as e:
+            err = str(e)
+            if "FOREIGN KEY" in err or "IntegrityError" in err:
+                msg = self._("packaging_type_in_use_cannot_delete")
+            else:
+                msg = err
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
 
     # -----------------------------
     # Double-click → view dialog

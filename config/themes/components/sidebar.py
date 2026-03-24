@@ -32,11 +32,14 @@ def get_styles(theme):
         background   : transparent;
         border       : none;
         border-radius: 12px;
-        padding      : 6px 10px;
+        padding      : 4px 8px 6px 8px;
         color        : {c["text_secondary"]};
         font-size    : {s["sm"]}px;
         font-weight  : 500;
-        min-width    : 68px;
+        min-width    : 60px;
+        max-width    : 100px;
+        /* Qt needs explicit text position for ToolButtonTextUnderIcon */
+        qproperty-toolButtonStyle: ToolButtonTextUnderIcon;
     }}
 
     QToolButton#pill-tab-btn:hover {{
@@ -48,6 +51,7 @@ def get_styles(theme):
         background : {c["primary"]};
         color      : #FFFFFF;
         font-weight: 700;
+        border-radius: 12px;
     }}
 
     QToolButton#pill-tab-btn:checked:hover {{

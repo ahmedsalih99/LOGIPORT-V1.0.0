@@ -1,4 +1,4 @@
-"""Table Component Styles - Professional Clean"""
+"""Table Component Styles - Professional Clean v2"""
 
 from ..spacing import Spacing
 from ..border_radius import BorderRadius
@@ -10,7 +10,7 @@ def get_styles(theme):
 
     return f"""
     /* =======================================================
-       TABLES - PROFESSIONAL CLEAN
+       TABLES - PROFESSIONAL CLEAN v2
     ======================================================= */
 
     QTableWidget {{
@@ -20,7 +20,7 @@ def get_styles(theme):
         border-radius            : {BorderRadius.MD};
         gridline-color           : {c["border_subtle"]};
         font-size                : {s["base"]}px;
-        alternate-background-color: {c["bg_hover"]};
+        alternate-background-color: {c["bg_disabled"]};
         selection-background-color: {c["primary_light"]};
         selection-color          : {c["primary"]};
         outline                  : none;
@@ -34,10 +34,11 @@ def get_styles(theme):
     /* ── Items ── */
 
     QTableWidget::item {{
-        padding    : {Spacing.SM} {Spacing.MD};
+        padding    : 5px {Spacing.MD};
         border     : none;
-        font-weight: 700;
+        font-weight: 500;
         font-size  : {s["base"]}px;
+        color      : {c["text_primary"]};
     }}
 
     QTableWidget::item:hover {{
@@ -47,16 +48,13 @@ def get_styles(theme):
     QTableWidget::item:selected {{
         background   : {c["primary_light"]};
         color        : {c["primary"]};
-        border-radius: {BorderRadius.SM};
     }}
 
-    /* ── Alternating Rows ── */
-
-    QTableView {{
-        alternate-background-color: {c["bg_hover"]};
+    QTableWidget::item:alternate {{
+        background: {c["bg_disabled"]};
     }}
 
-    /* Header - lighter and cleaner */
+    /* ── Header - clear and readable ── */
 
     QHeaderView {{
         background: transparent;
@@ -64,20 +62,21 @@ def get_styles(theme):
     }}
 
     QHeaderView::section {{
-        background   : {c["bg_card"]};
+        background   : {c["bg_disabled"]};
         color        : {c["text_secondary"]};
-        padding      : {Spacing.SM} {Spacing.MD};
+        padding      : 6px {Spacing.MD};
         border       : none;
         border-bottom: 2px solid {c["border"]};
+        border-right : 1px solid {c["border_subtle"]};
         font-weight  : 700;
         font-size    : {s["sm"]}px;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.2px;
     }}
 
     QHeaderView::section:hover {{
         background: {c["bg_hover"]};
         color     : {c["primary"]};
+        cursor    : pointer;
     }}
 
     QHeaderView::section:pressed {{
@@ -85,18 +84,33 @@ def get_styles(theme):
         color     : {c["primary"]};
     }}
 
+    QHeaderView::section:checked {{
+        background: {c["primary_light"]};
+        color     : {c["primary"]};
+    }}
+
+    /* Sort indicator arrows */
+    QHeaderView::down-arrow {{
+        width : 10px;
+        height: 10px;
+    }}
+    QHeaderView::up-arrow {{
+        width : 10px;
+        height: 10px;
+    }}
+
     QHeaderView::section:first {{
         border-top-right-radius: {BorderRadius.MD};
     }}
-
     QHeaderView::section:last {{
-        border-top-left-radius: {BorderRadius.MD};
+        border-top-left-radius : {BorderRadius.MD};
+        border-right           : none;
     }}
 
     /* ── Corner Button ── */
 
     QTableCornerButton::section {{
-        background   : {c["bg_card"]};
+        background   : {c["bg_disabled"]};
         border-bottom: 2px solid {c["border"]};
         border       : none;
     }}
@@ -106,14 +120,14 @@ def get_styles(theme):
     QTableWidget QScrollBar:vertical {{
         background   : transparent;
         border       : none;
-        width        : 8px;
-        margin       : 4px 0;
+        width        : 6px;
+        margin       : 2px 0;
     }}
 
     QTableWidget QScrollBar::handle:vertical {{
         background   : {c["border"]};
-        border-radius: 4px;
-        min-height   : 30px;
+        border-radius: 3px;
+        min-height   : 24px;
     }}
 
     QTableWidget QScrollBar::handle:vertical:hover {{
@@ -128,14 +142,14 @@ def get_styles(theme):
     QTableWidget QScrollBar:horizontal {{
         background   : transparent;
         border       : none;
-        height       : 8px;
-        margin       : 0 4px;
+        height       : 6px;
+        margin       : 0 2px;
     }}
 
     QTableWidget QScrollBar::handle:horizontal {{
         background   : {c["border"]};
-        border-radius: 4px;
-        min-width    : 30px;
+        border-radius: 3px;
+        min-width    : 24px;
     }}
 
     QTableWidget QScrollBar::handle:horizontal:hover {{
@@ -147,64 +161,99 @@ def get_styles(theme):
         width: 0px;
     }}
 
+    /* ── Selection Action Bar ── */
+
+    QFrame#selection-action-bar {{
+        background   : {c["primary"]};
+        border       : none;
+        border-radius: 8px;
+        min-height   : 38px;
+        max-height   : 38px;
+        margin       : 0 2px;
+    }}
+
+    /* Force white on all children — higher specificity */
+    QFrame#selection-action-bar QLabel {{
+        color      : #FFFFFF;
+        background : transparent;
+        font-size  : {s["base"]}px;
+        font-weight: 600;
+    }}
+
+    QFrame#selection-action-bar QLabel#sel-count-label {{
+        color      : #FFFFFF;
+        background : transparent;
+        font-size  : {s["base"]}px;
+        font-weight: 600;
+    }}
+
+    /* Override global QPushButton inside sel bar */
+    QFrame#selection-action-bar QPushButton,
+    QFrame#selection-action-bar QPushButton:!hover,
+    QFrame#selection-action-bar QPushButton:!pressed {{
+        background   : rgba(255,255,255,0.15);
+        color        : #FFFFFF;
+        border       : 1px solid rgba(255,255,255,0.35);
+        border-radius: 6px;
+        padding      : 3px 12px;
+        font-size    : {s["sm"]}px;
+        font-weight  : 600;
+    }}
+
+    QFrame#selection-action-bar QPushButton:hover {{
+        background  : rgba(255,255,255,0.28);
+        border-color: rgba(255,255,255,0.55);
+        color       : #FFFFFF;
+    }}
+
+    QFrame#selection-action-bar QPushButton:pressed {{
+        background: rgba(255,255,255,0.38);
+        color     : #FFFFFF;
+    }}
+
+    QFrame#selection-action-bar QPushButton#danger-btn,
+    QFrame#selection-action-bar QPushButton#danger-btn:!hover {{
+        background  : rgba(220,38,38,0.75);
+        border-color: rgba(220,38,38,0.9);
+        color       : #FFFFFF;
+    }}
+
+    QFrame#selection-action-bar QPushButton#danger-btn:hover {{
+        background: rgba(220,38,38,0.95);
+        color     : #FFFFFF;
+    }}
+
     /* ── Status Bar ── */
 
-    QWidget#base-tab-status-bar {{
-        background : {c["bg_card"]};
-        border-top : 1px solid {c["border_subtle"]};
-        min-height : 28px;
-        max-height : 28px;
+    QLabel#status-count-lbl,
+    QLabel#status-sort-lbl {{
+        color    : {c["text_muted"]};
+        font-size: {s["xs"]}px;
+        font-weight: 500;
     }}
 
-    QLabel#base-tab-count-label,
-    QLabel#base-tab-sort-label {{
-        color    : {c["text_secondary"]};
-        font-size: 11px;
-    }}
-
-    QLabel#base-tab-count-label {{
+    QLabel#status-count-lbl {{
         font-weight: 600;
+        color: {c["text_secondary"]};
+    }}
+
+    QLabel#status-sort-lbl {{
+        color: {c["primary"]};
     }}
 
     /* ── Empty State ── */
 
-    QWidget#empty-state-widget {{
+    QWidget#empty-state {{
         background: transparent;
     }}
 
-    QLabel#empty-state-icon {{
-        color      : {c["text_secondary"]};
-        margin-bottom: 8px;
-    }}
-
     QLabel#empty-state-text {{
-        color      : {c["text_secondary"]};
+        color      : {c["text_muted"]};
         font-size  : 14px;
         font-weight: 500;
     }}
 
-    /* ── Sort Combo ── */
-
-    QComboBox#sort-combo {{
-        background   : {c["bg_card"]};
-        color        : {c["text_primary"]};
-        border       : 1px solid {c["border"]};
-        border-radius: 6px;
-        padding      : 4px 10px;
-        font-size    : 12px;
-        min-height   : 30px;
-    }}
-
-    QComboBox#sort-combo:hover {{
-        border-color: {c["primary"]};
-    }}
-
-    QComboBox#sort-combo::drop-down {{
-        border: none;
-        width : 20px;
-    }}
-
-    /* ── Aliases for named tables (documents-table, custom-table) ── */
+    /* ── Aliases (documents-table, custom-table) ── */
 
     QTableWidget#documents-table,
     QTableWidget#custom-table {{
@@ -214,7 +263,7 @@ def get_styles(theme):
         border-radius            : {BorderRadius.MD};
         gridline-color           : {c["border_subtle"]};
         font-size                : {s["base"]}px;
-        alternate-background-color: {c["bg_hover"]};
+        alternate-background-color: {c["bg_disabled"]};
         selection-background-color: {c["primary_light"]};
         selection-color          : {c["primary"]};
         outline                  : none;
@@ -222,27 +271,9 @@ def get_styles(theme):
 
     QTableWidget#documents-table::item,
     QTableWidget#custom-table::item {{
-        padding    : {Spacing.SM} {Spacing.MD};
+        padding    : 5px {Spacing.MD};
         border     : none;
-        font-weight: 700;
+        font-weight: 500;
         font-size  : {s["base"]}px;
-    }}
-
-    QTableWidget#documents-table::item:selected,
-    QTableWidget#custom-table::item:selected {{
-        background   : {c["primary_light"]};
-        color        : {c["primary"]};
-        border-radius: {BorderRadius.SM};
-    }}
-
-    QTableWidget#documents-table QHeaderView::section,
-    QTableWidget#custom-table QHeaderView::section {{
-        background   : {c["bg_card"]};
-        color        : {c["text_secondary"]};
-        padding      : {Spacing.SM} {Spacing.MD};
-        border       : none;
-        border-bottom: 2px solid {c["border"]};
-        font-weight  : 700;
-        font-size    : {s["sm"]}px;
     }}
     """

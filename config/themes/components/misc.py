@@ -20,8 +20,8 @@ def get_styles(theme):
     /* Vertical Scrollbar */
     QScrollBar:vertical {{
         background: {c["bg_main"]};
-        width: 12px;
-        border-radius: 6px;
+        width: 8px;
+        border-radius: 4px;
         margin: 0;
     }}
 
@@ -31,8 +31,8 @@ def get_styles(theme):
             stop: 0 {c["primary"]},
             stop: 1 {c["primary_hover"]}
         );
-        border-radius: 6px;
-        min-height: 30px;
+        border-radius: 4px;
+        min-height: 24px;
     }}
 
     QScrollBar::handle:vertical:hover {{
@@ -52,8 +52,8 @@ def get_styles(theme):
     /* Horizontal Scrollbar */
     QScrollBar:horizontal {{
         background: {c["bg_main"]};
-        height: 12px;
-        border-radius: 6px;
+        height: 8px;
+        border-radius: 4px;
         margin: 0;
     }}
 

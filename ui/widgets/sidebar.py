@@ -94,13 +94,13 @@ class FloatingPillNav(QFrame):
     def _build(self):
         # الـ FloatingPillNav يمتد أفقياً — ارتفاع ثابت
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(122)
+        self.setFixedHeight(106)
         # مهم: لا يُسبّب minimum width على النافذة
         self.setMinimumWidth(0)
 
         # Layout خارجي يُمركز الـ pill
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(16, 8, 16, 8)
+        outer.setContentsMargins(12, 8, 12, 8)
         outer.setSpacing(0)
         outer.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
@@ -109,11 +109,11 @@ class FloatingPillNav(QFrame):
         self._pill.setObjectName("pill-inner")
         # Preferred: يأخذ ما يحتاج لكن لا يتجاوز الـ outer
         self._pill.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        self._pill.setFixedHeight(106)
+        self._pill.setFixedHeight(90)
         self._pill.setMinimumWidth(0)
 
         self._pill_layout = QHBoxLayout(self._pill)
-        self._pill_layout.setContentsMargins(8, 4, 8, 4)
+        self._pill_layout.setContentsMargins(6, 3, 6, 3)
         self._pill_layout.setSpacing(2)
 
         # نضيف الـ pill للـ outer بدون stretch — يتمركز طبيعياً
@@ -157,11 +157,18 @@ class FloatingPillNav(QFrame):
         btn.setAutoRaise(True)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        # Preferred: يأخذ مساحة متساوية مع بقية الأزرار
         btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         btn.setMinimumWidth(0)
+        # Force text visible under icon
+        try:
+            from PySide6.QtGui import QFont
+            f = QFont()
+            f.setPointSize(8)
+            btn.setFont(f)
+        except Exception:
+            pass
 
-        icon_size = 72
+        icon_size = 48
         svg_icon  = get_sidebar_icon(key, icon_size)
         if not svg_icon.isNull():
             btn.setIcon(svg_icon)

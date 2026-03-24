@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 
 # ── ثوابت ارتفاع الصفوف الافتراضية ─────────────────────────────────────────
 # القيمة الافتراضية لارتفاع الصف — يمكن للتابات/الديالوغات تجاوزها
-TABLE_ROW_HEIGHT_DEFAULT = 46   # px
-TABLE_ROW_HEIGHT_MIN     = 32   # px الحد الأدنى
+TABLE_ROW_HEIGHT_DEFAULT = 36   # px
+TABLE_ROW_HEIGHT_MIN     = 28   # px الحد الأدنى
 
 
 def _make_table_item_font(size_px: int | None = None, bold: bool = True) -> QFont:
@@ -334,6 +334,17 @@ class BaseTab(QWidget):
         # أو بعده باستخدام set_row_height()
         self.table_row_height: int = TABLE_ROW_HEIGHT_DEFAULT
 
+        # ── sort state ───────────────────────────────────────────────────
+        self._sort_col: int  = -1       # العمود المرتَّب حالياً (-1 = لا يوجد)
+        self._sort_asc: bool = True     # اتجاه الترتيب
+
+        # ── column visibility & width memory ─────────────────────────────
+        self._col_visibility: dict = {}   # {col_index: bool}
+        self._col_widths_key: str  = ""   # مفتاح الحفظ في SettingsManager
+
+        # ── aggregates ───────────────────────────────────────────────────
+        self._agg_cols: list = []   # قائمة keys الأعمدة الرقمية للمجاميع
+
         # ── build ────────────────────────────────────────────────────────
         self._setup_ui()
         self._setup_table()
@@ -384,34 +395,67 @@ class BaseTab(QWidget):
         self.btn_export  = self._toolbar_btn("export to excel",  "export")
         self.btn_refresh = self._toolbar_btn("refresh",          "refresh")
 
-        for btn in (self.btn_add, self.btn_export, self.btn_refresh):
+        # زر إظهار/إخفاء الأعمدة
+        self.btn_col_visibility = QPushButton("⚙")
+        self.btn_col_visibility.setObjectName("secondary-btn")
+        self.btn_col_visibility.setFixedWidth(32)
+        self.btn_col_visibility.setToolTip(self._("columns_visibility") if hasattr(self, "_") else "Columns")
+        self.btn_col_visibility.clicked.connect(self._show_col_visibility_menu)
+
+        # Row density selector
+        self._btn_density = QPushButton("≡")
+        self._btn_density.setObjectName("secondary-btn")
+        self._btn_density.setFixedWidth(32)
+        self._btn_density.setToolTip(self._("row_density") if hasattr(self,"_") else "Row Density")
+        self._btn_density.clicked.connect(self._show_density_menu)
+        self._density = "comfortable"   # compact / comfortable / spacious
+
+        for btn in (self.btn_add, self.btn_export, self.btn_refresh, self.btn_col_visibility, self._btn_density):
             self.top_bar.addWidget(btn)
 
         self._layout.addLayout(self.top_bar)
 
-        # ── Selection Action Bar (مخفي افتراضياً — يظهر عند التحديد) ──
+        # ── Selection Action Bar ──────────────────────────────────────────
+        # يظهر عند count=1 (سطر واحد) وعند count>1 (متعدد)
+        # عند count=1: عرض/تعديل/حذف
+        # عند count>1: حذف جماعي + تصدير + إلغاء تحديد
         self._sel_bar = QFrame()
         self._sel_bar.setObjectName("selection-action-bar")
         sel_lay = QHBoxLayout(self._sel_bar)
-        sel_lay.setContentsMargins(12, 6, 12, 6)
-        sel_lay.setSpacing(8)
+        sel_lay.setContentsMargins(12, 5, 12, 5)
+        sel_lay.setSpacing(6)
 
         self._lbl_sel_count = QLabel()
         self._lbl_sel_count.setObjectName("sel-count-label")
         sel_lay.addWidget(self._lbl_sel_count)
         sel_lay.addStretch()
 
-        self._btn_sel_delete = QPushButton()
-        self._btn_sel_delete.setObjectName("danger-btn")
-        self._btn_sel_delete.setMinimumWidth(90)
-        self._btn_sel_delete.clicked.connect(self._on_sel_bar_delete)
-        sel_lay.addWidget(self._btn_sel_delete)
+        # أزرار سطر واحد
+        self._btn_sel_view = QPushButton()
+        self._btn_sel_view.setObjectName("secondary-btn")
+        self._btn_sel_view.setMinimumWidth(80)
+        self._btn_sel_view.clicked.connect(self._on_sel_bar_view)
+        sel_lay.addWidget(self._btn_sel_view)
 
+        self._btn_sel_edit = QPushButton()
+        self._btn_sel_edit.setObjectName("secondary-btn")
+        self._btn_sel_edit.setMinimumWidth(80)
+        self._btn_sel_edit.clicked.connect(self._on_sel_bar_edit)
+        sel_lay.addWidget(self._btn_sel_edit)
+
+        # أزرار متعددة
         self._btn_sel_export = QPushButton()
         self._btn_sel_export.setObjectName("secondary-btn")
         self._btn_sel_export.setMinimumWidth(100)
         self._btn_sel_export.clicked.connect(self._on_sel_bar_export)
         sel_lay.addWidget(self._btn_sel_export)
+
+        # حذف (يظهر في كلا الحالتين)
+        self._btn_sel_delete = QPushButton()
+        self._btn_sel_delete.setObjectName("danger-btn")
+        self._btn_sel_delete.setMinimumWidth(90)
+        self._btn_sel_delete.clicked.connect(self._on_sel_bar_delete)
+        sel_lay.addWidget(self._btn_sel_delete)
 
         self._btn_sel_clear = QPushButton()
         self._btn_sel_clear.setObjectName("secondary-btn")
@@ -516,6 +560,10 @@ class BaseTab(QWidget):
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
         self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
+        # ترتيب بالكليك على الهيدر
+        self.table.horizontalHeader().sectionClicked.connect(self._on_header_clicked)
+        # حفظ عروض الأعمدة عند تغييرها يدوياً
+        self.table.horizontalHeader().sectionResized.connect(self._on_col_resized)
 
         # ── تحديث الفونت عند تغيير الثيم ──────────────────────────────
         try:
@@ -583,11 +631,18 @@ class BaseTab(QWidget):
                   lambda: self.view_selected_item() if self._table_has_focus() else None)
         QShortcut(QKeySequence("Escape"),          self,
                   lambda: self.clear_selection() if self._table_has_focus() else None)
+        # Space — تبديل checkbox للصف الحالي
+        QShortcut(QKeySequence("Space"),           self,
+                  lambda: self._toggle_current_row_checkbox() if self._table_has_focus() else None)
 
     def _setup_signals(self):
         self.btn_add.clicked.connect(self.add_new_item)
         self.btn_export.clicked.connect(self.export_table_to_excel)
         self.btn_refresh.clicked.connect(self.refresh_data)
+        # Tooltips مع shortcuts
+        self.btn_add.setToolTip(f"{self._('add')}  (Ctrl+N)")
+        self.btn_export.setToolTip(f"{self._('export to excel')}  (Ctrl+Shift+E)")
+        self.btn_refresh.setToolTip(f"{self._('refresh')}  (Ctrl+R)")
 
         # debounce بحث — 350ms بعد آخر حرف
         self._search_timer = QTimer(self)
@@ -616,6 +671,9 @@ class BaseTab(QWidget):
         )
         self.table.setColumnWidth(0, 36)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        # استعادة العروض والإخفاء المحفوظة
+        if self._col_widths_key:
+            QTimer.singleShot(0, self._load_col_settings)
 
     def _setup_checkbox_header(self):
         """يضع QCheckBox في header العمود 0 لـ select/deselect all."""
@@ -893,7 +951,8 @@ class BaseTab(QWidget):
         return [r for r in rows if any(q in str(r.get(k, "") or "").casefold() for k in keys)]
 
     def _apply_base_sort(self, rows: list) -> list:
-        return rows  # التابات الفرعية ترتّب server-side أو تعيد تعريف هذه
+        """ترتيب ذكي بعمود واحد — يعيد تعريف التابات الفرعية إذا أرادت server-side sort."""
+        return self._apply_base_sort_smart(rows)
 
     def _on_search_changed(self):
         self.current_page = 1
@@ -939,10 +998,43 @@ class BaseTab(QWidget):
     def _update_status_bar(self, displayed: int, total: int):
         q = (self.search_bar.text() or "").strip()
         if q and displayed < total:
-            self._lbl_count.setText(f"🔍 {displayed} {self._('of')} {total} {self._('total_rows')}")
+            count_txt = f"🔍 {displayed} {self._('of')} {total} {self._('total_rows')}"
         else:
-            self._lbl_count.setText(f"{displayed} {self._('total_rows')}")
-        self._lbl_sort.setText("")
+            count_txt = f"{displayed} {self._('total_rows')}"
+        # مجاميع الأعمدة الرقمية
+        agg_parts = []
+        for agg_key in getattr(self, "_agg_cols", []):
+            col_idx = next((i for i, c in enumerate(self.columns) if c.get("key") == agg_key), None)
+            if col_idx is None:
+                continue
+            real_col = col_idx + 1  # offset checkbox
+            total_val = 0.0
+            for row in range(self.table.rowCount()):
+                item = self.table.item(row, real_col)
+                if item:
+                    txt = item.text().replace(",", "").replace(" ", "").strip()
+                    try:
+                        total_val += float(txt)
+                    except (ValueError, TypeError):
+                        pass
+            # اسم العمود
+            col_label = self._(self.columns[col_idx].get("label", agg_key))
+            # تنسيق الرقم
+            if total_val == int(total_val):
+                fmt = f"{int(total_val):,}"
+            else:
+                fmt = f"{total_val:,.2f}"
+            agg_parts.append(f"{col_label}: {fmt}")
+        if agg_parts:
+            count_txt += "  |  " + "  |  ".join(agg_parts)
+        self._lbl_count.setText(count_txt)
+        # مؤشر الترتيب
+        if getattr(self, "_sort_col", -1) >= 0 and self._sort_col < len(self.columns):
+            col_name = self._(self.columns[self._sort_col].get("label", ""))
+            arrow = "↑" if self._sort_asc else "↓"
+            self._lbl_sort.setText(f"{arrow} {col_name}")
+        else:
+            self._lbl_sort.setText("")
 
     def _show_empty_state(self, empty: bool, searched: bool = False):
         if empty:
@@ -993,37 +1085,56 @@ class BaseTab(QWidget):
     # ─────────────────────────────────────────────────────────────────────
 
     def _on_selection_changed(self, *_):
-        """يُحدَّث عند كل تغيير في التحديد — يُظهر/يُخفي الـ action bar."""
+        """يُحدَّث عند كل تغيير في التحديد."""
         rows  = self.get_selected_rows()
         count = len(rows)
-        if count == 0:
-            self._sel_bar.setVisible(False)
-            return
 
-        # نص العداد
-        self._lbl_sel_count.setText(
-            self._("selected_rows_count").format(count=count)
-        )
-        # نص زر الحذف
-        self._btn_sel_delete.setText(
-            f"{self._('delete')}  ({count})"
-        )
-        # نص تصدير
-        self._btn_sel_export.setText(self._("export_selected"))
-        # نص إلغاء تحديد
-        self._btn_sel_clear.setText(self._("clear_selection"))
-
-        # صلاحية الحذف
-        can_del = _has_perm(self.current_user,
-                            self.required_permissions.get("delete"))                   or self.is_admin
-        self._btn_sel_delete.setVisible(can_del)
-
-        self._sel_bar.setVisible(True)
-        # زامن checkboxes الصفوف
+        # زامن checkboxes دائماً
         try:
             self._sync_row_checkboxes()
         except Exception:
             pass
+
+        if count == 0:
+            self._sel_bar.setVisible(False)
+            return
+
+        can_del  = _has_perm(self.current_user,
+                             self.required_permissions.get("delete")) or self.is_admin
+        can_edit = _has_perm(self.current_user,
+                             self.required_permissions.get("edit"))   or self.is_admin
+        can_view = _has_perm(self.current_user,
+                             self.required_permissions.get("view"))   or self.is_admin or True
+
+        if count == 1:
+            # سطر واحد — لا نعرض الـ bar (عمود الإجراءات يكفي)
+            self._sel_bar.setVisible(False)
+            return
+
+        # ── وضع متعدد فقط ───────────────────────────────────────────────
+        self._lbl_sel_count.setText(
+            self._("selected_rows_count").format(count=count)
+        )
+        self._btn_sel_view.setVisible(False)
+        self._btn_sel_edit.setVisible(False)
+        self._btn_sel_export.setText(self._("export_selected"))
+        self._btn_sel_export.setVisible(True)
+        self._btn_sel_delete.setText(f"🗑  {self._('delete')}  ({count})")
+        self._btn_sel_delete.setVisible(can_del)
+        self._btn_sel_clear.setText(self._("clear_selection"))
+        self._sel_bar.setVisible(True)
+
+    def _on_sel_bar_view(self):
+        """زر العرض في الـ action bar (سطر واحد)."""
+        rows = self.get_selected_rows()
+        if rows:
+            self.request_view.emit(rows[0])
+
+    def _on_sel_bar_edit(self):
+        """زر التعديل في الـ action bar (سطر واحد)."""
+        rows = self.get_selected_rows()
+        if rows:
+            self.request_edit.emit(rows[0])
 
     def _on_sel_bar_delete(self):
         """زر الحذف في الـ action bar."""
@@ -1272,6 +1383,225 @@ class BaseTab(QWidget):
                                  self._("Failed to export: ") + str(e))
 
     # ─────────────────────────────────────────────────────────────────────
+    # COLUMN SORT
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _on_header_clicked(self, logical_col: int):
+        """ترتيب البيانات عند الكليك على رأس العمود — يتجاهل col 0 (checkbox)."""
+        if logical_col == 0:
+            return
+        data_col = logical_col - 1   # offset checkbox
+        if data_col < 0 or data_col >= len(self.columns):
+            return
+        if self._sort_col == data_col:
+            self._sort_asc = not self._sort_asc
+        else:
+            self._sort_col = data_col
+            self._sort_asc = True
+        self._apply_sort_indicator()
+        self.current_page = 1
+        self.reload_data()
+
+    def _apply_sort_indicator(self):
+        """يُظهر سهم الترتيب على هيدر العمود الصحيح."""
+        hdr = self.table.horizontalHeader()
+        hdr.setSortIndicatorShown(self._sort_col >= 0)
+        if self._sort_col >= 0:
+            real_col = self._sort_col + 1
+            hdr.setSortIndicator(
+                real_col,
+                Qt.AscendingOrder if self._sort_asc else Qt.DescendingOrder
+            )
+
+    def _apply_base_sort_smart(self, rows: list) -> list:
+        """
+        ترتيب ذكي يحترم نوع البيانات: رقم، تاريخ، نص.
+        يُستدعى من display_data / _display_with_actions.
+        """
+        if self._sort_col < 0 or self._sort_col >= len(self.columns):
+            return rows
+        key = self.columns[self._sort_col].get("key", "")
+        if not key or key == "actions":
+            return rows
+        import re as _re
+
+        def _sort_key(row):
+            val = row.get(key) or ""
+            if val is None:
+                return ("", 0, "")
+            s = str(val).strip()
+            # رقم؟
+            num_s = s.replace(",", "").replace(" ", "")
+            try:
+                return ("num", float(num_s), "")
+            except ValueError:
+                pass
+            # تاريخ YYYY-MM-DD؟
+            if _re.match(r"\d{4}-\d{2}-\d{2}", s):
+                return ("date", 0, s)
+            return ("str", 0, s.casefold())
+
+        try:
+            return sorted(rows, key=_sort_key, reverse=not self._sort_asc)
+        except Exception:
+            return rows
+
+    # ─────────────────────────────────────────────────────────────────────
+    # COLUMN VISIBILITY
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _show_col_visibility_menu(self):
+        """قائمة منسدلة لإظهار/إخفاء الأعمدة."""
+        menu = QMenu(self)
+        menu.setTitle(self._("columns_visibility"))
+        # Force LTR on the menu so checkmark appears on the left correctly
+        menu.setLayoutDirection(Qt.LeftToRight)
+        for i, col in enumerate(self.columns):
+            label = self._(col.get("label", "")) or col.get("key", f"col{i}")
+            if col.get("key") == "actions":
+                continue
+            real_col = i + 1   # offset checkbox
+            visible = not self.table.isColumnHidden(real_col)
+            # Use emoji prefix instead of Qt checkable to avoid RTL overlap
+            prefix = "✓  " if visible else "      "
+            act = menu.addAction(prefix + label)
+            act.setData((real_col, visible))
+        menu.addSeparator()
+        act_show_all = menu.addAction("⊞  " + self._("show_all_columns"))
+        act_reset    = menu.addAction("↺  " + self._("reset_columns"))
+
+        chosen = menu.exec(self.btn_col_visibility.mapToGlobal(
+            self.btn_col_visibility.rect().bottomLeft()
+        ))
+        if chosen is None:
+            return
+        if chosen == act_show_all:
+            for i in range(self.table.columnCount()):
+                self.table.setColumnHidden(i, False)
+            self._col_visibility = {}
+            self._save_col_settings()
+            return
+        if chosen == act_reset:
+            self._col_visibility = {}
+            self._save_col_settings()
+            self._apply_col_visibility()
+            return
+        data = chosen.data()
+        if data is not None:
+            col_idx, was_visible = data
+            self.table.setColumnHidden(col_idx, was_visible)
+            self._col_visibility[col_idx] = was_visible   # True = hidden
+            self._save_col_settings()
+
+    def _apply_col_visibility(self):
+        """يُطبّق إعدادات الإخفاء المحفوظة."""
+        for col_idx, hidden in self._col_visibility.items():
+            if col_idx < self.table.columnCount():
+                self.table.setColumnHidden(col_idx, hidden)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # COLUMN WIDTH MEMORY
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _on_col_resized(self, logical_col: int, old_w: int, new_w: int):
+        """يحفظ عرض العمود عند تغييره يدوياً."""
+        if logical_col == 0 or new_w < 10:
+            return
+        if not hasattr(self, "_col_resize_timer"):
+            self._col_resize_timer = QTimer(self)
+            self._col_resize_timer.setSingleShot(True)
+            self._col_resize_timer.setInterval(500)
+            self._col_resize_timer.timeout.connect(self._save_col_settings)
+        self._col_resize_timer.start()
+
+    def _save_col_settings(self):
+        """يحفظ عروض الأعمدة وإعدادات الإخفاء في SettingsManager."""
+        if not self._col_widths_key:
+            return
+        widths = {}
+        for i in range(1, self.table.columnCount()):
+            if not self.table.isColumnHidden(i):
+                widths[str(i)] = self.table.columnWidth(i)
+        data = {
+            "widths": widths,
+            "hidden": {str(k): v for k, v in self._col_visibility.items()},
+        }
+        try:
+            self.settings.set(self._col_widths_key, data)
+        except Exception:
+            pass
+
+    def _load_col_settings(self):
+        """يستعيد عروض الأعمدة وإعدادات الإخفاء من SettingsManager."""
+        if not self._col_widths_key:
+            return
+        try:
+            data = self.settings.get(self._col_widths_key)
+            if not isinstance(data, dict):
+                return
+            widths = data.get("widths", {})
+            hidden = data.get("hidden", {})
+            for k, w in widths.items():
+                col = int(k)
+                if col < self.table.columnCount() and isinstance(w, int) and w > 10:
+                    self.table.setColumnWidth(col, w)
+            self._col_visibility = {int(k): bool(v) for k, v in hidden.items()}
+            self._apply_col_visibility()
+        except Exception:
+            pass
+
+    def enable_col_memory(self, key: str):
+        """
+        API عام: يُفعّل حفظ عروض الأعمدة لهذا التاب.
+        key: معرّف فريد مثل 'col_settings_clients'
+        يُستدعى من التاب الفرعي بعد set_columns().
+        """
+        self._col_widths_key = key
+        self._load_col_settings()
+
+    def set_aggregate_columns(self, keys: list):
+        """
+        يحدد الأعمدة الرقمية التي تُعرض مجاميعها في status bar.
+        keys: قائمة data keys مثل ['total_value', 'net_weight']
+        """
+        self._agg_cols = keys
+
+    # ─────────────────────────────────────────────────────────────────────
+    # SPACE KEY — toggle checkbox
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _show_density_menu(self):
+        """قائمة كثافة الصفوف: compact / comfortable / spacious."""
+        menu = QMenu(self)
+        densities = [
+            ("compact",      self._("density_compact"),      28),
+            ("comfortable",  self._("density_comfortable"),  36),
+            ("spacious",     self._("density_spacious"),      48),
+        ]
+        for key, label, height in densities:
+            act = menu.addAction(("✓  " if self._density == key else "    ") + label)
+            act.setData((key, height))
+        chosen = menu.exec(self._btn_density.mapToGlobal(
+            self._btn_density.rect().bottomLeft()
+        ))
+        if chosen and chosen.data():
+            key, height = chosen.data()
+            self._density = key
+            self.table_row_height = height
+            self._apply_row_height(height)
+
+    def _toggle_current_row_checkbox(self):
+        """Space — يبدّل checkbox الصف الحالي."""
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        w = self.table.cellWidget(row, 0)
+        if w:
+            chk = w.findChild(QCheckBox)
+            if chk:
+                chk.setChecked(not chk.isChecked())
+
+    # ─────────────────────────────────────────────────────────────────────
     # I18N
     # ─────────────────────────────────────────────────────────────────────
 
@@ -1286,6 +1616,8 @@ class BaseTab(QWidget):
             self._lbl_rows_per_page.setText(self._("rows_per_page"))
             self._lbl_empty_text.setText(self._("no_data_available"))
             self._update_pagination_label()
+            if hasattr(self, "btn_col_visibility"):
+                self.btn_col_visibility.setToolTip(self._("columns_visibility"))
             # هيدر الجدول — col 0 هو checkbox، col 1+ هي الأعمدة
             if self.columns and self.table.columnCount() == len(self.columns) + 1:
                 for i, col in enumerate(self.columns):

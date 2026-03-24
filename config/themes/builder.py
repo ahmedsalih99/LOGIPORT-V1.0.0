@@ -78,12 +78,97 @@ class ThemeBuilder:
         # Additional RTL fixes
         rtl_fixes = self._get_rtl_fixes() if self.rtl else ""
 
+        # Final overrides — applied LAST to beat all component styles
+        final_overrides = self._get_final_overrides()
+
         # Combine all
         parts = [base_styles, *component_styles]
         if rtl_fixes:
             parts.append(rtl_fixes)
+        parts.append(final_overrides)
 
         return "\n\n".join(parts)
+
+    def _get_final_overrides(self) -> str:
+        """Overrides applied last — highest effective priority."""
+        c = self.colors
+        s = self.sizes
+        return f"""
+        /* ═══════════════════════════════════════════════════════════
+           FINAL OVERRIDES — These run last and beat everything above
+        ═══════════════════════════════════════════════════════════ */
+
+        /* Selection Action Bar — force white on all children */
+        QFrame#selection-action-bar,
+        QFrame#selection-action-bar * {{
+            color: #FFFFFF;
+        }}
+        QFrame#selection-action-bar {{
+            background   : {c["primary"]};
+            border       : none;
+            border-radius: 8px;
+        }}
+        QFrame#selection-action-bar QLabel {{
+            background: transparent;
+            color     : #FFFFFF;
+            font-weight: 600;
+        }}
+        QFrame#selection-action-bar QPushButton {{
+            background   : rgba(255,255,255,0.15);
+            color        : #FFFFFF;
+            border       : 1px solid rgba(255,255,255,0.35);
+            border-radius: 6px;
+            padding      : 3px 12px;
+            font-size    : {s["sm"]}px;
+            font-weight  : 600;
+        }}
+        QFrame#selection-action-bar QPushButton:hover {{
+            background  : rgba(255,255,255,0.28);
+            border-color: rgba(255,255,255,0.6);
+            color       : #FFFFFF;
+        }}
+        QFrame#selection-action-bar QPushButton:pressed {{
+            background: rgba(255,255,255,0.38);
+            color     : #FFFFFF;
+        }}
+        QFrame#selection-action-bar QPushButton#danger-btn {{
+            background  : rgba(220,38,38,0.8);
+            border-color: rgba(220,38,38,1.0);
+            color       : #FFFFFF;
+        }}
+        QFrame#selection-action-bar QPushButton#danger-btn:hover {{
+            background: rgba(220,38,38,1.0);
+            color     : #FFFFFF;
+        }}
+
+        /* secondary-btn — visible gray background, not transparent */
+        QPushButton#secondary-btn {{
+            background   : {c["bg_disabled"]};
+            color        : {c["text_secondary"]};
+            border       : 1px solid {c["border"]};
+        }}
+        QPushButton#secondary-btn:hover {{
+            background  : {c["bg_hover"]};
+            color       : {c["primary"]};
+            border-color: {c["primary"]};
+        }}
+        QPushButton#secondary-btn:pressed {{
+            background: {c["bg_active"]};
+            color     : {c["primary"]};
+        }}
+
+        /* Nav pill buttons — force text color explicitly */
+        QToolButton#pill-tab-btn {{
+            color    : {c["text_secondary"]};
+            font-size: 9px;
+        }}
+        QToolButton#pill-tab-btn:hover {{
+            color: {c["text_primary"]};
+        }}
+        QToolButton#pill-tab-btn:checked {{
+            color: #FFFFFF;
+        }}
+        """
 
     def _get_base_styles(self) -> str:
         """Generate base application styles with RTL support and gradients"""

@@ -230,9 +230,18 @@ class DeliveryMethodsTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            _failed = []
             for row in rows:
                 dm = self.data[row]["actions"]
-                self._delete_single(dm, confirm=False)
+                ok, err = self._delete_single(dm, confirm=False)
+                if not ok:
+                    _name = (
+                        getattr(dm, "name_ar", None) or
+                        getattr(dm, "name_en", None) or
+                        (dm.get("username") if isinstance(dm, dict) else None) or
+                        str(getattr(dm, "id", "?"))
+                    )
+                    _failed.append(f"{_name}: {err}")
             QMessageBox.information(self, self._("deleted"), self._("delivery_method_deleted_success"))
             self.reload_data()
             from core.data_bus import DataBus
@@ -246,7 +255,18 @@ class DeliveryMethodsTab(BaseTab):
             )
             if reply != QMessageBox.Yes:
                 return
-        self.delivery_methods_crud.delete(dm.id)
+        try:
+            self.delivery_methods_crud.delete(dm.id)
+            return True, None
+        except Exception as e:
+            err = str(e)
+            if "FOREIGN KEY" in err or "IntegrityError" in err:
+                msg = self._("delivery_method_in_use_cannot_delete")
+            else:
+                msg = err
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
 
     # -----------------------------
     # Double-click → view dialog

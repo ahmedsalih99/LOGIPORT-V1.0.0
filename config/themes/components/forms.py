@@ -38,7 +38,7 @@ def get_styles(theme):
         border-radius : {BorderRadius.MD};
         padding    : {PAD_NORMAL};
         font-size  : {s["base"]}px;
-        font-weight: 600;
+        font-weight: 400;
     }}
 
     QLineEdit:hover {{

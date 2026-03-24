@@ -71,8 +71,7 @@ def get_styles(theme):
        مستخدَم كـ: primary-btn  |  btn-primary  |  action-btn
     ═══════════════════════════════════════════════════════════════════ */
     QPushButton#primary-btn,
-    QPushButton#btn-primary,
-    QPushButton#action-btn {{
+    QPushButton#btn-primary {{
         background   : {c["primary"]};
         color        : {c["text_white"]};
         border       : none;
@@ -81,17 +80,36 @@ def get_styles(theme):
         padding      : {PAD_MD};
     }}
     QPushButton#primary-btn:hover,
-    QPushButton#btn-primary:hover,
-    QPushButton#action-btn:hover {{
+    QPushButton#btn-primary:hover {{
         background: {c["primary_hover"]};
     }}
     QPushButton#primary-btn:pressed,
-    QPushButton#btn-primary:pressed,
-    QPushButton#action-btn:pressed {{
+    QPushButton#btn-primary:pressed {{
         background: {c["primary_active"]};
     }}
     QPushButton#primary-btn:disabled,
-    QPushButton#btn-primary:disabled,
+    QPushButton#btn-primary:disabled {{
+        background: {c["bg_disabled"]};
+        color     : {c["text_disabled"]};
+    }}
+
+    /* action-btn — شريط أدوات التابات: هادئ بحدود واضحة */
+    QPushButton#action-btn {{
+        background   : {c["bg_card"]};
+        color        : {c["text_secondary"]};
+        border       : 1px solid {c["border"]};
+        border-radius: {R};
+        font-weight  : 500;
+        padding      : {PAD_MD};
+    }}
+    QPushButton#action-btn:hover {{
+        background  : {c["bg_hover"]};
+        color       : {c["primary"]};
+        border-color: {c["primary"]};
+    }}
+    QPushButton#action-btn:pressed {{
+        background: {c["primary_light"]};
+    }}
     QPushButton#action-btn:disabled {{
         background: {c["bg_disabled"]};
         color     : {c["text_disabled"]};
@@ -101,7 +119,7 @@ def get_styles(theme):
        SECONDARY — الإجراءات الثانوية (إلغاء، رجوع)
     ═══════════════════════════════════════════════════════════════════ */
     QPushButton#secondary-btn {{
-        background   : transparent;
+        background   : {c["bg_disabled"]};
         color        : {c["text_secondary"]};
         border       : 1px solid {c["border"]};
         border-radius: {R};
@@ -109,8 +127,8 @@ def get_styles(theme):
     }}
     QPushButton#secondary-btn:hover {{
         background  : {c["bg_hover"]};
-        color       : {c["text_primary"]};
-        border-color: {c["border_hover"]};
+        color       : {c["primary"]};
+        border-color: {c["primary"]};
     }}
     QPushButton#secondary-btn:pressed {{
         background: {c["bg_active"]};
@@ -211,22 +229,24 @@ def get_styles(theme):
         font-weight  : 500;
     }}
 
-    /* edit */
+    /* edit — compact ghost button */
     QPushButton#table-edit,
     QTableWidget QPushButton#table-edit,
     QTableView  QPushButton#table-edit {{
         background   : transparent;
         color        : {c["primary"]};
-        border       : 1px solid {c["primary"]};
+        border       : 1px solid transparent;
         border-radius: {R_SM};
         font-weight  : 600;
-        font-size    : {s["sm"]}px;
-        padding      : {PAD_XS};
+        font-size    : {s["xs"]}px;
+        padding      : 2px 8px;
+        min-width    : 0;
     }}
     QPushButton#table-edit:hover,
     QTableWidget QPushButton#table-edit:hover,
     QTableView  QPushButton#table-edit:hover {{
-        background: {c["primary_light"]};
+        background  : {c["primary_light"]};
+        border-color: {c["primary"]};
     }}
     QPushButton#table-edit:pressed,
     QTableWidget QPushButton#table-edit:pressed,
@@ -234,22 +254,24 @@ def get_styles(theme):
         background: {c["primary_lighter"]};
     }}
 
-    /* delete */
+    /* delete — compact ghost button */
     QPushButton#table-delete,
     QTableWidget QPushButton#table-delete,
     QTableView  QPushButton#table-delete {{
         background   : transparent;
         color        : {c["danger"]};
-        border       : 1px solid {c["danger"]};
+        border       : 1px solid transparent;
         border-radius: {R_SM};
         font-weight  : 600;
-        font-size    : {s["sm"]}px;
-        padding      : {PAD_XS};
+        font-size    : {s["xs"]}px;
+        padding      : 2px 8px;
+        min-width    : 0;
     }}
     QPushButton#table-delete:hover,
     QTableWidget QPushButton#table-delete:hover,
     QTableView  QPushButton#table-delete:hover {{
-        background: {c["danger_light"]};
+        background  : {c["danger_light"]};
+        border-color: {c["danger"]};
     }}
     QPushButton#table-delete:pressed,
     QTableWidget QPushButton#table-delete:pressed,

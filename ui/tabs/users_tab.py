@@ -215,10 +215,18 @@ class UsersTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            _failed = []
             for row in rows:
                 user_obj = self.data[row]["actions"]
-                self.users_crud.delete(user_obj["id"] if isinstance(user_obj, dict) else user_obj.id)
-            QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
+                ok, err = self._delete_single(user_obj, confirm=False)
+                if not ok:
+                    _name = (user_obj.get("username") if isinstance(user_obj, dict)
+                             else getattr(user_obj, "username", None)) or str(row)
+                    _failed.append(f"{_name}: {err}")
+            if _failed:
+                QMessageBox.warning(self, self._("error"), "\n".join(_failed))
+            else:
+                QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
             self.reload_data()
             from core.data_bus import DataBus
             DataBus.get_instance().emit('users')
@@ -264,9 +272,21 @@ class UsersTab(BaseTab):
             )
             if reply != QMessageBox.Yes:
                 return
-        self.users_crud.delete(user.get("id") if isinstance(user, dict) else user.id)
-        QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
-        self.reload_data()
+        try:
+            self.users_crud.delete(user.get("id") if isinstance(user, dict) else user.id)
+            if confirm:
+                QMessageBox.information(self, self._("deleted"), self._("user_deleted_success"))
+                self.reload_data()
+            return True, None
+        except Exception as e:
+            err = str(e)
+            if "FOREIGN KEY" in err or "IntegrityError" in err:
+                msg = self._("user_in_use_cannot_delete")
+            else:
+                msg = err
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
 
     def delete_user(self, user):
         self._delete_single(user, confirm=True)

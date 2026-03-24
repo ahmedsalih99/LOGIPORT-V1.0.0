@@ -240,10 +240,17 @@ class CurrenciesTab(BaseTab):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
+            _failed = []
             for row in rows:
                 curr = self.data[row]["actions"]
-                self._delete_single(curr, confirm=False)
-            QMessageBox.information(self, self._("deleted"), self._("currency_deleted_success"))
+                ok, err = self._delete_single(curr, confirm=False)
+                if not ok:
+                    _name = getattr(curr, "name_ar", None) or getattr(curr, "name_en", None) or str(getattr(curr, "id", "?"))
+                    _failed.append(f"{_name}: {err}")
+            if _failed:
+                QMessageBox.warning(self, self._("error"), "\n".join(_failed))
+            else:
+                QMessageBox.information(self, self._("delete_currency"), self._("currency_deleted_success"))
             self.reload_data()
             from core.data_bus import DataBus
             DataBus.get_instance().emit('currencies')
@@ -256,7 +263,18 @@ class CurrenciesTab(BaseTab):
             )
             if reply != QMessageBox.Yes:
                 return
-        self.currencies_crud.delete(curr.id)
+        try:
+            self.currencies_crud.delete(curr.id)
+        except Exception as e:
+            err = str(e)
+            if "FOREIGN KEY" in err or "IntegrityError" in err:
+                msg = self._("currency_in_use_cannot_delete")
+            else:
+                msg = err
+            if confirm:
+                QMessageBox.warning(self, self._("error"), msg)
+            return False, msg
+        return True, None
 
     # -----------------------------
     # i18n / Tab title
