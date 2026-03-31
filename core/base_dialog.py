@@ -13,7 +13,7 @@ import logging
 from typing import Optional, Any
 from PySide6.QtWidgets import (
     QDialog, QMessageBox, QApplication,
-    QDialogButtonBox, QVBoxLayout, QWidget, QLineEdit)
+    QVBoxLayout, QWidget, QLineEdit)
 
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtCore import Qt, Signal
@@ -74,13 +74,8 @@ class BaseDialog(QDialog):
     # --------- Settings & Translation ---------
 
     def _apply_settings(self) -> None:
-        """Apply application settings to dialog"""
-        try:
-            # Settings will be applied by the main app
-            # This is here for future extension
-            pass
-        except Exception as e:
-            logger.error(f"Failed to apply settings: {e}")
+        """Apply application settings to dialog — subclasses can override."""
+        pass
 
     def set_translated_title(self, title_key: str) -> None:
         try:
@@ -91,21 +86,29 @@ class BaseDialog(QDialog):
             self.setWindowTitle(title_key)  # Fallback to key itself
 
     def _retranslate_ui(self) -> None:
-        """Re-translate UI elements when language changes"""
+        """
+        يُستدعى تلقائياً عند تغيير اللغة.
+        لا تستدعي retranslate_ui() هنا مباشرة لتجنب الـ recursion —
+        الـ subclass يُعرِّف retranslate_ui() وهذه الدالة تستدعيها.
+        """
         try:
-            # Update layout direction first
             self._apply_layout_direction()
-
-            # Update window title
             if self._title_key:
                 self.setWindowTitle(self._(self._title_key))
-
-            # Call custom retranslate if exists
-            if hasattr(self, 'retranslate_ui'):
-                self.retranslate_ui()
-
+            # استدعاء retranslate_ui المُعرَّفة في الـ subclass فقط
+            # نتحقق أنها ليست _retranslate_ui نفسها لمنع الـ infinite loop
+            fn = getattr(type(self), "retranslate_ui", None)
+            if fn is not None and fn is not getattr(BaseDialog, "retranslate_ui", None):
+                try:
+                    self.retranslate_ui()
+                except Exception as e:
+                    logger.warning(f"retranslate_ui failed in {self.__class__.__name__}: {e}")
         except Exception as e:
-            logger.warning(f"Failed to retranslate dialog: {e}")
+            logger.warning(f"_retranslate_ui failed: {e}")
+
+    def retranslate_ui(self) -> None:
+        """Override في الـ subclass لتحديث نصوص الـ UI عند تغيير اللغة."""
+        pass
 
     def _apply_layout_direction(self):
         try:
@@ -124,14 +127,16 @@ class BaseDialog(QDialog):
     def _geometry_key(self):
         return f"dialog_geometry_{self.__class__.__name__}"
 
-    def _restore_geometry(self):
+    def _restore_geometry(self) -> bool:
+        """يستعيد الـ geometry — يُرجع True إذا نجح."""
         try:
             encoded = self.settings.get(self._geometry_key())
             if encoded:
                 geometry = b64decode(encoded.encode("utf-8"))
-                self.restoreGeometry(geometry)
+                return bool(self.restoreGeometry(geometry))
         except Exception as e:
             logger.warning(f"Failed restoring geometry: {e}")
+        return False
 
 
     def _save_geometry(self):
@@ -264,7 +269,7 @@ class BaseDialog(QDialog):
         if isinstance(focused, (QLineEdit, QComboBox, QAbstractSpinBox, QTextEdit, QPlainTextEdit)):
             # اترك الـ widget يتعامل مع Escape بنفسه (مسح النص مثلاً)
             return
-        self.close()
+        self.reject()   # يمر عبر validate() ويُطلق dialog_closed signal بشكل صحيح
 
     def _on_save_shortcut(self) -> None:
         """
@@ -315,7 +320,6 @@ class BaseDialog(QDialog):
             message = self._(message)
 
         QMessageBox.information(self, title, message)
-        self.log_event(f"Info shown: {title}")
 
     def show_warning(
         self,
@@ -459,10 +463,13 @@ class BaseDialog(QDialog):
             except Exception:
                 pass
 
-        # استعادة الحجم والموقع بعد اكتمال بناء الـ UI
-        self._restore_geometry()
-
-        if getattr(self, "_auto_center", False):
+        # استعادة الحجم والموقع — مرة واحدة فقط عند أول ظهور
+        if not getattr(self, "_geometry_restored", False):
+            self._geometry_restored = True
+            restored = self._restore_geometry()
+            if not restored and getattr(self, "_auto_center", False):
+                self.center_on_parent()
+        elif getattr(self, "_auto_center", False):
             self.center_on_parent()
 
         self._focus_first_input()
@@ -478,7 +485,7 @@ class BaseDialog(QDialog):
         self.dialog_opened.emit()
 
 
-    def _build_primary_header(self, title: str = "", subtitle: str = "") -> "QWidget":
+    def _build_primary_header(self, title: str = "", subtitle: str = "") -> tuple:
         """
         يبني header بالنمط المعتمد: خلفية بلون primary + نص أبيض.
         يُستخدم في dialogs التي لا ترث FormDialog.
@@ -549,8 +556,19 @@ class BaseDialog(QDialog):
     # --------- Helper Methods ---------
 
     def _focus_first_input(self):
-        for widget in self.findChildren(QLineEdit):
-            if widget.isVisible() and widget.isEnabled():
+        """يضع الـ focus على أول حقل إدخال مرئي ومُفعَّل."""
+        from PySide6.QtWidgets import QComboBox, QDateEdit, QAbstractSpinBox
+        candidates = (
+            list(self.findChildren(QLineEdit)) +
+            list(self.findChildren(QComboBox)) +
+            list(self.findChildren(QDateEdit)) +
+            list(self.findChildren(QAbstractSpinBox))
+        )
+        # رتّب حسب الموضع العمودي ثم الأفقي
+        candidates.sort(key=lambda w: (w.mapToGlobal(w.rect().topLeft()).y(),
+                                       w.mapToGlobal(w.rect().topLeft()).x()))
+        for widget in candidates:
+            if widget.isVisible() and widget.isEnabled() and not widget.isReadOnly() if hasattr(widget, "isReadOnly") else widget.isVisible() and widget.isEnabled():
                 widget.setFocus()
                 break
 

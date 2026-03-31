@@ -94,7 +94,7 @@ class FloatingPillNav(QFrame):
     def _build(self):
         # الـ FloatingPillNav يمتد أفقياً — ارتفاع ثابت
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(106)
+        self.setFixedHeight(126)
         # مهم: لا يُسبّب minimum width على النافذة
         self.setMinimumWidth(0)
 
@@ -109,7 +109,7 @@ class FloatingPillNav(QFrame):
         self._pill.setObjectName("pill-inner")
         # Preferred: يأخذ ما يحتاج لكن لا يتجاوز الـ outer
         self._pill.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        self._pill.setFixedHeight(90)
+        self._pill.setFixedHeight(116)
         self._pill.setMinimumWidth(0)
 
         self._pill_layout = QHBoxLayout(self._pill)
@@ -159,14 +159,6 @@ class FloatingPillNav(QFrame):
         btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         btn.setMinimumWidth(0)
-        # Force text visible under icon
-        try:
-            from PySide6.QtGui import QFont
-            f = QFont()
-            f.setPointSize(8)
-            btn.setFont(f)
-        except Exception:
-            pass
 
         icon_size = 48
         svg_icon  = get_sidebar_icon(key, icon_size)
@@ -177,7 +169,7 @@ class FloatingPillNav(QFrame):
         btn.setIconSize(QSize(icon_size, icon_size))
         btn.setText(self._(key))
         btn.setToolTip(self._(key))
-
+        btn.setStyleSheet("font-size: 15px;")
         btn.clicked.connect(lambda _=False, k=key: self.change_section(k))
         self._pill_layout.addWidget(btn)
         self.buttons[key] = btn

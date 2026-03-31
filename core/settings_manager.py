@@ -73,6 +73,8 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         "dialog_geometry_",
         "window_geometry_",
         "ui_state_",
+        "col_settings_",   # عروض الأعمدة من base_tab.enable_col_memory()
+        "tab_state_",      # حالة التابات (مستقبلاً)
     )
 
     # Settings that users can change without special permissions
@@ -215,16 +217,22 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         # Set the value
         self.settings[key] = value
 
-        # Save to file
-        if not self.save():
-            logger.error(f"Failed to save setting '{key}'")
-            return False
+        # Geometry/UI state — debounced save (avoid flood on resize/drag)
+        is_transient = any(key.startswith(p) for p in self.DYNAMIC_PREFIXES) or                        key == "window_geometry"
+        if is_transient:
+            # Schedule a deferred save instead of immediate write
+            self._schedule_deferred_save()
+        else:
+            if not self.save():
+                logger.error(f"Failed to save setting '{key}'")
+                return False
 
         # Emit signal
         self.setting_changed.emit(key, value)
 
-        # Apply side effects
-        self._apply_setting_side_effects(key, value)
+        # Apply side effects (only for non-transient settings)
+        if not is_transient:
+            self._apply_setting_side_effects(key, value)
 
         logger.info(f"Setting '{key}' changed from {old_value} to {value}")
         return True
@@ -262,12 +270,19 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         if not self.save():
             return False
 
-        # Emit signals
+        # Emit signals (only for keys that actually changed)
         for key, value in new_settings.items():
             self.setting_changed.emit(key, value)
 
-        # Mark theme for reapplication
-        self._pending_theme_apply = True
+        # Apply side effects for changed keys
+        for key, value in new_settings.items():
+            if key in ("theme", "font_size", "font_family", "language"):
+                self._apply_setting_side_effects(key, value)
+
+        # Mark theme for reapplication if needed
+        if any(k in new_settings for k in ("theme", "font_size", "font_family")):
+            self._pending_theme_apply = True
+            self.apply_pending_theme()
 
         logger.info(f"Updated {len(new_settings)} settings")
         return True
@@ -295,8 +310,15 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         Returns:
             True if reset successfully
         """
+        old_settings = self.settings.copy()
         self.settings = self.DEFAULT_SETTINGS.copy()
-        return self.save()
+        if not self.save():
+            return False
+        # أطلق signal لكل إعداد تغيّر
+        for key, value in self.settings.items():
+            if old_settings.get(key) != value:
+                self.setting_changed.emit(key, value)
+        return True
 
     def export_settings(self, path: str) -> bool:
         """
@@ -312,8 +334,10 @@ class SettingsManager(QObject, QObjectSingletonMixin):
             export_path = Path(path)
             export_path.parent.mkdir(parents=True, exist_ok=True)
 
+            to_export = self.settings.copy()
+            to_export.pop("user", None)   # لا نُصدّر الـ user object
             with open(export_path, "w", encoding="utf-8") as f:
-                json.dump(self.settings, f, indent=4, ensure_ascii=False)
+                json.dump(to_export, f, indent=4, ensure_ascii=False)
 
             self.settings_exported.emit(str(export_path))
             logger.info(f"Settings exported to: {export_path}")
@@ -363,6 +387,21 @@ class SettingsManager(QObject, QObjectSingletonMixin):
     def set_language(self, lang: str) -> bool:
         """Set language and apply changes"""
         return self.set("language", lang)
+
+    def _schedule_deferred_save(self) -> None:
+        """يُجدوِل حفظاً مؤجلاً بعد 1 ثانية — يمنع flood الكتابة للـ geometry."""
+        if not hasattr(self, "_deferred_save_timer"):
+            try:
+                from PySide6.QtCore import QTimer
+                self._deferred_save_timer = QTimer()
+                self._deferred_save_timer.setSingleShot(True)
+                self._deferred_save_timer.setInterval(1000)
+                self._deferred_save_timer.timeout.connect(self.save)
+            except Exception:
+                # Fallback: حفظ فوري إذا فشل إنشاء الـ timer
+                self.save()
+                return
+        self._deferred_save_timer.start()   # يُعيد تشغيل العدّاد إذا كان يعمل
 
     def apply_all_settings(self, force: bool = False) -> None:
         """Apply all settings (theme, language, direction)"""
@@ -501,15 +540,22 @@ class SettingsManager(QObject, QObjectSingletonMixin):
 
             # Check role
             from core.permissions import is_admin
-            from database.crud.users_crud import UsersCRUD
 
             if is_admin(user):
                 return True
 
-            # Check if manager
+            # Check if manager — cache the role name per user to avoid repeated DB hits
             role_id = getattr(user, "role_id", None)
             if role_id:
-                role_name = UsersCRUD.get_role_name_by_id(role_id)
+                cache_key = f"_role_cache_{role_id}"
+                role_name = getattr(self, cache_key, None)
+                if role_name is None:
+                    try:
+                        from database.crud.users_crud import UsersCRUD
+                        role_name = UsersCRUD.get_role_name_by_id(role_id) or ""
+                        setattr(self, cache_key, role_name)
+                    except Exception:
+                        role_name = ""
                 if role_name in ("Admin", "Manager"):
                     return True
 

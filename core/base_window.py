@@ -78,8 +78,9 @@ class BaseWindow(QMainWindow):
         # Connect to translation changes
         self.translator.language_changed.connect(self._on_language_changed)
 
-        # Initial translation
-        self.retranslate_ui()
+        # الترجمة الأولية مؤجّلة حتى يكتمل بناء الـ subclass UI
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.retranslate_ui)
 
         logger.info(f"Initialized {self.__class__.__name__}")
 
@@ -228,8 +229,6 @@ class BaseWindow(QMainWindow):
                         action, text_key = item
                         if action:
                             action.setText(self._(text_key))
-                            if action.toolTip():
-                                action.setToolTip(self._(text_key))
                     elif len(item) == 3:
                         action, text_key, tooltip_key = item
                         if action:
@@ -239,13 +238,14 @@ class BaseWindow(QMainWindow):
                 except Exception as e:
                     logger.error(f"Error translating action: {e}")
 
-            # Update sidebar (if exists)
-            if hasattr(self, "sidebar") and hasattr(self.sidebar, "retranslate_ui"):
-                self.sidebar.retranslate_ui()
-
-            # Update topbar (if exists)
-            if hasattr(self, "topbar") and hasattr(self.topbar, "retranslate_ui"):
-                self.topbar.retranslate_ui()
+            # Update sidebar & topbar (if exists) — both name variants
+            for attr in ("sidebar", "top_bar", "topbar"):
+                w = getattr(self, attr, None)
+                if w is not None and hasattr(w, "retranslate_ui"):
+                    try:
+                        w.retranslate_ui()
+                    except Exception as e:
+                        logger.warning(f"retranslate_ui failed on {attr}: {e}")
 
             # Update status bar message (if set)
             if hasattr(self, "statusBar"):
@@ -289,7 +289,7 @@ class BaseWindow(QMainWindow):
             else:
                 logger.debug("Theme already applied, skipping")
         except Exception as e:
-            logger.error(f"Failed to apply settings: {e}")
+            logger.error(f"Failed to apply settings: {e}", exc_info=True)
 
     def open_settings_dialog(self) -> None:
         """
@@ -327,6 +327,10 @@ class BaseWindow(QMainWindow):
             level: Log level ('info', 'warning', 'error', 'debug')
             exc: Optional exception object
         """
+        # نتجنب استدعاء get_user_display_name على debug level لتقليل الـ overhead
+        if level == "debug" and not logger.isEnabledFor(logging.DEBUG):
+            return
+
         user_display = get_user_display_name(self.current_user)
         msg = f"{self.__class__.__name__}: [User: {user_display}] {message}"
         if exc:
@@ -359,7 +363,8 @@ class BaseWindow(QMainWindow):
     # ==============================
     # GEOMETRY — حفظ واستعادة حجم النافذة
     # ==============================
-
+
+
     def keyPressEvent(self, event) -> None:
         """Enter → next field, Shift+Enter → previous."""
         from PySide6.QtCore import Qt
