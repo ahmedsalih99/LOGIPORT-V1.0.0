@@ -397,15 +397,15 @@ class BaseTab(QWidget):
 
         # زر إظهار/إخفاء الأعمدة
         self.btn_col_visibility = QPushButton("⚙")
-        self.btn_col_visibility.setObjectName("secondary-btn")
-        self.btn_col_visibility.setFixedWidth(32)
+        self.btn_col_visibility.setObjectName("toolbar-icon-btn")
+        self.btn_col_visibility.setFixedSize(32, 32)
         self.btn_col_visibility.setToolTip(self._("columns_visibility") if hasattr(self, "_") else "Columns")
         self.btn_col_visibility.clicked.connect(self._show_col_visibility_menu)
 
         # Row density selector
         self._btn_density = QPushButton("≡")
-        self._btn_density.setObjectName("secondary-btn")
-        self._btn_density.setFixedWidth(32)
+        self._btn_density.setObjectName("toolbar-icon-btn")
+        self._btn_density.setFixedSize(32, 32)
         self._btn_density.setToolTip(self._("row_density") if hasattr(self,"_") else "Row Density")
         self._btn_density.clicked.connect(self._show_density_menu)
         self._density = "comfortable"   # compact / comfortable / spacious
@@ -545,7 +545,7 @@ class BaseTab(QWidget):
         self.table.setSortingEnabled(True)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setSectionsMovable(False)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setStretchLastSection(False)
 
         # ── ارتفاع الصفوف: قيمة افتراضية + إمكانية تعديل يدوي ──────────
         self._apply_row_height(self.table_row_height)
@@ -669,7 +669,7 @@ class BaseTab(QWidget):
         self.table.setHorizontalHeaderLabels(
             [""] + [self._(c.get("label", "")) if c.get("label") else "" for c in self.columns]
         )
-        self.table.setColumnWidth(0, 36)
+        self.table.setColumnWidth(0, 42)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         # استعادة العروض والإخفاء المحفوظة
         if self._col_widths_key:
@@ -690,8 +690,8 @@ class BaseTab(QWidget):
         lay.setAlignment(Qt.AlignCenter)
         lay.addWidget(chk)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.table.setColumnWidth(0, 36)
-        self.table.horizontalHeader().setMinimumSectionSize(36)
+        self.table.setColumnWidth(0, 42)
+        self.table.horizontalHeader().setMinimumSectionSize(42)
 
     def _on_header_checkbox_changed(self, state):
         """Select all / deselect all من الـ header."""
@@ -747,6 +747,9 @@ class BaseTab(QWidget):
     # ─────────────────────────────────────────────────────────────────────
 
     def _apply_columns_for_current_role(self):
+        # إذا ما استُخدم set_columns_for_role، لا تمس الأعمدة
+        if not self._base_columns:
+            return
         cols = list(self._base_columns)
         if self.is_admin and self.chk_admin_cols.isChecked():
             cols += self._admin_columns
@@ -914,17 +917,28 @@ class BaseTab(QWidget):
         if not self.table.columnCount():
             return
         hdr = self.table.horizontalHeader()
-        # أولاً: اضبط كل عمود حسب محتواه (header + cells)
         hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
-        # ثانياً: حوّل للوضع Interactive — مع حماية عمود checkbox (col 0)
+
         def _finish():
             if self.table.isHidden():
                 return
+            col_count = self.table.columnCount()
             hdr.setSectionResizeMode(QHeaderView.Interactive)
-            # أعد تثبيت عرض عمود الـ checkbox
-            if self.table.columnCount() > 0:
-                hdr.setSectionResizeMode(0, QHeaderView.Fixed)
-                self.table.setColumnWidth(0, 36)
+
+            # ① عمود الـ checkbox دائماً Fixed بعرض ثابت
+            hdr.setSectionResizeMode(0, QHeaderView.Fixed)
+            self.table.setColumnWidth(0, 42)
+
+            # ② آخر عمود مرئي وغير Fixed يأخذ Stretch
+            stretch_col = None
+            for c in range(col_count - 1, 0, -1):
+                if not self.table.isColumnHidden(c):
+                    if hdr.sectionResizeMode(c) != QHeaderView.Fixed:
+                        stretch_col = c
+                        break
+            if stretch_col is not None:
+                hdr.setSectionResizeMode(stretch_col, QHeaderView.Stretch)
+
         QTimer.singleShot(0, _finish)
 
     def set_row_height(self, height: int):

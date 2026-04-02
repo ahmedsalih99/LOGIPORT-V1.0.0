@@ -149,6 +149,28 @@ def get_styles(theme):
     }}
 
     /* ═══════════════════════════════════════════════════════════════════
+       TOOLBAR ICON BTN — أزرار أيقونة مربعة في شريط الأدوات
+       مستخدَم كـ: toolbar-icon-btn
+       حجم ثابت 32×32 بلا padding جانبي — يعرض رمز Unicode كبير وواضح
+    ═══════════════════════════════════════════════════════════════════ */
+    QPushButton#toolbar-icon-btn {{
+        background   : {c["bg_secondary"]};
+        color        : {c["text_primary"]};
+        border       : 1px solid {c["border"]};
+        border-radius: {R};
+        padding      : 0px;
+        font-size    : 15px;
+    }}
+    QPushButton#toolbar-icon-btn:hover {{
+        background  : {c["bg_hover"]};
+        color       : {c["primary"]};
+        border-color: {c["primary"]};
+    }}
+    QPushButton#toolbar-icon-btn:pressed {{
+        background: {c["bg_active"]};
+    }}
+
+    /* ═══════════════════════════════════════════════════════════════════
        DANGER — حذف، إجراءات لا رجعة فيها
        مستخدَم كـ: danger-btn  |  btn-danger
     ═══════════════════════════════════════════════════════════════════ */

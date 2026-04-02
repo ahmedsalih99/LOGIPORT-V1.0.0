@@ -24,6 +24,7 @@ from core.translator import TranslationManager
 from database.models import get_session_local
 from database.db_utils import format_local_dt
 from database.models import Transaction, Material, Client, AuditLog, Document
+from database.models.entry import Entry
 from sqlalchemy import func, desc
 from datetime import datetime
 
@@ -233,7 +234,7 @@ class MiniProgressCard(QFrame):
 class QuickActionBtn(QPushButton):
     def __init__(self, icon, label, callback=None, parent=None):
         super().__init__(parent)
-        self.setFixedSize(86, 64)
+        self.setFixedSize(120, 90)
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self._apply_style()
         self._set_text(icon, label)
@@ -250,10 +251,10 @@ class QuickActionBtn(QPushButton):
             QPushButton {{
                 background: {bg};
                 border: 1px solid {bdr};
-                border-radius: 10px;
+                border-radius: 12px;
                 color: {tp};
-                font-family: Tajawal; font-size: 9px; font-weight: 600;
-                padding: 4px;
+                font-family: Tajawal; font-size: 11px; font-weight: 600;
+                padding: 6px 4px;
             }}
             QPushButton:hover {{
                 background: {bg_h};
@@ -407,7 +408,7 @@ class DashboardTab(QWidget):
 
     _TOP_CARDS = [
         ("total_transactions", "stat_transactions",  "active_transactions_fmt", "transactions", "📦"),
-        ("total_value",        "total_value",         "active_transactions_lbl", "value",        "💰"),
+        ("total_entries",      "entries",             "stat_entries_sub",        "import",       "📋"),
         ("total_clients",      "clients",             "registered_client",       "clients",      "👥"),
         ("total_materials",    "materials",           "available_material",      "materials",    "📋"),
         ("total_documents",    "documents",           "stat_documents",          "documents",    "📄"),
@@ -685,7 +686,7 @@ class DashboardTab(QWidget):
     def _get_stats(self):
         s = {k: 0 for k in [
             "total_transactions", "active_transactions", "total_value",
-            "total_clients", "total_materials",
+            "total_clients", "total_materials", "total_entries",
             "import_count", "import_value", "export_count", "export_value",
             "transit_count", "transit_value", "total_documents",
             "tasks_overdue", "tasks_pending",
@@ -706,6 +707,7 @@ class DashboardTab(QWidget):
                 s["total_clients"]   = session.query(Client).count()
                 s["total_materials"] = session.query(Material).count()
                 s["total_documents"] = session.query(Document).count()
+                s["total_entries"]   = session.query(Entry).count()
         except Exception as e:
             logger.error(f"Dashboard stats error: {e}")
         try:
@@ -719,7 +721,9 @@ class DashboardTab(QWidget):
 
     def _resolve_sub(self, sub_key, stats):
         if sub_key == "active_transactions_fmt":
-            return self._("active_transactions").format(count=stats.get("active_transactions", 0))
+            return self._("active_transactions_fmt").format(count=stats.get("active_transactions", 0))
+        if sub_key == "stat_entries_sub":
+            return self._("stat_entries_sub")
         return self._(sub_key)
 
     # ── Activity feed ─────────────────────────────────────────────────────────

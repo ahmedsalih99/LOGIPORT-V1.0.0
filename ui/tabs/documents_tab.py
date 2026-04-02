@@ -182,6 +182,9 @@ class DocumentsTab(BaseTab):
         hdr.setSectionResizeMode(self.COL_PATH,        QHeaderView.Stretch)
         hdr.setSectionResizeMode(self.COL_ACTIONS,     QHeaderView.Fixed)
         self.table.setColumnWidth(self.COL_ACTIONS, 175)
+        # ① أعد تثبيت عمود الـ checkbox — يجب بعد أي setSectionResizeMode عام
+        hdr.setSectionResizeMode(0, QHeaderView.Fixed)
+        self.table.setColumnWidth(0, 42)
 
         self._build_filter_widgets()
         self._replace_add_btn_with_generate()

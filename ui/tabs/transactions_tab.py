@@ -382,8 +382,14 @@ class TransactionsTab(BaseTab):
         self.table.setSortingEnabled(False)
         self.table.setUpdatesEnabled(False)
         try:
-            self.table.setColumnCount(len(self.columns))
-            self.table.setHorizontalHeaderLabels([self._(c.get("label", "")) for c in self.columns])
+            # col 0 محجوز للـ checkbox — الأعمدة تبدأ من 1
+            self.table.setColumnCount(len(self.columns) + 1)
+            self.table.setHorizontalHeaderLabels(
+                [""] + [self._(c.get("label", "")) for c in self.columns]
+            )
+            # تثبيت عمود الـ checkbox
+            hdr.setSectionResizeMode(0, QHeaderView.Fixed)
+            self.table.setColumnWidth(0, 42)
             self.table.setRowCount(len(data))
 
             can_edit   = getattr(self, "can_edit",   False)
@@ -393,9 +399,12 @@ class TransactionsTab(BaseTab):
             for ri, row in enumerate(data):
                 status = str(row.get("status", "active") or "active")
                 obj    = row.get("actions")
+                # col 0: checkbox
+                self._set_row_checkbox(ri)
 
                 for ci, col in enumerate(self.columns):
-                    key = col.get("key")
+                    key    = col.get("key")
+                    real_c = ci + 1   # offset بسبب checkbox في col 0
 
                     if key == "actions":
                         if not show_actions:
@@ -451,7 +460,7 @@ class TransactionsTab(BaseTab):
 
                         w = QWidget()
                         w.setLayout(al)
-                        self.table.setCellWidget(ri, ci, w)
+                        self.table.setCellWidget(ri, real_c, w)
 
                     elif key == "transaction_type_badge":
                         # ✅ نص + لون بـ QTableWidgetItem بدل setCellWidget (أسرع بكثير)
@@ -468,13 +477,13 @@ class TransactionsTab(BaseTab):
                         elif status == "draft":    bg = "#FFF9C4"
                         item.setBackground(QBrush(QColor(bg)))
                         item.setFont(_BOLD_ITEM_FONT)
-                        self.table.setItem(ri, ci, item)
+                        self.table.setItem(ri, real_c, item)
 
                     else:
                         item = QTableWidgetItem(str(row.get(key, "") or ""))
                         item.setTextAlignment(Qt.AlignCenter)
                         item.setFont(_BOLD_ITEM_FONT)
-                        self.table.setItem(ri, ci, item)
+                        self.table.setItem(ri, real_c, item)
 
         finally:
             self.table.setUpdatesEnabled(True)
@@ -484,9 +493,10 @@ class TransactionsTab(BaseTab):
         try:
             ai = next((i for i, c in enumerate(self.columns) if c.get("key") == "actions"), None)
             if ai is not None:
-                self.table.setColumnHidden(ai, not show_actions)
-                hdr.setSectionResizeMode(ai, QHeaderView.Fixed)
-                hdr.resizeSection(ai, 220)
+                real_ai = ai + 1   # offset بسبب checkbox في col 0
+                self.table.setColumnHidden(real_ai, not show_actions)
+                hdr.setSectionResizeMode(real_ai, QHeaderView.Fixed)
+                hdr.resizeSection(real_ai, 220)
         except Exception:
             pass
 
@@ -495,10 +505,11 @@ class TransactionsTab(BaseTab):
             key = col.get("key", "")
             w = self._COL_WIDTHS.get(key) or self._COL_WIDTHS.get(col.get("label", ""))
             if w:
-                hdr.resizeSection(ci, w)
+                hdr.resizeSection(ci + 1, w)   # +1 offset بسبب checkbox
 
         self._apply_admin_columns()
         self.update_pagination_label()
+        self._stretch_columns()
 
     # ── Actions ───────────────────────────────────────────────────────
     def add_new_item(self):

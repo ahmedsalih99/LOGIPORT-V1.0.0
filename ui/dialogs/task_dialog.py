@@ -224,8 +224,8 @@ class TaskDialog(_Base):
             "due_date":       due,
             "assigned_to_id": self._assigned_cb.currentData(),
             "description":    self._desc_edit.toPlainText().strip() or None,
-            "created_by_id":  getattr(self._user, "id", None) if not self._task_data else None,
-            "updated_by_id":  getattr(self._user, "id", None) if self._task_data else None,
+            "created_by_id":  getattr(self._user, "id", None) if not self._task else None,
+            "updated_by_id":  getattr(self._user, "id", None) if self._task else None,
         }
         self.accept()
 

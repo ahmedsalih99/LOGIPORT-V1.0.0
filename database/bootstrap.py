@@ -340,7 +340,7 @@ def _run_migrations(conn) -> None:
                 id                INTEGER PRIMARY KEY AUTOINCREMENT,
                 transaction_id    INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
                 client_id         INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-                container_no      VARCHAR(32) NOT NULL,
+                container_no      VARCHAR(32),
                 bl_number         VARCHAR(64),
                 booking_no        VARCHAR(64),
                 shipping_line     VARCHAR(128),
@@ -497,6 +497,21 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: tasks migration skipped: %s", _e)
 
+    # Migration: إصلاح container_tracking.container_no NOT NULL في DBs القديمة
+    # SQLite >= 3.35 يدعم DROP COLUMN، لكن ما يساعدنا هنا
+    # الحل الأسلم: إذا العمود NOT NULL، نضع DEFAULT '' عليه عبر UPDATE
+    # SQLite لا يدعم ALTER COLUMN — لكن يمكن تغيير الـ schema بطريقة آمنة:
+    # نتحقق فقط، ونُسجّل تحذيراً — الـ CRUD سيتعامل بـ empty string بدل None
+    try:
+        cols = {c[1]: c[3] for c in conn.execute("PRAGMA table_info(container_tracking)").fetchall()}
+        if cols.get("container_no") == 1:   # notnull=1
+            logger.warning(
+                "Bootstrap: container_tracking.container_no هو NOT NULL في هذه DB. "
+                "سيتم استخدام string فارغ بدلاً من NULL."
+            )
+    except Exception as _e:
+        logger.warning("Bootstrap: container_no check skipped: %s", _e)
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 
@@ -514,6 +529,13 @@ def run_bootstrap() -> bool:
         import sqlite3 as _sqlite3
         with _sqlite3.connect(get_db_path()) as _conn:
             _run_migrations(_conn)
+
+        # إعادة تهيئة الـ engine بعد الـ migrations لمسح الـ metadata القديمة
+        try:
+            from database.models.base import get_engine
+            get_engine().dispose()
+        except Exception:
+            pass
 
         # ② إدراج البيانات الأساسية
         _seed_all()

@@ -173,7 +173,7 @@ class ContainerTrackingCRUD(BaseCRUD):
         # إضافة الكونتينرات
         for c in containers_data:
             obj.containers.append(ShipmentContainer(
-                container_no = c.get("container_no") or None,
+                container_no = c.get("container_no") or "",
                 seal_no      = c.get("seal_no")      or None,
                 recipient    = c.get("recipient")    or None,
             ))
@@ -196,7 +196,7 @@ class ContainerTrackingCRUD(BaseCRUD):
             for c in containers_data:
                 session.add(ShipmentContainer(
                     shipment_id  = shipment_id,
-                    container_no = c.get("container_no") or None,
+                    container_no = c.get("container_no") or "",
                     seal_no      = c.get("seal_no")      or None,
                     recipient    = c.get("recipient")    or None,
                 ))

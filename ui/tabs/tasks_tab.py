@@ -1,39 +1,32 @@
 """
 ui/tabs/tasks_tab.py — LOGIPORT
 ==================================
-تاب المهام الكامل — المرحلة 5.
-
-الميزات:
-- جدول المهام مع ألوان الأولوية والحالة
-- فلاتر: الكل / قيد الانتظار / جارٍ / منجز / متأخرة
-- إضافة / تعديل / حذف / تعيين كمنجز
-- بحث نصي
-- RTL/LTR aware
+تاب المهام — يرث BaseTab.
 """
 from __future__ import annotations
 
+import logging
 from datetime import date
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QColor
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit,
-    QFrame, QMenu, QMessageBox, QSizePolicy, QAbstractItemView,
-)
+from PySide6.QtCore import Qt
+from PySide6.QtGui  import QColor
+from PySide6.QtWidgets import QTableWidgetItem, QMessageBox, QMenu
 
-from core.translator import TranslationManager
+from core.base_tab import BaseTab
+from core.permissions import has_perm
 
-def _get_priority_colors():
-    """ألوان الأولوية — تتكيف مع الثيم."""
+logger = logging.getLogger(__name__)
+
+
+def _priority_colors():
     try:
         from core.theme_manager import ThemeManager
         c = ThemeManager.get_instance().current_theme.colors
         return {
-            "urgent": (c.get("danger_light",   "#FEF2F2"), c.get("danger",         "#DC2626")),
-            "high":   (c.get("warning_light",  "#FFFBEB"), c.get("warning",        "#D97706")),
-            "medium": (c.get("primary_lighter","#EFF6FF"), c.get("primary",        "#2563EB")),
-            "low":    (c.get("bg_disabled",    "#F9FAFB"), c.get("text_muted",     "#6B7280")),
+            "urgent": (c.get("danger_light",    "#FEF2F2"), c.get("danger",     "#DC2626")),
+            "high":   (c.get("warning_light",   "#FFFBEB"), c.get("warning",    "#D97706")),
+            "medium": (c.get("primary_lighter", "#EFF6FF"), c.get("primary",    "#2563EB")),
+            "low":    (c.get("bg_disabled",     "#F9FAFB"), c.get("text_muted", "#6B7280")),
         }
     except Exception:
         return {
@@ -42,29 +35,9 @@ def _get_priority_colors():
             "medium": ("#EFF6FF", "#2563EB"),
             "low":    ("#F9FAFB", "#6B7280"),
         }
-_PRIORITY_COLORS = _get_priority_colors()  # initial load
-def _get_status_badge():
-    """ألوان بادجات الحالة — تتكيف مع الثيم."""
-    try:
-        from core.theme_manager import ThemeManager
-        c = ThemeManager.get_instance().current_theme.colors
-        return {
-            "pending":     (c.get("warning_light",  "#FEF3C7"), c.get("warning_active",  "#92400E")),
-            "in_progress": (c.get("primary_light",  "#DBEAFE"), c.get("primary_active",  "#1E40AF")),
-            "done":        (c.get("success_light",  "#D1FAE5"), c.get("success_active",  "#065F46")),
-            "cancelled":   (c.get("bg_disabled",    "#F3F4F6"), c.get("text_muted",      "#6B7280")),
-        }
-    except Exception:
-        return {
-            "pending":     ("#FEF3C7", "#92400E"),
-            "in_progress": ("#DBEAFE", "#1E40AF"),
-            "done":        ("#D1FAE5", "#065F46"),
-            "cancelled":   ("#F3F4F6", "#6B7280"),
-        }
-_STATUS_BADGE = _get_status_badge()  # initial load
 
 
-class TasksTab(QWidget):
+class TasksTab(BaseTab):
 
     required_permissions = {
         "view":   "view_tasks",
@@ -73,288 +46,198 @@ class TasksTab(QWidget):
         "delete": "delete_task",
     }
 
-    _COLUMNS = ["title", "priority", "status", "due_date", "assigned_to"]
-
-    _ROWS_PER_PAGE = 50
-
     def __init__(self, current_user=None, parent=None):
-        super().__init__(parent)
-        self._user  = current_user
-        self._       = TranslationManager.get_instance().translate
-        self._rows: list = []
-        self._filter = "all"    # all | pending | in_progress | done | overdue
-        # pagination state
-        self._current_page  = 1
-        self._total_pages   = 1
-        self._total_rows    = 0
-        TranslationManager.get_instance().language_changed.connect(self._retranslate)
-        self._build_ui()
-        self._load()
+        super().__init__(title="tasks", parent=parent, user=current_user)
+        self._filter = "all"
+        self._col_widths_key = "tasks_tab_col_widths"
+
+        self.set_columns([
+            {"label": "task_title",       "key": "title"},
+            {"label": "task_priority",    "key": "priority_label"},
+            {"label": "task_status",      "key": "status_label"},
+            {"label": "task_due_date",    "key": "due_date_str"},
+            {"label": "task_assigned_to", "key": "assigned_name"},
+        ])
+
+        # هذا التاب لا يستخدم set_columns_for_role → نخفي checkbox أعمدة الإدارة
+        if hasattr(self, "chk_admin_cols"):
+            self.chk_admin_cols.setVisible(False)
+
+        from ui.widgets.tasks_filter_bar import TasksFilterBar
+        self._filter_bar = TasksFilterBar(self)
+        self._filter_bar.filter_changed.connect(self._on_filter_change)
+        self._layout.insertWidget(1, self._filter_bar)
+
         try:
             from core.theme_manager import ThemeManager
-            ThemeManager.get_instance().theme_changed.connect(lambda _: self._load())
+            ThemeManager.get_instance().theme_changed.connect(lambda _: self.reload_data())
         except Exception:
             pass
 
-    # ─── Permissions ─────────────────────────────────────────────────────────
-
-    def _user_id(self) -> int | None:
-        """يرجع ID المستخدم الحالي."""
-        if isinstance(self._user, dict):
-            return self._user.get("id")
-        return getattr(self._user, "id", None)
-
-    def _can(self, action: str) -> bool:
         try:
-            from core.permissions import has_perm
-            return has_perm(self._user, self.required_permissions.get(action, ""))
+            from core.data_bus import DataBus
+            DataBus.get_instance().subscribe("tasks", lambda _=None: self.reload_data())
         except Exception:
-            return True
+            pass
 
-    # ─── UI ──────────────────────────────────────────────────────────────────
+        self.reload_data()
 
-    def _build_ui(self):
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 16, 16, 16)
-        lay.setSpacing(10)
+    # ── Data ──────────────────────────────────────────────────────────────
 
-        # ── شريط الأدوات ───────────────────────────────────────────────────
-        toolbar = QHBoxLayout(); toolbar.setSpacing(8)
-
-        self._btn_add = QPushButton(f"+ {self._('add_task')}")
-        self._btn_add.setObjectName("primary-btn")
-        self._btn_add.setMinimumHeight(36)
-        self._btn_add.clicked.connect(self._on_add)
-        toolbar.addWidget(self._btn_add)
-
-        toolbar.addStretch()
-
-        self._search = QLineEdit()
-        self._search.setPlaceholderText(f"🔍  {self._('search')}...")
-        self._search.setMinimumHeight(36)
-        self._search.setFixedWidth(240)
-        self._search.textChanged.connect(self._on_search_changed)
-        toolbar.addWidget(self._search)
-
-        self._btn_refresh = QPushButton(self._("refresh"))
-        self._btn_refresh.setObjectName("secondary-btn")
-        self._btn_refresh.setMinimumHeight(36)
-        self._btn_refresh.clicked.connect(self._load)
-        toolbar.addWidget(self._btn_refresh)
-
-        lay.addLayout(toolbar)
-
-        # ── فلاتر الحالة ───────────────────────────────────────────────────
-        self._filter_bar = _FilterBar(self)
-        self._filter_bar.filter_changed.connect(self._on_filter_change)
-        lay.addWidget(self._filter_bar)
-
-        # ── الجدول ─────────────────────────────────────────────────────────
-        self._table = QTableWidget()
-        self._table.setObjectName("data-table")
-        self._table.setColumnCount(len(self._COLUMNS))
-        self._table.setHorizontalHeaderLabels(self._col_headers())
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._table.setAlternatingRowColors(True)
-        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._table.customContextMenuRequested.connect(self._on_context_menu)
-        self._table.doubleClicked.connect(self._on_edit)
-        self._table.verticalHeader().setDefaultSectionSize(44)
-        lay.addWidget(self._table, 1)
-
-        # ── شريط الحالة ────────────────────────────────────────────────────
-        self._status_lbl = QLabel()
-        self._status_lbl.setObjectName("text-secondary")
-        lay.addWidget(self._status_lbl)
-
-        # ── شريط الـ pagination ─────────────────────────────────────────────
-        pg_bar = QHBoxLayout(); pg_bar.setSpacing(6)
-        self._btn_prev = QPushButton("◀")
-        self._btn_prev.setObjectName("pagination-btn")
-        self._btn_prev.setFixedWidth(32)
-        self._btn_prev.setMinimumHeight(30)
-        self._btn_prev.clicked.connect(self._prev_page)
-
-        self._lbl_page = QLabel()
-        self._lbl_page.setObjectName("text-secondary")
-        self._lbl_page.setAlignment(Qt.AlignCenter)
-        self._lbl_page.setMinimumWidth(100)
-
-        self._btn_next = QPushButton("▶")
-        self._btn_next.setObjectName("pagination-btn")
-        self._btn_next.setFixedWidth(32)
-        self._btn_next.setMinimumHeight(30)
-        self._btn_next.clicked.connect(self._next_page)
-
-        pg_bar.addStretch()
-        pg_bar.addWidget(self._btn_prev)
-        pg_bar.addWidget(self._lbl_page)
-        pg_bar.addWidget(self._btn_next)
-        pg_bar.addStretch()
-        lay.addLayout(pg_bar)
-
-    def _col_headers(self):
-        return [
-            self._("task_title"), self._("task_priority"),
-            self._("task_status"), self._("task_due_date"),
-            self._("task_assigned_to"),
-        ]
-
-    # ─── Data ─────────────────────────────────────────────────────────────────
-
-    def _load(self):
+    def reload_data(self):
         try:
             from database.crud.tasks_crud import TasksCRUD
-            crud = TasksCRUD()
-            search = self._search.text().strip() if hasattr(self, "_search") else ""
+            crud   = TasksCRUD()
+            search = self.search_bar.text().strip() if hasattr(self, "search_bar") else ""
 
             if self._filter == "overdue":
-                self._rows = crud.get_all(only_overdue=True, search=search or None)
+                rows = crud.get_all(only_overdue=True, search=search or None)
             elif self._filter in ("pending", "in_progress", "done", "cancelled"):
-                self._rows = crud.get_all(status=self._filter, search=search or None)
+                rows = crud.get_all(status=self._filter, search=search or None)
             else:
-                self._rows = crud.get_all(search=search or None)
+                rows = crud.get_all(search=search or None)
 
-            self._filter_bar.update_counts(crud)
+            all_tasks = crud.get_all()
+            if hasattr(self, "_filter_bar"):
+                self._filter_bar.update_counts(all_tasks)
+
+            self.data = self._to_rows(rows)
         except Exception as e:
-            self._rows = []
-            import logging; logging.getLogger(__name__).error("TasksTab load: %s", e)
+            logger.error("TasksTab.reload_data: %s", e)
+            self.data = []
 
-        # حساب pagination
-        self._total_rows  = len(self._rows)
-        self._total_pages = max(1, (self._total_rows + self._ROWS_PER_PAGE - 1) // self._ROWS_PER_PAGE)
-        self._current_page = max(1, min(self._current_page, self._total_pages))
-        self._refresh_table()
+        self.display_data()
 
-    def _refresh_table(self):
-        # slice الصفحة الحالية
-        start     = (self._current_page - 1) * self._ROWS_PER_PAGE
-        page_rows = self._rows[start: start + self._ROWS_PER_PAGE]
-
-        self._table.setRowCount(len(page_rows))
-
+    def _to_rows(self, tasks: list) -> list:
         today = date.today()
-
-        for ri, task in enumerate(page_rows):
-            pri = getattr(task, "priority", "medium")
-            bg_hex, _ = _get_priority_colors().get(pri, ("#FFFFFF", "#6B7280"))
-
-            # عنوان
-            t_item = QTableWidgetItem(getattr(task, "title", ""))
-            t_item.setData(Qt.UserRole, task.id)
-            if getattr(task, "status", "") == "done":
-                f = t_item.font(); f.setStrikeOut(True); t_item.setFont(f)
-            self._table.setItem(ri, 0, t_item)
-
-            # أولوية
-            pri_label = self._(f"priority_{pri}")
-            pri_item  = QTableWidgetItem(pri_label)
-            pri_item.setTextAlignment(Qt.AlignCenter)
-            self._table.setItem(ri, 1, pri_item)
-
-            # حالة
-            st = getattr(task, "status", "pending")
-            st_item = QTableWidgetItem(self._(f"task_status_{st}"))
-            st_item.setTextAlignment(Qt.AlignCenter)
-            self._table.setItem(ri, 2, st_item)
-
-            # تاريخ الاستحقاق
+        rows  = []
+        for task in tasks:
+            pri = getattr(task, "priority", "medium") or "medium"
+            st  = getattr(task, "status",   "pending") or "pending"
             due = getattr(task, "due_date", None)
             if due:
                 overdue = due < today and st not in ("done", "cancelled")
-                due_text = f"⚠ {due}" if overdue else str(due)
-                due_item = QTableWidgetItem(due_text)
-                if overdue:
-                    due_item.setForeground(QColor("#DC2626"))
+                due_str = f"⚠ {due}" if overdue else str(due)
             else:
-                due_item = QTableWidgetItem("—")
-                due_item.setForeground(QColor("#9CA3AF"))
-            due_item.setTextAlignment(Qt.AlignCenter)
-            self._table.setItem(ri, 3, due_item)
-
-            # مسند إلى
+                due_str = "—"
             assigned = getattr(task, "assigned_to", None)
-            aname = ""
+            aname    = ""
             if assigned:
                 aname = getattr(assigned, "full_name", None) or getattr(assigned, "username", "") or ""
-            a_item = QTableWidgetItem(aname or "—")
-            self._table.setItem(ri, 4, a_item)
+            rows.append({
+                "id":             task.id,
+                "title":          getattr(task, "title", ""),
+                "priority":       pri,
+                "priority_label": self._(f"priority_{pri}"),
+                "status":         st,
+                "status_label":   self._(f"task_status_{st}"),
+                "due_date":       due,
+                "due_date_str":   due_str,
+                "assigned_name":  aname or "—",
+                "_task_obj":      task,
+                "actions":        task,
+            })
+        return rows
 
-        self._status_lbl.setText(self._("tasks_count").format(n=self._total_rows))
-        self._btn_add.setEnabled(self._can("add"))
-        # تحديث labels pagination
-        self._lbl_page.setText(f"{self._current_page} / {self._total_pages}")
-        self._btn_prev.setEnabled(self._current_page > 1)
-        self._btn_next.setEnabled(self._current_page < self._total_pages)
+    # ── Display ───────────────────────────────────────────────────────────
 
-    # ─── Actions ─────────────────────────────────────────────────────────────
+    def display_data(self):
+        rows = list(self.data) if self.data else []
+        if not getattr(self, "_skip_base_search", False):
+            rows = self._apply_base_search(rows)
+        if not getattr(self, "_skip_base_sort", False):
+            rows = self._apply_base_sort(rows)
 
-    def _current_task(self):
-        row = self._table.currentRow()
-        if row < 0:
-            return None
-        offset = (self._current_page - 1) * self._ROWS_PER_PAGE
-        idx = offset + row
-        if 0 <= idx < len(self._rows):
-            return self._rows[idx]
-        return None
+        self.total_rows  = len(rows)
+        self.total_pages = max(1, (self.total_rows + self.rows_per_page - 1) // self.rows_per_page)
+        self.current_page = max(1, min(self.current_page, self.total_pages))
+        start     = (self.current_page - 1) * self.rows_per_page
+        page_rows = rows[start: start + self.rows_per_page]
 
-    def _on_add(self):
-        from ui.dialogs.task_dialog import TaskDialog
-        dlg = TaskDialog(current_user=self._user, parent=self)
-        if dlg.exec() and dlg.result_data:
-            try:
-                from database.crud.tasks_crud import TasksCRUD
-                data = dict(dlg.result_data)
-                data.setdefault("created_by_id", self._user_id())
-                TasksCRUD().create(**data)
-                self._load()
-                from core.data_bus import DataBus
-                DataBus.get_instance().emit('tasks')
-            except Exception as e:
-                QMessageBox.critical(self, self._("error"), str(e))
+        self._update_pagination_label()
+        self._update_status_bar(len(rows), len(self.data))
+        self._show_empty_state(len(rows) == 0)
 
-    def _on_edit(self, *_):
-        if not self._can("edit"):
+        if not self.columns:
+            self.table.setRowCount(0)
             return
-        task = self._current_task()
-        if not task:
-            return
-        from ui.dialogs.task_dialog import TaskDialog
-        dlg = TaskDialog(task_data=task, current_user=self._user, parent=self)
-        if dlg.exec() and dlg.result_data:
-            try:
-                from database.crud.tasks_crud import TasksCRUD
-                data = dict(dlg.result_data)
-                data["updated_by_id"] = self._user_id()
-                TasksCRUD().update(task.id, **data)
-                self._load()
-                from core.data_bus import DataBus
-                DataBus.get_instance().emit('tasks')
-            except Exception as e:
-                QMessageBox.critical(self, self._("error"), str(e))
 
-    def _on_mark_done(self):
-        task = self._current_task()
-        if not task:
-            return
+        self.table.setSortingEnabled(False)
+        self.table.setUpdatesEnabled(False)
         try:
-            from database.crud.tasks_crud import TasksCRUD
-            TasksCRUD().mark_done(task.id, updated_by_id=self._user_id())
-            self._load()
-            from core.data_bus import DataBus
-            DataBus.get_instance().emit('tasks')
-        except Exception as e:
-            QMessageBox.critical(self, self._("error"), str(e))
+            self.table.setRowCount(len(page_rows))
+            pri_colors = _priority_colors()
+            for i, row in enumerate(page_rows):
+                self._set_row_checkbox(i)
+                pri = row.get("priority", "medium")
+                _, fg_hex = pri_colors.get(pri, ("#FFFFFF", "#1E293B"))
+                for j, col in enumerate(self.columns):
+                    key = col.get("key", "")
+                    val = row.get(key, "")
+                    item = QTableWidgetItem(str(val) if val is not None else "")
+                    item.setTextAlignment(Qt.AlignCenter)
+                    if key == "title":
+                        item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                        if row.get("status") == "done":
+                            f = item.font(); f.setStrikeOut(True); item.setFont(f)
+                        item.setData(Qt.UserRole, row.get("id"))
+                    elif key == "priority_label":
+                        item.setForeground(QColor(fg_hex))
+                    elif key == "due_date_str" and str(val).startswith("⚠"):
+                        item.setForeground(QColor("#DC2626"))
+                    self.table.setItem(i, j + 1, item)
+        finally:
+            self.table.setUpdatesEnabled(True)
+            self.table.setSortingEnabled(True)
+        self._stretch_columns()
 
-    def _on_delete(self):
-        if not self._can("delete"):
+    # ── Actions ───────────────────────────────────────────────────────────
+
+    def _current_task_obj(self):
+        rows = self.get_selected_rows()
+        if not rows:
+            return None
+        idx = (self.current_page - 1) * self.rows_per_page + rows[0]
+        if not self.data or idx >= len(self.data):
+            return None
+        return self.data[idx].get("_task_obj")
+
+    def add_new_item(self):
+        from ui.dialogs.task_dialog import TaskDialog
+        dlg = TaskDialog(current_user=self.current_user, parent=self)
+        if dlg.exec() and dlg.result_data:
+            try:
+                from database.crud.tasks_crud import TasksCRUD
+                data = dict(dlg.result_data)
+                data.setdefault("created_by_id", getattr(self.current_user, "id", None))
+                data.pop("updated_by_id", None)   # create() لا يقبل updated_by_id
+                TasksCRUD().create(**data)
+                self.reload_data()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit("tasks")
+            except Exception as e:
+                QMessageBox.critical(self, self._("error"), str(e))
+
+    def _open_edit_dialog(self, task_obj):
+        if not task_obj:
             return
-        task = self._current_task()
-        if not task:
+        from ui.dialogs.task_dialog import TaskDialog
+        dlg = TaskDialog(task_data=task_obj, current_user=self.current_user, parent=self)
+        if dlg.exec() and dlg.result_data:
+            try:
+                from database.crud.tasks_crud import TasksCRUD
+                data = dict(dlg.result_data)
+                data["updated_by_id"] = getattr(self.current_user, "id", None)
+                data.pop("created_by_id", None)   # لا تُعدَّل عند التحديث
+                TasksCRUD().update(task_obj.id, **data)
+                self.reload_data()
+                from core.data_bus import DataBus
+                DataBus.get_instance().emit("tasks")
+            except Exception as e:
+                QMessageBox.critical(self, self._("error"), str(e))
+
+    def _delete_single(self, task_obj):
+        if not task_obj:
             return
         reply = QMessageBox.question(
             self, self._("confirm"), self._("task_confirm_delete"),
@@ -363,129 +246,55 @@ class TasksTab(QWidget):
         if reply == QMessageBox.Yes:
             try:
                 from database.crud.tasks_crud import TasksCRUD
-                TasksCRUD().delete(task.id)
-                self._load()
+                TasksCRUD().delete(task_obj.id)
+                self.reload_data()
                 from core.data_bus import DataBus
-                DataBus.get_instance().emit('tasks')
+                DataBus.get_instance().emit("tasks")
             except Exception as e:
                 QMessageBox.critical(self, self._("error"), str(e))
 
-    def _on_context_menu(self, pos):
-        task = self._current_task()
+    def _mark_done(self, task_obj):
+        if not task_obj:
+            return
+        try:
+            from database.crud.tasks_crud import TasksCRUD
+            TasksCRUD().mark_done(
+                task_obj.id,
+                updated_by_id=getattr(self.current_user, "id", None)
+            )
+            self.reload_data()
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit("tasks")
+        except Exception as e:
+            QMessageBox.critical(self, self._("error"), str(e))
+
+    def _on_row_double_clicked(self, index):
+        self._open_edit_dialog(self._current_task_obj())
+
+    def _show_context_menu(self, pos):
+        task = self._current_task_obj()
         if not task:
             return
         menu = QMenu(self)
-        if self._can("edit"):
-            menu.addAction(f"✏️  {self._('edit_task')}").triggered.connect(self._on_edit)
+        if has_perm(self.current_user, "edit_task") or self.is_admin:
+            menu.addAction(f"✏️  {self._('edit_task')}").triggered.connect(
+                lambda: self._open_edit_dialog(task))
         if getattr(task, "status", "") not in ("done", "cancelled"):
-            menu.addAction(f"✅  {self._('task_mark_done')}").triggered.connect(self._on_mark_done)
+            menu.addAction(f"✅  {self._('task_mark_done')}").triggered.connect(
+                lambda: self._mark_done(task))
         menu.addSeparator()
-        if self._can("delete"):
-            menu.addAction(f"🗑  {self._('delete_task')}").triggered.connect(self._on_delete)
-        menu.exec(self._table.viewport().mapToGlobal(pos))
-
-    def _prev_page(self):
-        if self._current_page > 1:
-            self._current_page -= 1
-            self._refresh_table()
-
-    def _next_page(self):
-        if self._current_page < self._total_pages:
-            self._current_page += 1
-            self._refresh_table()
+        if has_perm(self.current_user, "delete_task") or self.is_admin:
+            menu.addAction(f"🗑  {self._('delete_task')}").triggered.connect(
+                lambda: self._delete_single(task))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_filter_change(self, f: str):
         self._filter = f
-        self._current_page = 1  # reset page on filter change
-        self._load()
+        self.current_page = 1
+        self.reload_data()
 
-    def _on_search_changed(self, _):
-        self._current_page = 1
-        QTimer.singleShot(300, self._load)
-
-    def _retranslate(self):
-        self._  = TranslationManager.get_instance().translate
-        self._btn_add.setText(f"+ {self._('add_task')}")
-        self._btn_refresh.setText(self._("refresh"))
-        self._table.setHorizontalHeaderLabels(self._col_headers())
-        self._filter_bar.retranslate()
-        self._load()
-
-
-# ─── FilterBar ────────────────────────────────────────────────────────────────
-
-class _FilterBar(QWidget):
-    from PySide6.QtCore import Signal
-    filter_changed = Signal(str)
-
-    _FILTERS = [
-        ("all",         "tasks_all"),
-        ("pending",     "tasks_pending"),
-        ("in_progress", "tasks_in_progress"),
-        ("done",        "tasks_done"),
-        ("overdue",     "tasks_overdue"),
-    ]
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._ = TranslationManager.get_instance().translate
-        self._active = "all"
-        self._btns   = {}
-        self._counts = {}
-        self._build()
-
-    def _build(self):
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(6)
-        for code, key in self._FILTERS:
-            btn = QPushButton(self._(key))
-            btn.setCheckable(True)
-            btn.setChecked(code == "all")
-            btn.setObjectName("stats-filter-btn")
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _, c=code: self._set_active(c))
-            self._btns[code] = btn
-            lay.addWidget(btn)
-        lay.addStretch()
-        self._refresh_btn_text()
-        # تحديث عند تغيير الثيم
-
-    def _set_active(self, code: str):
-        self._active = code
-        for c, btn in self._btns.items():
-            btn.setChecked(c == code)
-        self.filter_changed.emit(code)
-
-
-    def update_counts(self, crud):
-        """تحديث عدادات كل فلتر."""
-        try:
-            from database.crud.tasks_crud import TasksCRUD
-            all_tasks = crud.get_all()
-            today = date.today()
-            self._counts = {
-                "all":         str(len(all_tasks)),
-                "pending":     str(sum(1 for t in all_tasks if t.status == "pending")),
-                "in_progress": str(sum(1 for t in all_tasks if t.status == "in_progress")),
-                "done":        str(sum(1 for t in all_tasks if t.status == "done")),
-                "overdue":     str(sum(1 for t in all_tasks
-                                       if t.due_date and t.due_date < today
-                                       and t.status not in ("done","cancelled"))),
-            }
-        except Exception:
-            self._counts = {}
-        # تحديث نص الأزرار
-        self._refresh_btn_text()
-
-    def _refresh_btn_text(self):
-        """تحديث نص الأزرار بالعداد الحالي."""
-        for code, btn in self._btns.items():
-            label_key = dict(self._FILTERS).get(code, code)
-            label = self._(label_key)
-            cnt = self._counts.get(code, "")
-            btn.setText(f"{label}  {cnt}".strip())
-
-    def retranslate(self):
-        self._ = TranslationManager.get_instance().translate
-        self._refresh_btn_text()
+    def retranslate_ui(self):
+        super().retranslate_ui()
+        if hasattr(self, "_filter_bar"):
+            self._filter_bar.retranslate()
+        self.reload_data()

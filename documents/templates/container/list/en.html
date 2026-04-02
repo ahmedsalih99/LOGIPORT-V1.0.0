@@ -1,88 +1,83 @@
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
-  <meta charset="utf-8" />
-  <title>Container List</title>
+  <meta charset="utf-8"/>
+  <title>BL Tracking List</title>
   <style>
-    @page { size: A4 landscape; margin: 12mm 14mm; }
+    @page { size: A4 landscape; margin: 10mm 12mm; }
     html { color: #000; background: #fff; }
-    body { font: 10pt/1.5 "Segoe UI", Arial, sans-serif; }
-    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10pt; border-bottom: 2pt solid #1e3a5f; padding-bottom: 8pt; }
-    .page-title  { font-size: 16pt; font-weight: 700; color: #1e3a5f; margin: 0; }
-    .page-meta   { font-size: 9pt; color: #555; text-align: right; }
-    .company-name{ font-size: 12pt; font-weight: 700; color: #1e3a5f; }
-    .summary { display: flex; gap: 8pt; margin-bottom: 8pt; flex-wrap: wrap; }
-    .badge { display: inline-flex; align-items: center; gap: 4pt; padding: 3pt 9pt; border-radius: 20pt; font-size: 9pt; font-weight: 600; border: 1pt solid currentColor; }
-    .filters { font-size: 9pt; color: #666; margin-bottom: 6pt; }
-    table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-    thead th { background: #1e3a5f; color: #fff; padding: 5pt; text-align: left; font-weight: 600; font-size: 8.5pt; border-right: 0.5pt solid rgba(255,255,255,0.2); }
-    tbody tr:nth-child(even) { background: #f5f7fa; }
-    tbody td { padding: 4pt 5pt; vertical-align: middle; border-bottom: 0.5pt solid #ddd; border-right: 0.5pt solid #eee; }
-    tfoot td { padding: 5pt; font-weight: 700; border-top: 1.5pt solid #1e3a5f; background: #f0f4fa; }
-    .col-no { width: 5%; font-family: monospace; font-weight: 700; color: #1a56db; }
-    .col-bl { width: 9%; font-family: monospace; }
-    .status-badge { display: inline-block; padding: 2pt 6pt; border-radius: 10pt; font-size: 8pt; font-weight: 600; color: #fff; }
-    .eta-overdue { color: #dc2626; font-weight: 700; }
-    .eta-today   { color: #d97706; font-weight: 700; }
-    .page-footer { margin-top: 10pt; font-size: 8pt; color: #888; display: flex; justify-content: space-between; border-top: 0.5pt solid #ccc; padding-top: 5pt; }
+    body { font: 9pt/1.4 "Segoe UI",Arial,sans-serif; }
+    .page-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8pt; border-bottom:2pt solid #1e3a5f; padding-bottom:6pt; }
+    .page-title  { font-size:14pt; font-weight:700; color:#1e3a5f; margin:0; }
+    .page-meta   { font-size:8pt; color:#555; }
+    .company-name{ font-size:11pt; font-weight:700; color:#1e3a5f; }
+    .summary     { display:flex; gap:6pt; margin-bottom:6pt; flex-wrap:wrap; }
+    .badge       { display:inline-flex; align-items:center; gap:3pt; padding:2pt 8pt; border-radius:20pt; font-size:8pt; font-weight:600; border:1pt solid currentColor; }
+    .filters     { font-size:8pt; color:#666; margin-bottom:5pt; }
+    table { width:100%; border-collapse:collapse; font-size:8pt; }
+    thead th { background:#1e3a5f; color:#fff; padding:4pt; text-align:left; font-weight:600; font-size:7.5pt; border-right:0.5pt solid rgba(255,255,255,0.2); }
+    tbody tr:nth-child(even) { background:#f5f7fa; }
+    tbody td { padding:3pt 4pt; vertical-align:middle; border-bottom:0.5pt solid #ddd; border-right:0.5pt solid #eee; }
+    tfoot td { padding:4pt; font-weight:700; border-top:1.5pt solid #1e3a5f; background:#f0f4fa; }
+    .eta-overdue { color:#dc2626; font-weight:700; }
+    .eta-today   { color:#d97706; font-weight:700; }
+    .page-footer { margin-top:8pt; font-size:7pt; color:#888; display:flex; justify-content:space-between; border-top:0.5pt solid #ccc; padding-top:4pt; }
   </style>
 </head>
 <body>
   <div class="page-header">
     <div>
       {% if company_name %}<div class="company-name">{{ company_name }}</div>{% endif %}
-      <h1 class="page-title">Container List</h1>
+      <h1 class="page-title">BL Tracking List</h1>
       {% if filters %}<div class="filters">Filter: {{ filters }}</div>{% endif %}
     </div>
     <div class="page-meta">
-      <div>Print Date: {{ print_date }}</div>
-      <div>Total: {{ containers | length }} containers</div>
+      <div>{{ print_date }}</div>
+      <div>Total: {{ containers | length }}</div>
     </div>
   </div>
+
   {% if status_summary %}
   <div class="summary">
     {% for s in status_summary %}
-    <span class="badge" style="color: {{ s.color }}; border-color: {{ s.color }};">{{ s.label }}: {{ s.count }}</span>
+    <span class="badge" style="color:{{ s.color }};border-color:{{ s.color }}">{{ s.label }}: {{ s.count }}</span>
     {% endfor %}
   </div>
   {% endif %}
+
   <table>
     <thead>
       <tr>
-        <th class="col-no">Container No</th>
-        <th class="col-bl">BL No</th>
-        <th>Client</th>
-        <th>Shipping Line</th>
-        <th>Vessel</th>
-        <th>POL</th>
-        <th>POD</th>
-        <th>ETD</th>
-        <th>ETA</th>
-        <th>ATA</th>
-        <th style="text-align:center;">Status</th>
+        <th>BL No</th><th>Shipping Line</th><th>Client</th><th>Cargo Type</th>
+        <th>Qty</th><th>Origin</th><th>POD</th><th>Containers</th>
+        <th>Docs</th><th>Docs Date</th><th>BL Status</th><th>ETA</th><th>Status</th>
       </tr>
     </thead>
     <tbody>
-      {% for container in containers %}
+      {% for c in containers %}
       <tr>
-        <td class="col-no">{{ container.container_no or '—' }}</td>
-        <td class="col-bl">{{ container.bl_number or '—' }}</td>
-        <td>{{ container.client_name or '—' }}</td>
-        <td>{{ container.shipping_line or '—' }}</td>
-        <td>{{ container.vessel_name or '—' }}</td>
-        <td>{{ container.port_of_loading or '—' }}</td>
-        <td>{{ container.port_of_discharge or '—' }}</td>
-        <td>{{ container.etd or '—' }}</td>
-        <td class="{% if container.eta_state == 'overdue' %}eta-overdue{% elif container.eta_state == 'today' %}eta-today{% endif %}">{{ container.eta or '—' }}</td>
-        <td>{{ container.ata or '—' }}</td>
-        <td style="text-align:center;"><span class="status-badge" style="background: {{ container.status_color }};">{{ container.status_label }}</span></td>
+        <td style="font-family:monospace;color:#1a56db;font-weight:700">{{ c.bl_number or '—' }}</td>
+        <td>{{ c.shipping_line or '—' }}</td>
+        <td>{{ c.client_name or '—' }}</td>
+        <td>{{ c.cargo_type or '—' }}</td>
+        <td style="text-align:center">{{ c.quantity or '—' }}</td>
+        <td>{{ c.origin_country or '—' }}</td>
+        <td>{{ c.port_of_discharge or '—' }}</td>
+        <td style="text-align:center">{{ c.containers_count or '—' }}</td>
+        <td style="text-align:center">{% if c.docs_delivered %}✅ Yes{% else %}—{% endif %}</td>
+        <td>{{ c.docs_received_date or '—' }}</td>
+        <td>{{ c.bl_status or '—' }}</td>
+        <td class="{% if c.eta_state == 'overdue' %}eta-overdue{% elif c.eta_state == 'today' %}eta-today{% endif %}">{{ c.eta or '—' }}</td>
+        <td style="text-align:center">
+          <span style="background:{{ c.status_color }};color:#fff;padding:2pt 7pt;border-radius:10pt;font-size:7.5pt;font-weight:600">{{ c.status_label }}</span>
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="12" style="text-align:center; color:#888; padding:14pt;">No data</td></tr>
+      <tr><td colspan="13" style="text-align:center;color:#888;padding:14pt">No data</td></tr>
       {% endfor %}
     </tbody>
     <tfoot>
-      <tr><td colspan="10">Total</td><td style="text-align:center;">{{ containers | length }}</td><td></td></tr>
+      <tr><td colspan="12">Total</td><td style="text-align:center">{{ containers | length }}</td></tr>
     </tfoot>
   </table>
   <div class="page-footer"><span>LOGIPORT — Auto Report</span><span>{{ print_date }}</span></div>
