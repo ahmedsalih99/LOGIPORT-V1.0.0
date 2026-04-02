@@ -172,4 +172,35 @@ def get_styles(theme):
         color: {c["text_primary"]};
     }}
 
+    /* ===== KPI CARDS (v3.4) ===== */
+
+    QFrame#kpi-card {{
+        background: {c["bg_card"]};
+        border-radius: 10px;
+        border: 1px solid {c["border"]};
+        min-height: 78px;
+        max-height: 90px;
+    }}
+    QFrame#kpi-card:hover {{
+        background: {c["bg_hover"]};
+    }}
+
+    /* ===== MINI PROGRESS CARDS ===== */
+
+    QFrame#mini-progress-card {{
+        background: {c["bg_card"]};
+        border-radius: 8px;
+        border: 1px solid {c["border"]};
+        min-height: 68px;
+        max-height: 80px;
+    }}
+
+    /* ===== TASKS STRIP ===== */
+
+    QFrame#tasks-strip {{
+        background: {c["bg_card"]};
+        border-radius: 7px;
+        border: 1px solid {c["border"]};
+    }}
+
     """

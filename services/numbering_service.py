@@ -20,7 +20,10 @@ Smart Transaction & Document Numbering Service — v2
 
 from __future__ import annotations
 from typing import Tuple, Optional
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 
 class NumberingService:
@@ -100,7 +103,7 @@ class NumberingService:
             db_session.rollback()
             import datetime
             fallback = f"T{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            print(f"⚠️ Numbering service error: {e}, using fallback: {fallback}")
+            logger.warning(f"Numbering service error: {e}, using fallback: {fallback}")
             return fallback
 
     @staticmethod
@@ -133,7 +136,7 @@ class NumberingService:
             NumberingService._save_last_number(db_session, db_max)
             return db_max
         except Exception as e:
-            print(f"⚠️ sync_last_number error: {e}")
+            logger.warning(f"sync_last_number error: {e}")
             return 0
 
     # ─── helpers ──────────────────────────────────────────────────────
@@ -226,7 +229,7 @@ class NumberingService:
             return False
         except Exception as e:
             db_session.rollback()
-            print(f"⚠️ Error validating transaction number: {e}")
+            logger.warning(f"Error validating transaction number: {e}")
             return False
 
     @staticmethod

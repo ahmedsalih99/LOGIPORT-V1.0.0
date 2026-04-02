@@ -52,9 +52,7 @@ class SyncSettingsDialog(BaseDialog):
         title.setStyleSheet("font-size:16px; font-weight:600;")
         lay.addWidget(title)
 
-        sub = QLabel(
-            "بعد الإعداد، ستتزامن البيانات تلقائياً كل 5 دقائق بين جميع المكاتب."
-        )
+        sub = QLabel(self._("sync_settings_desc"))
         sub.setObjectName("form-hint")
         sub.setWordWrap(True)
         lay.addWidget(sub)
@@ -69,7 +67,7 @@ class SyncSettingsDialog(BaseDialog):
         self._url_edit = QLineEdit()
         self._url_edit.setPlaceholderText("https://xxxxxxxxxxxx.supabase.co")
         self._url_edit.setObjectName("form-input")
-        form.addRow("رابط المشروع (Project URL):", self._url_edit)
+        form.addRow(self._("sync_project_url_label"), self._url_edit)
 
         self._key_edit = QLineEdit()
         self._key_edit.setPlaceholderText("eyJhbGci...")
@@ -90,7 +88,7 @@ class SyncSettingsDialog(BaseDialog):
         self._office_combo = QComboBox()
         self._office_combo.setObjectName("form-combo")
         self._load_offices()
-        form.addRow("المكتب الحالي:", self._office_combo)
+        form.addRow(self._("sync_office_label"), self._office_combo)
 
         lay.addLayout(form)
 
@@ -98,17 +96,17 @@ class SyncSettingsDialog(BaseDialog):
 
         # ── Auto-sync options ────────────────────────────
         auto_row = QHBoxLayout()
-        self._auto_chk = QCheckBox("تفعيل المزامنة التلقائية")
+        self._auto_chk = QCheckBox(self._("sync_auto_enable"))
         self._auto_chk.setObjectName("form-checkbox")
         auto_row.addWidget(self._auto_chk)
         auto_row.addStretch()
 
-        interval_lbl = QLabel("كل")
+        interval_lbl = QLabel(self._("sync_interval_prefix"))
         auto_row.addWidget(interval_lbl)
         self._interval_spin = QSpinBox()
         self._interval_spin.setRange(1, 60)
         self._interval_spin.setValue(5)
-        self._interval_spin.setSuffix(" دقيقة")
+        self._interval_spin.setSuffix(" " + self._("sync_interval_suffix"))
         self._interval_spin.setFixedWidth(100)
         auto_row.addWidget(self._interval_spin)
         lay.addLayout(auto_row)
@@ -125,15 +123,15 @@ class SyncSettingsDialog(BaseDialog):
         # ── Buttons ─────────────────────────────────────
         btn_row = QHBoxLayout()
 
-        self._test_btn = QPushButton("اختبار الاتصال")
+        self._test_btn = QPushButton(self._("sync_test_connection"))
         self._test_btn.setObjectName("secondary-btn")
         self._test_btn.clicked.connect(self._test_connection)
 
-        self._save_btn = QPushButton("حفظ")
+        self._save_btn = QPushButton(self._("save"))
         self._save_btn.setObjectName("primary-btn")
         self._save_btn.clicked.connect(self._save)
 
-        cancel_btn = QPushButton("إلغاء")
+        cancel_btn = QPushButton(self._("cancel"))
         cancel_btn.setObjectName("secondary-btn")
         cancel_btn.clicked.connect(self.reject)
 
@@ -188,7 +186,7 @@ class SyncSettingsDialog(BaseDialog):
         except Exception as e:
             pass
 
-        self._show_status("✓ تم الحفظ بنجاح", success=True)
+        self._show_status(self._("sync_status_saved"), success=True)
         QTimer.singleShot(800, self.accept)
 
     # ── Test connection ───────────────────────────────────
@@ -198,11 +196,11 @@ class SyncSettingsDialog(BaseDialog):
         key = self._key_edit.text().strip()
 
         if not url or not key:
-            self._show_status("⚠ أدخل الـ URL والـ Key أولاً", success=False)
+            self._show_status(self._("sync_status_url_key_required"), success=False)
             return
 
         self._test_btn.setEnabled(False)
-        self._show_status("جارٍ الاختبار...", success=None)
+        self._show_status(self._("sync_status_testing"), success=None)
 
         def _do_test():
             from services.supabase_client import SupabaseClient
@@ -211,9 +209,9 @@ class SyncSettingsDialog(BaseDialog):
             def _apply():
                 self._test_btn.setEnabled(True)
                 if ok:
-                    self._show_status("✓ الاتصال ناجح — السيرفر يستجيب", success=True)
+                    self._show_status(self._("sync_status_connected"), success=True)
                 else:
-                    self._show_status("✗ تعذّر الاتصال — تحقق من الـ URL والـ Key", success=False)
+                    self._show_status(self._("sync_status_failed"), success=False)
             QTimer.singleShot(0, _apply)
 
         threading.Thread(target=_do_test, daemon=True).start()

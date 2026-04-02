@@ -7,19 +7,19 @@ from core.form_dialog import FormDialog
 from PySide6.QtWidgets import QLineEdit, QComboBox, QTextEdit, QSpinBox
 from ui.utils.wheel_blocker import block_wheel_in
 
-
-_COUNTRIES = [
-    ("", "—"),
-    ("SY", "سوريا / Syria"),
-    ("TR", "تركيا / Turkey"),
-    ("LB", "لبنان / Lebanon"),
-    ("JO", "الأردن / Jordan"),
-    ("IQ", "العراق / Iraq"),
-    ("DE", "ألمانيا / Germany"),
-    ("NL", "هولندا / Netherlands"),
-    ("GB", "بريطانيا / UK"),
-    ("OTHER", "أخرى / Other"),
-]
+_COUNTRY_CODES = ["", "SY", "TR", "LB", "JO", "IQ", "DE", "NL", "GB", "OTHER"]
+_COUNTRY_KEYS  = {
+    "":      None,
+    "SY":    "office_country_sy",
+    "TR":    "office_country_tr",
+    "LB":    "office_country_lb",
+    "JO":    "office_country_jo",
+    "IQ":    "office_country_iq",
+    "DE":    "office_country_de",
+    "NL":    "office_country_nl",
+    "GB":    "office_country_gb",
+    "OTHER": "office_country_other",
+}
 
 
 class AddOfficeDialog(FormDialog):
@@ -31,6 +31,15 @@ class AddOfficeDialog(FormDialog):
         if office:
             self._populate(office)
         block_wheel_in(self)
+
+    def _build_countries(self):
+        """يبني قائمة الدول مع الترجمة الحالية."""
+        result = []
+        for code in _COUNTRY_CODES:
+            key = _COUNTRY_KEYS.get(code)
+            label = self._(key) if key else "—"
+            result.append((code, label))
+        return result
 
     def _build_form(self):
         # الكود — مثل TR-01 / SY-01
@@ -56,7 +65,7 @@ class AddOfficeDialog(FormDialog):
 
         # البلد
         self.country_combo = QComboBox()
-        for code, label in _COUNTRIES:
+        for code, label in self._build_countries():
             self.country_combo.addItem(label, code)
         self.add_row(self._("country"), self.country_combo)
 

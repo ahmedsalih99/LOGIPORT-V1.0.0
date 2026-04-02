@@ -434,7 +434,12 @@ class UserProfileTab(QWidget):
             role_txt = getattr(role, "name", "—") if role else "—"
             office = getattr(user, "office", None)
             if office:
-                office_txt = getattr(office, "name_ar", None) or getattr(office, "name_en", "—")
+                lang = SettingsManager.get_instance().get("language") or "ar"
+                office_txt = (
+                    getattr(office, f"name_{lang}", None)
+                    or getattr(office, "name_ar", None)
+                    or getattr(office, "name_en", "—")
+                )
 
         self._hero_name = QLabel(name)
         f = QFont()
@@ -467,7 +472,7 @@ class UserProfileTab(QWidget):
         right.setSpacing(8)
         right.setAlignment(Qt.AlignTop)
 
-        self._online_badge = QLabel("● متصل")
+        self._online_badge = QLabel(self._("profile_online_badge"))
         self._online_badge.setStyleSheet(
             "color: #6EE7B7;"
             " background: rgba(0,0,0,0.2);"
@@ -483,7 +488,7 @@ class UserProfileTab(QWidget):
         self._btn_avatar_hero.clicked.connect(self._pick_avatar)
         right.addWidget(self._btn_avatar_hero)
 
-        self._btn_delete_avatar = QPushButton("🗑  حذف الصورة")
+        self._btn_delete_avatar = QPushButton(self._("profile_delete_avatar_btn"))
         self._btn_delete_avatar.setMinimumHeight(32)
         self._btn_delete_avatar.setCursor(Qt.PointingHandCursor)
         self._btn_delete_avatar.setStyleSheet("""
@@ -612,7 +617,12 @@ class UserProfileTab(QWidget):
         office    = getattr(user, "office", None)
         office_name = "—"
         if office:
-            office_name = getattr(office, "name_ar", None) or getattr(office, "name_en", "—")
+            lang = SettingsManager.get_instance().get("language") or "ar"
+            office_name = (
+                getattr(office, f"name_{lang}", None)
+                or getattr(office, "name_ar", None)
+                or getattr(office, "name_en", "—")
+            )
         created   = getattr(user, "created_at", None)
         status    = self._("user_status_active") if getattr(user, "is_active", True) else self._("user_status_suspended")
 
@@ -620,7 +630,7 @@ class UserProfileTab(QWidget):
             (self._("username"),   getattr(user, "username",  "—")),
             (self._("full_name"),  getattr(user, "full_name", "—")),
             (self._("role"),       role_name),
-            ("المكتب",             office_name),
+            (self._("profile_office_label"), office_name),
             (self._("status"),     status),
             (self._("created_at"), format_local_dt(created, "%Y-%m-%d") if created else "—"),
         ]
@@ -630,7 +640,7 @@ class UserProfileTab(QWidget):
     # ── Edit name ─────────────────────────────────────────────────────────────
 
     def _build_edit_name(self) -> QFrame:
-        self._edit_card = _Card("تعديل الاسم الكامل")
+        self._edit_card = _Card(self._("profile_edit_name_title"))
 
         user = _current_user()
         self._name_edit = _Field(self._("full_name"))
@@ -638,7 +648,7 @@ class UserProfileTab(QWidget):
         self._edit_card.body.addWidget(self._name_edit)
 
         btn_row = QHBoxLayout()
-        self._save_name_btn = _Btn("💾  حفظ الاسم", "primary")
+        self._save_name_btn = _Btn(self._("profile_save_name_btn"), "primary")
         self._save_name_btn.setMaximumWidth(160)
         self._save_name_btn.clicked.connect(self._save_name)
         btn_row.addWidget(self._save_name_btn)
@@ -650,7 +660,7 @@ class UserProfileTab(QWidget):
         from database.models import User as UserModel
         new_name = self._name_edit.text().strip()
         if not new_name:
-            QMessageBox.warning(self, self._("warning"), "أدخل الاسم أولاً")
+            QMessageBox.warning(self, self._("warning"), self._("profile_enter_name_first"))
             return
         user = _current_user()
         if not user:
@@ -848,7 +858,8 @@ class UserProfileTab(QWidget):
         if not user:
             return
         r = QMessageBox.question(
-            self, "حذف الصورة", "هل تريد حذف صورتك الشخصية؟",
+            self, self._("profile_delete_avatar_confirm_title"),
+            self._("profile_delete_avatar_confirm_msg"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if r != QMessageBox.Yes:
@@ -909,11 +920,15 @@ class UserProfileTab(QWidget):
     def retranslate_ui(self):
         self._ = TranslationManager.get_instance().translate
         user = _current_user()
+        lang = SettingsManager.get_instance().get("language") or "ar"
 
         # Hero
         if hasattr(self, "_btn_avatar_hero"):
             self._btn_avatar_hero.setText("📷  " + self._("change_avatar"))
+        if hasattr(self, "_btn_delete_avatar"):
+            self._btn_delete_avatar.setText(self._("profile_delete_avatar_btn"))
         self._online_badge.setText("● " + self._("user_online"))
+
         role_txt = "—"
         office_txt = "—"
         if user:
@@ -921,7 +936,11 @@ class UserProfileTab(QWidget):
             role_txt = getattr(role, "name", "—") if role else "—"
             office = getattr(user, "office", None)
             if office:
-                office_txt = getattr(office, "name_ar", None) or "—"
+                office_txt = (
+                    getattr(office, f"name_{lang}", None)
+                    or getattr(office, "name_ar", None)
+                    or "—"
+                )
         self._hero_role.setText(f"◎  {role_txt}")
         self._hero_office.setText(f"⊞  {office_txt}")
 
@@ -936,7 +955,9 @@ class UserProfileTab(QWidget):
         self._populate_info()
 
         # Edit name
-        self._edit_card.set_title("تعديل الاسم الكامل")
+        self._edit_card.set_title(self._("profile_edit_name_title"))
+        self._save_name_btn.setText(self._("profile_save_name_btn"))
+        self._name_edit.setPlaceholderText(self._("full_name"))
 
         # Password
         self._pw_card.set_title(self._("change_password_title"))

@@ -332,7 +332,7 @@ if __name__ == "__main__":
         admin_cols=[4, 5, 6, 7]
     )
 
-    print(f"User is admin: {is_admin_user}")
+    logging.info(f"User is admin: {is_admin_user}")
 
     # Show table
     table.show()

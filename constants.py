@@ -260,11 +260,3 @@ def get_label(enum_class, value: str, lang: str = "ar") -> str:
         if value in labels:
             return labels[value].get(lang, value)
     return value
-
-
-if __name__ == "__main__":
-    # Test constants
-    print("✅ Constants loaded successfully")
-    print(f"Admin role ID: {UserRoles.ADMIN}")
-    print(f"Transaction types: {TransactionType.CHOICES}")
-    print(f"Export label (AR): {get_label(TransactionType, TransactionType.EXPORT, 'ar')}")

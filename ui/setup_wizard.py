@@ -84,7 +84,7 @@ class SetupWizard(BaseDialog):
             logo_lbl.setAlignment(Qt.AlignCenter)
             header_lay.addWidget(logo_lbl)
 
-        title_lbl = QLabel("مرحباً بك في LOGIPORT")
+        title_lbl = QLabel(self._("setup_welcome_title"))
         title_lbl.setObjectName("WizardTitle")
         title_lbl.setAlignment(Qt.AlignCenter)
         header_lay.addWidget(title_lbl)
@@ -104,10 +104,7 @@ class SetupWizard(BaseDialog):
         body_lay.setSpacing(18)
 
         # وصف
-        desc = QLabel(
-            "هذا التطبيق يعمل لأول مرة.\n"
-            "أنشئ حساب المسؤول الرئيسي للتحكم الكامل بالنظام."
-        )
+        desc = QLabel(self._("setup_first_run_desc"))
         desc.setObjectName("WizardDesc")
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignCenter)
@@ -116,20 +113,20 @@ class SetupWizard(BaseDialog):
         body_lay.addSpacing(8)
 
         # الاسم الكامل
-        self._add_field(body_lay, "👤  الاسم الكامل", "full_name_edit",
-                        "أدخل الاسم الكامل…", False)
+        self._add_field(body_lay, "👤  " + self._("setup_field_full_name"), "full_name_edit",
+                        self._("setup_placeholder_full_name"), False)
 
         # اسم المستخدم
-        self._add_field(body_lay, "🔑  اسم المستخدم", "username_edit",
-                        "أدخل اسم المستخدم (بالإنجليزية)…", False)
+        self._add_field(body_lay, "🔑  " + self._("setup_field_username"), "username_edit",
+                        self._("setup_placeholder_username"), False)
 
         # كلمة المرور
-        self._add_field(body_lay, "🔒  كلمة المرور", "password_edit",
-                        "أدخل كلمة مرور قوية…", True)
+        self._add_field(body_lay, "🔒  " + self._("setup_field_password"), "password_edit",
+                        self._("setup_placeholder_password"), True)
 
         # تأكيد كلمة المرور
-        self._add_field(body_lay, "🔒  تأكيد كلمة المرور", "confirm_edit",
-                        "أعد إدخال كلمة المرور…", True)
+        self._add_field(body_lay, "🔒  " + self._("setup_field_confirm"), "confirm_edit",
+                        self._("setup_placeholder_confirm"), True)
 
         # رسالة الخطأ
         self.error_lbl = QLabel("")
@@ -160,7 +157,7 @@ class SetupWizard(BaseDialog):
         root.addWidget(body)
 
         # ── Footer ──────────────────────────────
-        footer = QLabel("© 2025 LOGIPORT — جميع الحقوق محفوظة")
+        footer = QLabel(self._("setup_footer"))
         footer.setObjectName("WizardFooter")
         footer.setAlignment(Qt.AlignCenter)
         footer.setFixedHeight(36)
@@ -206,19 +203,19 @@ class SetupWizard(BaseDialog):
 
         # التحقق من المدخلات
         if not full_name:
-            return self._show_error("❌  يرجى إدخال الاسم الكامل.")
+            return self._show_error("❌  " + self._("setup_err_full_name_required"))
         if not username:
-            return self._show_error("❌  يرجى إدخال اسم المستخدم.")
+            return self._show_error("❌  " + self._("setup_err_username_required"))
         if len(username) < 3:
-            return self._show_error("❌  اسم المستخدم يجب أن يكون 3 أحرف على الأقل.")
+            return self._show_error("❌  " + self._("setup_err_username_short"))
         if not username.replace("_", "").replace("-", "").isalnum():
-            return self._show_error("❌  اسم المستخدم يجب أن يحتوي على أحرف وأرقام فقط (إنجليزية).")
+            return self._show_error("❌  " + self._("setup_err_username_invalid"))
         if not password:
-            return self._show_error("❌  يرجى إدخال كلمة المرور.")
+            return self._show_error("❌  " + self._("setup_err_password_required"))
         if len(password) < 6:
-            return self._show_error("❌  كلمة المرور يجب أن تكون 6 أحرف على الأقل.")
+            return self._show_error("❌  " + self._("setup_err_password_short"))
         if password != confirm:
-            return self._show_error("❌  كلمة المرور وتأكيدها غير متطابقَين.")
+            return self._show_error("❌  " + self._("setup_err_password_mismatch"))
 
         # تعطيل الزر وإظهار التحميل
         self.create_btn.setEnabled(False)
@@ -244,8 +241,8 @@ class SetupWizard(BaseDialog):
                 self._reset_button()
 
         except Exception as exc:
-            logger.error(f"SetupWizard: خطأ أثناء إنشاء الحساب: {exc}", exc_info=True)
-            self._show_error(f"❌  خطأ: {exc}")
+            logger.error(f"SetupWizard: account creation error: {exc}", exc_info=True)
+            self._show_error("❌  " + self._("setup_err_generic").format(error=exc))
             self._reset_button()
 
     def _show_success(self, username: str):
@@ -261,9 +258,7 @@ class SetupWizard(BaseDialog):
         # اعرض رسالة نجاح
         self._clear_error()
         success_msg = QLabel(
-            f"✅  تم إنشاء حساب المسؤول بنجاح!\n"
-            f"اسم المستخدم: {username}\n\n"
-            f"يمكنك تغيير كلمة المرور لاحقاً من إعدادات الحساب."
+            self._("setup_success_msg").format(username=username)
         )
         success_msg.setObjectName("WizardSuccess")
         success_msg.setWordWrap(True)
@@ -288,6 +283,10 @@ class SetupWizard(BaseDialog):
         self.progress.hide()
         self.create_btn.setEnabled(True)
         self.create_btn.setText(self._("setup_create_btn"))
+
+    def _retranslate(self):
+        """إعادة ترجمة النصوص عند تغيير اللغة."""
+        self.setWindowTitle(self._("setup_wizard_title"))
 
     # ──────────────────────────────────────────────
     # التصميم

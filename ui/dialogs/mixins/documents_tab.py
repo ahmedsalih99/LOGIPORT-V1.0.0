@@ -142,7 +142,7 @@ class DocumentsTabMixin:
         for group_label, group_icon, group_docs in [
             (self._get_tr("invoice"),      "🧾", invoices),
             (self._get_tr("packing_list"), "📦", packings),
-            (self._get_tr("other") if self._get_tr("other") != "other" else "أخرى", "📄", others),
+            (self._get_tr("other"),        "📄", others),
         ]:
             if not group_docs:
                 continue
@@ -164,8 +164,7 @@ class DocumentsTabMixin:
         root.addWidget(scroll)
 
         # ── hint ────────────────────────────────────────────────────────────
-        hint = QLabel(self._get_tr("docs_panel_hint") if self._get_tr("docs_panel_hint") != "docs_panel_hint"
-                      else "✓ اختر المستندات\nثم اضغط حفظ")
+        hint = QLabel(self._get_tr("docs_panel_hint"))
         hint.setObjectName("docs-hint-label")
         hint.setWordWrap(True)
         hint.setAlignment(Qt.AlignCenter)
@@ -201,9 +200,7 @@ class DocumentsTabMixin:
 
         if not supported:
             cb.setEnabled(False)
-            fallback = "⚠ هذا النوع غير مدعوم للتوليد حالياً"
-            tip = self._get_tr("doc_not_supported_yet")
-            cb.setToolTip(tip if tip != "doc_not_supported_yet" else fallback)
+            cb.setToolTip(self._get_tr("docs_tab_unsupported_type"))
 
         if doc_id is not None:
             self._doc_code_map[doc_id] = code
@@ -314,15 +311,15 @@ class DocumentsTabMixin:
         except Exception:
             pass
         return [
-            {"id": 1,  "code": "INV_EXT",               "name_ar": "فاتورة خارجية",          "name_en": "External Invoice",        "_cat": "invoice", "is_active": 1},
-            {"id": 16, "code": "INV_NORMAL",             "name_ar": "فاتورة عادية",            "name_en": "Normal Invoice",          "_cat": "invoice", "is_active": 1},
-            {"id": 9,  "code": "INV_PRO",                "name_ar": "بروفورما إنفويس",          "name_en": "Proforma Invoice",        "_cat": "invoice", "is_active": 1},
-            {"id": 11, "code": "INV_SYR_TRANS",          "name_ar": "فاتورة سورية – عبور",      "name_en": "Syrian Transit Invoice",  "_cat": "invoice", "is_active": 1},
-            {"id": 12, "code": "INV_SYR_INTERM",         "name_ar": "فاتورة سورية – وسيط",      "name_en": "Syrian Intermediary Inv", "_cat": "invoice", "is_active": 1},
-            {"id": 10, "code": "invoice.syrian.entry",   "name_ar": "فاتورة سورية – إدخال",     "name_en": "Syrian Entry Invoice",    "_cat": "invoice", "is_active": 1},
-            {"id": 13, "code": "PL_EXPORT_SIMPLE",       "name_ar": "قائمة تعبئة – بسيطة",     "name_en": "Packing List – Simple",   "_cat": "packing", "is_active": 1},
-            {"id": 14, "code": "PL_EXPORT_WITH_DATES",   "name_ar": "قائمة تعبئة – مع تواريخ", "name_en": "Packing List – With Dates","_cat": "packing", "is_active": 1},
-            {"id": 17, "code": "PL_EXPORT_WITH_LINE_ID", "name_ar": "قائمة تعبئة مع رقم سطر",  "name_en": "Packing List – Line ID",  "_cat": "packing", "is_active": 1},
+            {"id": 1,  "code": "INV_EXT",               "name_ar": "فاتورة خارجية",          "name_en": "External Invoice",         "name_tr": "Dış Fatura",                  "_cat": "invoice", "is_active": 1},
+            {"id": 16, "code": "INV_NORMAL",             "name_ar": "فاتورة عادية",            "name_en": "Normal Invoice",           "name_tr": "Normal Fatura",               "_cat": "invoice", "is_active": 1},
+            {"id": 9,  "code": "INV_PRO",                "name_ar": "بروفورما إنفويس",          "name_en": "Proforma Invoice",         "name_tr": "Proforma Fatura",             "_cat": "invoice", "is_active": 1},
+            {"id": 11, "code": "INV_SYR_TRANS",          "name_ar": "فاتورة سورية – عبور",      "name_en": "Syrian Transit Invoice",   "name_tr": "Suriye Transit Faturası",     "_cat": "invoice", "is_active": 1},
+            {"id": 12, "code": "INV_SYR_INTERM",         "name_ar": "فاتورة سورية – وسيط",      "name_en": "Syrian Intermediary Inv",  "name_tr": "Suriye Aracı Faturası",       "_cat": "invoice", "is_active": 1},
+            {"id": 10, "code": "invoice.syrian.entry",   "name_ar": "فاتورة سورية – إدخال",     "name_en": "Syrian Entry Invoice",     "name_tr": "Suriye Giriş Faturası",       "_cat": "invoice", "is_active": 1},
+            {"id": 13, "code": "PL_EXPORT_SIMPLE",       "name_ar": "قائمة تعبئة – بسيطة",     "name_en": "Packing List – Simple",    "name_tr": "Paketleme Listesi – Basit",   "_cat": "packing", "is_active": 1},
+            {"id": 14, "code": "PL_EXPORT_WITH_DATES",   "name_ar": "قائمة تعبئة – مع تواريخ", "name_en": "Packing List – With Dates", "name_tr": "Paketleme Listesi – Tarihli", "_cat": "packing", "is_active": 1},
+            {"id": 17, "code": "PL_EXPORT_WITH_LINE_ID", "name_ar": "قائمة تعبئة مع رقم سطر",  "name_en": "Packing List – Line ID",   "name_tr": "Hat No'lu Paketleme Listesi", "_cat": "packing", "is_active": 1},
         ]
 
     def _doc_label(self, d: Dict[str, Any]) -> str:
@@ -376,7 +373,7 @@ class DocumentsTabMixin:
         for group_label, group_icon, group_docs in [
             (self._get_tr("invoice"),      "🧾", invoices),
             (self._get_tr("packing_list"), "📦", packings),
-            (self._get_tr("other") if self._get_tr("other") != "other" else "أخرى", "📄", others),
+            (self._get_tr("other"),        "📄", others),
         ]:
             if not group_docs:
                 continue

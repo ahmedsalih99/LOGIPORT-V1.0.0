@@ -254,7 +254,7 @@ class OfficesTab(BaseTab):
         action = self._("deactivate") if is_active else self._("activate")
         name   = office_dict.get("name_ar", "")
         reply  = QMessageBox.question(
-            self, action, f"{action} — {name}؟",
+            self, action, self._("confirm_action_on_name").format(action=action, name=name),
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:

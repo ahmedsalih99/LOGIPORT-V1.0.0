@@ -554,7 +554,7 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
                     self,
                     self._("generate_documents"),
                     f"{self._('transaction_saved_successfully')}: {trx_no_saved}\n\n"
-                    f"{self._('generate_selected_documents_now') if self._('generate_selected_documents_now') != 'generate_selected_documents_now' else 'هل تريد توليد المستندات المختارة الآن؟'}",
+                    f"{self._('generate_selected_documents_now')}",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.Yes,
                 )
@@ -571,7 +571,7 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
                         dlg.exec()
                     except Exception as doc_err:
                         QMessageBox.warning(self, self._("warning"),
-                                            f"(توليد المستندات: {doc_err})")
+                                            self._("doc_generation_error").format(error=doc_err))
             else:
                 QMessageBox.information(self, self._("success"), self._("transaction_saved_successfully"))
 

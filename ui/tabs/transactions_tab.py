@@ -727,7 +727,7 @@ class TransactionsTab(BaseTab):
 
         if not _HAS_EXCEL_SVC:
             QMessageBox.warning(self, self._("error"),
-                                "ExcelService غير متاح. تأكد من تثبيت openpyxl.")
+                                self._("excel_service_unavailable"))
             return
 
         lang = TranslationManager.get_instance().get_current_language()

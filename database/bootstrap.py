@@ -617,6 +617,227 @@ def _no_users_exist() -> bool:
         return False
 
 
+# =============================================================================
+# Reference Data — بيانات مرجعية افتراضية (تُزرع مرة واحدة عند أول تشغيل)
+# =============================================================================
+
+_COUNTRIES = [
+    # (code, name_ar, name_en, name_tr)
+    ("SY", "سوريا",          "Syria",               "Suriye"),
+    ("TR", "تركيا",          "Turkey",              "Türkiye"),
+    ("LB", "لبنان",          "Lebanon",             "Lübnan"),
+    ("JO", "الأردن",         "Jordan",              "Ürdün"),
+    ("IQ", "العراق",         "Iraq",                "Irak"),
+    ("SA", "السعودية",       "Saudi Arabia",        "Suudi Arabistan"),
+    ("AE", "الإمارات",       "UAE",                 "BAE"),
+    ("EG", "مصر",            "Egypt",               "Mısır"),
+    ("DE", "ألمانيا",        "Germany",             "Almanya"),
+    ("FR", "فرنسا",          "France",              "Fransa"),
+    ("IT", "إيطاليا",        "Italy",               "İtalya"),
+    ("ES", "إسبانيا",        "Spain",               "İspanya"),
+    ("NL", "هولندا",         "Netherlands",         "Hollanda"),
+    ("BE", "بلجيكا",         "Belgium",             "Belçika"),
+    ("PL", "بولندا",         "Poland",              "Polonya"),
+    ("RO", "رومانيا",        "Romania",             "Romanya"),
+    ("BG", "بلغاريا",        "Bulgaria",            "Bulgaristan"),
+    ("GR", "اليونان",        "Greece",              "Yunanistan"),
+    ("CN", "الصين",          "China",               "Çin"),
+    ("IN", "الهند",          "India",               "Hindistan"),
+    ("RU", "روسيا",          "Russia",              "Rusya"),
+    ("UA", "أوكرانيا",       "Ukraine",             "Ukrayna"),
+    ("GB", "المملكة المتحدة","United Kingdom",       "Birleşik Krallık"),
+    ("US", "الولايات المتحدة","United States",       "Amerika Birleşik Devletleri"),
+    ("IR", "إيران",          "Iran",                "İran"),
+    ("KW", "الكويت",         "Kuwait",              "Kuveyt"),
+    ("QA", "قطر",            "Qatar",               "Katar"),
+    ("OM", "عُمان",          "Oman",                "Umman"),
+    ("MA", "المغرب",         "Morocco",             "Fas"),
+    ("TN", "تونس",           "Tunisia",             "Tunus"),
+    ("DZ", "الجزائر",        "Algeria",             "Cezayir"),
+    ("LY", "ليبيا",          "Libya",               "Libya"),
+    ("PS", "فلسطين",         "Palestine",           "Filistin"),
+    ("YE", "اليمن",          "Yemen",               "Yemen"),
+    ("AT", "النمسا",         "Austria",             "Avusturya"),
+    ("CH", "سويسرا",         "Switzerland",         "İsviçre"),
+    ("CZ", "التشيك",         "Czech Republic",      "Çekya"),
+    ("HU", "المجر",          "Hungary",             "Macaristan"),
+    ("SK", "سلوفاكيا",       "Slovakia",            "Slovakya"),
+    ("PK", "باكستان",        "Pakistan",            "Pakistan"),
+    ("BD", "بنغلاديش",       "Bangladesh",          "Bangladeş"),
+    ("KR", "كوريا الجنوبية", "South Korea",         "Güney Kore"),
+    ("JP", "اليابان",        "Japan",               "Japonya"),
+    ("TH", "تايلاند",        "Thailand",            "Tayland"),
+    ("MY", "ماليزيا",        "Malaysia",            "Malezya"),
+    ("ID", "إندونيسيا",      "Indonesia",           "Endonezya"),
+    ("AZ", "أذربيجان",       "Azerbaijan",          "Azerbaycan"),
+    ("GE", "جورجيا",         "Georgia",             "Gürcistan"),
+    ("AM", "أرمينيا",        "Armenia",             "Ermenistan"),
+]
+
+_CURRENCIES = [
+    # (code, symbol, name_ar, name_en, name_tr)
+    ("USD", "$",   "دولار أمريكي",     "US Dollar",          "Amerikan Doları"),
+    ("EUR", "€",   "يورو",             "Euro",               "Euro"),
+    ("TRY", "₺",   "ليرة تركية",      "Turkish Lira",       "Türk Lirası"),
+    ("SYP", "ل.س", "ليرة سورية",      "Syrian Pound",       "Suriye Lirası"),
+    ("SAR", "﷼",   "ريال سعودي",      "Saudi Riyal",        "Suudi Riyali"),
+    ("AED", "د.إ", "درهم إماراتي",    "UAE Dirham",         "BAE Dirhemi"),
+    ("GBP", "£",   "جنيه إسترليني",   "British Pound",      "İngiliz Sterlini"),
+    ("IQD", "ع.د", "دينار عراقي",     "Iraqi Dinar",        "Irak Dinarı"),
+    ("JOD", "د.أ", "دينار أردني",     "Jordanian Dinar",    "Ürdün Dinarı"),
+    ("LBP", "ل.ل", "ليرة لبنانية",    "Lebanese Pound",     "Lübnan Lirası"),
+    ("CNY", "¥",   "يوان صيني",       "Chinese Yuan",       "Çin Yuanı"),
+    ("RUB", "₽",   "روبل روسي",       "Russian Ruble",      "Rus Rublesi"),
+    ("EGP", "ج.م", "جنيه مصري",      "Egyptian Pound",     "Mısır Sterlini"),
+]
+
+_PACKAGING_TYPES = [
+    # (name_ar, name_en, name_tr)
+    ("كرتون",        "Carton",        "Karton"),
+    ("طرد",          "Package",       "Paket"),
+    ("كيس",          "Bag",           "Çuval"),
+    ("برميل",        "Barrel",        "Varil"),
+    ("صندوق خشبي",   "Wooden Box",    "Ahşap Kutu"),
+    ("إطار",         "Roll",          "Rulo"),
+    ("بالة",         "Bale",          "Balya"),
+    ("قارورة",       "Bottle",        "Şişe"),
+    ("علبة",         "Can/Tin",       "Teneke"),
+    ("جراكن",        "Jerry Can",     "Bidon"),
+    ("حاوية",        "Container",     "Konteyner"),
+    ("صينية",        "Tray",          "Tepsi"),
+    ("قطعة",         "Piece",         "Parça"),
+    ("طن",           "Ton",           "Ton"),
+    ("كغ",           "KG",            "KG"),
+]
+
+_DELIVERY_METHODS = [
+    # (name_ar, name_en, name_tr, sort_order)
+    # Incoterms — شروط التسليم التجارية
+    ("فوب",                     "FOB",   "FOB",   1),
+    ("سيف",                     "CIF",   "CIF",   2),
+    ("تكلفة وشحن",              "CFR",   "CFR",   3),
+    ("تكلفة وشحن وتأمين",       "CIP",   "CIP",   4),
+    ("تكلفة وشحن (CNF)",        "CNF",   "CNF",   5),
+    ("تسليم في الميناء",        "DAP",   "DAP",   6),
+    ("تسليم مدفوع الرسوم",      "DDP",   "DDP",   7),
+    ("تكلفة وأجرة الشحن",       "CPT",   "CPT",   8),
+    ("تسليم على ظهر السفينة",   "FAS",   "FAS",   9),
+    ("حر للناقل",               "FCA",   "FCA",   10),
+    ("تسليم المصنع",            "EXW",   "EXW",   11),
+]
+
+_MATERIAL_TYPES = [
+    # (name_ar, name_en, name_tr)
+    ("مواد غذائية",        "Food",               "Gıda"),
+    ("مواد بناء",          "Construction",       "İnşaat"),
+    ("كيماويات",           "Chemicals",          "Kimyasallar"),
+    ("منسوجات وألبسة",     "Textiles",           "Tekstil"),
+    ("إلكترونيات",         "Electronics",        "Elektronik"),
+    ("آلات ومعدات",        "Machinery",          "Makine"),
+    ("مواد طبية",          "Medical",            "Medikal"),
+    ("أثاث",               "Furniture",          "Mobilya"),
+    ("مواد زراعية",        "Agricultural",       "Tarım"),
+    ("بلاستيك ومطاط",      "Plastics & Rubber",  "Plastik ve Kauçuk"),
+    ("معادن",              "Metals",             "Metaller"),
+    ("ورق وطباعة",         "Paper & Print",      "Kağıt ve Baskı"),
+    ("مواد خام",           "Raw Materials",      "Ham Maddeler"),
+    ("منتجات نفطية",       "Petroleum Products", "Petrol Ürünleri"),
+    ("أخرى",               "Other",              "Diğer"),
+]
+
+
+def _tbl_exists(cur: sqlite3.Cursor, name: str) -> bool:
+    return bool(cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone())
+
+
+def _seed_reference_data(cur: sqlite3.Cursor) -> None:
+    """
+    يزرع البيانات المرجعية الأساسية.
+    يتحقق من كل سجل بشكل فردي بالاسم الإنجليزي → آمن تماماً على DBs موجودة.
+    """
+    # ── الدول ──────────────────────────────────────────────────────────────
+    if _tbl_exists(cur, "countries"):
+        added = 0
+        for code, name_ar, name_en, name_tr in _COUNTRIES:
+            exists = cur.execute(
+                "SELECT 1 FROM countries WHERE name_en=? OR code=?", (name_en, code)
+            ).fetchone()
+            if not exists:
+                cur.execute(
+                    "INSERT INTO countries (code, name_ar, name_en, name_tr) VALUES (?,?,?,?)",
+                    (code, name_ar, name_en, name_tr)
+                )
+                added += 1
+        if added:
+            logger.info(f"Bootstrap: زُرع {added} دولة")
+
+    # ── العملات ────────────────────────────────────────────────────────────
+    if _tbl_exists(cur, "currencies"):
+        added = 0
+        for code, symbol, name_ar, name_en, name_tr in _CURRENCIES:
+            exists = cur.execute(
+                "SELECT 1 FROM currencies WHERE code=? OR name_en=?", (code, name_en)
+            ).fetchone()
+            if not exists:
+                cur.execute(
+                    "INSERT INTO currencies (code, symbol, name_ar, name_en, name_tr) VALUES (?,?,?,?,?)",
+                    (code, symbol, name_ar, name_en, name_tr)
+                )
+                added += 1
+        if added:
+            logger.info(f"Bootstrap: زُرع {added} عملة")
+
+    # ── أنواع التغليف ───────────────────────────────────────────────────────
+    if _tbl_exists(cur, "packaging_types"):
+        added = 0
+        for name_ar, name_en, name_tr in _PACKAGING_TYPES:
+            exists = cur.execute(
+                "SELECT 1 FROM packaging_types WHERE name_en=?", (name_en,)
+            ).fetchone()
+            if not exists:
+                cur.execute(
+                    "INSERT INTO packaging_types (name_ar, name_en, name_tr) VALUES (?,?,?)",
+                    (name_ar, name_en, name_tr)
+                )
+                added += 1
+        if added:
+            logger.info(f"Bootstrap: زُرع {added} نوع تغليف")
+
+    # ── طرق التسليم ────────────────────────────────────────────────────────
+    if _tbl_exists(cur, "delivery_methods"):
+        added = 0
+        for name_ar, name_en, name_tr, sort_order in _DELIVERY_METHODS:
+            exists = cur.execute(
+                "SELECT 1 FROM delivery_methods WHERE name_en=?", (name_en,)
+            ).fetchone()
+            if not exists:
+                cur.execute(
+                    "INSERT INTO delivery_methods (name_ar, name_en, name_tr, is_active, sort_order) VALUES (?,?,?,1,?)",
+                    (name_ar, name_en, name_tr, sort_order)
+                )
+                added += 1
+        if added:
+            logger.info(f"Bootstrap: زُرع {added} طريقة تسليم")
+
+    # ── أنواع المواد ────────────────────────────────────────────────────────
+    if _tbl_exists(cur, "material_types"):
+        added = 0
+        for name_ar, name_en, name_tr in _MATERIAL_TYPES:
+            exists = cur.execute(
+                "SELECT 1 FROM material_types WHERE name_en=?", (name_en,)
+            ).fetchone()
+            if not exists:
+                cur.execute(
+                    "INSERT INTO material_types (name_ar, name_en, name_tr) VALUES (?,?,?)",
+                    (name_ar, name_en, name_tr)
+                )
+                added += 1
+        if added:
+            logger.info(f"Bootstrap: زُرع {added} نوع مادة")
+
+
 def _seed_all() -> None:
     from database.models import get_session_local
 
@@ -636,6 +857,7 @@ def _seed_all() -> None:
         _seed_pricing_types(cur)
         _seed_app_settings(cur)
         _seed_offices(cur)
+        _seed_reference_data(cur)
 
         session.commit()
         logger.info("Bootstrap: seed_all تم بنجاح")

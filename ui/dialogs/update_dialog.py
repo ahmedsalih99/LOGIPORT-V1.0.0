@@ -62,7 +62,7 @@ class UpdateDialog(BaseDialog):
         root.addStretch()
 
         # ── المحتوى ───────────────────────────────────────────────────────
-        title = QLabel("🎉  يتوفر إصدار جديد من LOGIPORT")
+        title = QLabel(self._("update_new_version_title"))
         title.setFont(QFont("Tajawal", 14, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
@@ -73,14 +73,14 @@ class UpdateDialog(BaseDialog):
         except Exception:
             current = "—"
 
-        version_lbl = QLabel(f"الإصدار الحالي: {current}   →   الإصدار الجديد: {self.update_info.version}")
+        version_lbl = QLabel(self._("update_version_label").format(current=current, new=self.update_info.version))
         version_lbl.setAlignment(Qt.AlignCenter)
         version_lbl.setFont(QFont("Tajawal", 10))
         layout.addWidget(version_lbl)
 
         # ── ملاحظات الإصدار ───────────────────────────────────────────────────
         if self.update_info.notes:
-            notes_lbl = QLabel("ما الجديد:")
+            notes_lbl = QLabel(self._("update_whats_new"))
             notes_lbl.setFont(QFont("Tajawal", 10, QFont.Bold))
             layout.addWidget(notes_lbl)
 
@@ -109,7 +109,7 @@ class UpdateDialog(BaseDialog):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
 
-        self._btn_later = QPushButton("لاحقاً")
+        self._btn_later = QPushButton(self._("update_btn_later"))
         self._btn_later.setMinimumHeight(36)
         self._btn_later.clicked.connect(self.reject)
         btn_row.addWidget(self._btn_later)
@@ -214,7 +214,7 @@ class UpdateDialog(BaseDialog):
         QTimer.singleShot(2000, self.accept)
 
     def _show_error(self, message: str):
-        self._status_lbl.setText(f"❌ فشل التنزيل: {message}")
+        self._status_lbl.setText(self._("update_download_failed").format(message=message))
         self._status_lbl.setVisible(True)
         self._btn_later.setEnabled(True)
         self._btn_update.setEnabled(True)

@@ -870,15 +870,15 @@ class GenerateDocumentDialog(_BaseDialog):
                     "SELECT truck_plate, carrier_company_id FROM transport_details WHERE transaction_id=:i"),
                     {"i": int(self.trx_id)}).mappings().first()
                 if not td or not td.get("truck_plate"):
-                    warnings.append("⚠  CMR: " + _("cmr_truck_plate_missing") if "cmr_truck_plate_missing" in dir() else "⚠  CMR: رقم لوحة الشاحنة غير موجود")
+                    warnings.append("⚠  CMR: " + _("cmr_truck_plate_missing"))
                 if not td or not td.get("carrier_company_id"):
-                    warnings.append("⚠  CMR: " + "شركة الناقل غير محددة")
+                    warnings.append("⚠  CMR: " + _("cmr_carrier_missing"))
             if any(c == "form_a" for c in doc_codes):
                 td2 = s.execute(_sql(
                     "SELECT certificate_no FROM transport_details WHERE transaction_id=:i"),
                     {"i": int(self.trx_id)}).mappings().first()
                 if not td2 or not td2.get("certificate_no"):
-                    warnings.append("⚠  Form A: رقم الشهادة غير موجود")
+                    warnings.append("⚠  Form A: " + _("forma_certificate_missing"))
         finally:
             s.close()
         return warnings

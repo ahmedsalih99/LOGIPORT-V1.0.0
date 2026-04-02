@@ -48,12 +48,12 @@ class TransportTabMixin:
 
         # ── قسمان جنب بعض: CMR يسار | Form A يمين ──────────────────────────────
         cmr_card = self._transport_section_card(
-            self._("cmr_section_title") if hasattr(self, "_") else "CMR — بيانات الشحن البري",
+            self._("cmr_section_title"),
             self._build_cmr_fields,
         )
 
         forma_card = self._transport_section_card(
-            self._("forma_section_title") if hasattr(self, "_") else "Form A — شهادة المنشأ",
+            self._("forma_section_title"),
             self._build_forma_fields,
         )
 
@@ -71,7 +71,7 @@ class TransportTabMixin:
         tab_layout.setContentsMargins(0, 0, 0, 0)
         tab_layout.addWidget(scroll)
 
-        label = self._("transport_tab_label") if hasattr(self, "_") else "🚛 الشحن"
+        label = self._("transport_tab_label")
         self.tabs.addTab(tab, label)
         self._transport_tab = tab
 

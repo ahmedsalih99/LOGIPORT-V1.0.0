@@ -29,23 +29,23 @@ _CATEGORY_ORDER = [
     "CONTAINERS", "VALUES", "OFFICES", "USERS", "AUDIT", "SETTINGS", "ADMIN",
 ]
 
-# ترجمة اسم الـ category إلى تسمية بالثلاث لغات
-_CATEGORY_LABELS = {
-    "DASHBOARD":     {"ar": "لوحة التحكم",      "en": "Dashboard",    "tr": "Kontrol Paneli"},
-    "TRANSACTIONS":  {"ar": "المعاملات",          "en": "Transactions", "tr": "İşlemler"},
-    "ENTRIES":       {"ar": "الإدخالات",          "en": "Entries",      "tr": "Girişler"},
-    "DOCUMENTS":     {"ar": "المستندات",          "en": "Documents",    "tr": "Belgeler"},
-    "CLIENTS":       {"ar": "العملاء",            "en": "Clients",      "tr": "Müşteriler"},
-    "COMPANIES":     {"ar": "الشركات",            "en": "Companies",    "tr": "Şirketler"},
-    "MATERIALS":     {"ar": "المواد",             "en": "Materials",    "tr": "Malzemeler"},
-    "PRICING":       {"ar": "التسعير",            "en": "Pricing",      "tr": "Fiyatlandırma"},
-    "VALUES":        {"ar": "القيم والإعدادات",   "en": "Values",       "tr": "Değerler"},
-    "OFFICES":       {"ar": "المكاتب",            "en": "Offices",      "tr": "Ofisler"},
-    "USERS":         {"ar": "المستخدمون والأدوار","en": "Users & Roles","tr": "Kullanıcılar"},
-    "AUDIT":         {"ar": "سجل التدقيق",        "en": "Audit Log",    "tr": "Denetim"},
-    "SETTINGS":      {"ar": "الإعدادات",          "en": "Settings",     "tr": "Ayarlar"},
-    "CONTAINERS":    {"ar": "تتبع الحاويات",      "en": "Containers",   "tr": "Konteynerler"},
-    "ADMIN":         {"ar": "لوحة الإدارة",       "en": "Admin Panel",  "tr": "Yönetim Paneli"},
+# مفاتيح الترجمة لكل category
+_CATEGORY_KEYS = {
+    "DASHBOARD":    "perm_cat_dashboard",
+    "TRANSACTIONS": "perm_cat_transactions",
+    "ENTRIES":      "perm_cat_entries",
+    "DOCUMENTS":    "perm_cat_documents",
+    "CLIENTS":      "perm_cat_clients",
+    "COMPANIES":    "perm_cat_companies",
+    "MATERIALS":    "perm_cat_materials",
+    "PRICING":      "perm_cat_pricing",
+    "VALUES":       "perm_cat_values",
+    "OFFICES":      "perm_cat_offices",
+    "USERS":        "perm_cat_users",
+    "AUDIT":        "perm_cat_audit",
+    "SETTINGS":     "perm_cat_settings",
+    "CONTAINERS":   "perm_cat_containers",
+    "ADMIN":        "perm_cat_admin",
 }
 
 
@@ -188,9 +188,10 @@ class PermissionsTab(QWidget):
         return TranslationManager.get_instance().get_current_language()
 
     def _category_label(self, cat: str) -> str:
-        lang = self._current_lang()
-        labels = _CATEGORY_LABELS.get(cat, {})
-        return labels.get(lang, labels.get("en", cat))
+        key = _CATEGORY_KEYS.get(cat)
+        if key:
+            return self._(key)
+        return cat
 
     # ──────────────────────────────────────────────────────────────────────
     # Roles

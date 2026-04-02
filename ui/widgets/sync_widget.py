@@ -189,21 +189,21 @@ class SyncWidget(QWidget):
 
     def _show_menu(self, pos):
         menu = QMenu(self)
-        menu.addAction("مزامنة الآن",         self._on_click)
-        menu.addAction("إعدادات المزامنة",     self.sync_settings_requested.emit)
+        menu.addAction(self._("sync_now"),           self._on_click)
+        menu.addAction(self._("sync_settings_menu"), self.sync_settings_requested.emit)
         menu.exec(self._btn.mapToGlobal(pos))
 
     def _update_tooltip(self):
         labels = {
-            self.STATE_DISABLED: "المزامنة غير مفعّلة",
-            self.STATE_OFFLINE:  "لا يوجد اتصال بالسيرفر",
-            self.STATE_SYNCING:  "جارٍ المزامنة...",
-            self.STATE_OK:       "متصل",
-            self.STATE_ERROR:    "فشلت المزامنة",
+            self.STATE_DISABLED: self._("sync_state_disabled"),
+            self.STATE_OFFLINE:  self._("sync_state_offline"),
+            self.STATE_SYNCING:  self._("sync_state_syncing"),
+            self.STATE_OK:       self._("sync_state_ok"),
+            self.STATE_ERROR:    self._("sync_state_error"),
         }
         tip = labels.get(self._state, "")
         if self._last_sync_time and self._state == self.STATE_OK:
-            tip += f"\nآخر مزامنة: {self._last_sync_time}"
+            tip += "\n" + self._("sync_last_sync").format(time=self._last_sync_time)
         self._btn.setToolTip(tip)
 
     def _show_toast(self, message: str):
