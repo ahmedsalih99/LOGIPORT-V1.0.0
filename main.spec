@@ -158,11 +158,12 @@ a = Analysis(
         'ui.widgets.notification_bell',
         'ui.widgets.pdf_preview_dialog',
         'ui.widgets.container_timeline',
-        'ui.widgets.container_timeline',
         'ui.widgets.searchable_combo',
         'ui.widgets.sidebar',
         'ui.widgets.sync_widget',
         'ui.widgets.topbar',
+        'ui.widgets.tasks_filter_bar',
+        'ui.widgets.container_stats_bar',
 
         # UI Utils
         'ui.utils',

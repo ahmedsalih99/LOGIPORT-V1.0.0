@@ -1,81 +1,83 @@
 @echo off
-chcp 65001 > nul
-title LOGIPORT Builder
+:: ============================================================
+:: build.bat — LOGIPORT Build Script
+:: يبني الـ EXE ثم الـ installer بأمر واحد
+:: ============================================================
+setlocal EnableDelayedExpansion
 
-echo ============================================================
-echo   LOGIPORT v1.0.0 - Build Script
-echo ============================================================
+title LOGIPORT Build
+
+echo.
+echo  ╔══════════════════════════════════════╗
+echo  ║     LOGIPORT Build Script            ║
+echo  ╚══════════════════════════════════════╝
 echo.
 
-:: تأكد أن المسار صحيح
-cd /d "%~dp0"
-
-:: ── 1. تنظيف البناء القديم ────────────────────────────────────
-echo [1/4] Cleaning previous build...
-if exist dist\LOGIPORT (
-    rmdir /s /q dist\LOGIPORT
-    echo       dist\LOGIPORT deleted
-)
-if exist build\LOGIPORT (
-    rmdir /s /q build\LOGIPORT
-    echo       build\LOGIPORT deleted
-)
-echo       Done.
-echo.
-
-:: ── 2. بناء EXE عبر PyInstaller ──────────────────────────────
-echo [2/4] Running PyInstaller...
-pyinstaller main.spec --noconfirm
+:: ── 1. التحقق من Python ─────────────────────────────────────
+python --version >nul 2>&1
 if errorlevel 1 (
+    echo [ERROR] Python not found in PATH
+    pause & exit /b 1
+)
+
+:: ── 2. التحقق من PyInstaller ────────────────────────────────
+python -m PyInstaller --version >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing PyInstaller...
+    pip install pyinstaller
+)
+
+:: ── 3. تنظيف build القديم ───────────────────────────────────
+echo [STEP 1/3] Cleaning previous build...
+if exist "dist\LOGIPORT" rmdir /s /q "dist\LOGIPORT"
+if exist "build"         rmdir /s /q "build"
+
+:: ── 4. بناء EXE بـ PyInstaller ──────────────────────────────
+echo [STEP 2/3] Building EXE with PyInstaller...
+python -m PyInstaller main.spec --clean --noconfirm
+
+if errorlevel 1 (
+    echo [ERROR] PyInstaller build FAILED
+    pause & exit /b 1
+)
+
+echo [OK] EXE built successfully.
+
+:: ── 5. بناء Installer بـ Inno Setup ────────────────────────
+echo [STEP 3/3] Building Installer with Inno Setup...
+
+:: ابحث عن Inno Setup في المسارات الشائعة
+set "ISCC="
+if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+if exist "C:\Program Files\Inno Setup 6\ISCC.exe"       set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
+
+if "!ISCC!"=="" (
+    echo [WARNING] Inno Setup not found — skipping installer build.
+    echo           Download from: https://jrsoftware.org/isdl.php
     echo.
-    echo [ERROR] PyInstaller failed! Check output above.
-    pause
-    exit /b 1
-)
-echo       EXE built successfully.
-echo.
-
-:: ── 3. تأكد أن dist\LOGIPORT\LOGIPORT.exe موجود ──────────────
-if not exist dist\LOGIPORT\LOGIPORT.exe (
-    echo [ERROR] LOGIPORT.exe not found in dist\LOGIPORT\
-    pause
-    exit /b 1
+    echo [DONE] EXE is ready at: dist\LOGIPORT\LOGIPORT.exe
+    pause & exit /b 0
 )
 
-:: ── 4. بناء المثبّت عبر Inno Setup ──────────────────────────
-echo [3/4] Building installer with Inno Setup...
+"!ISCC!" installer.iss
 
-:: ابحث عن ISCC في المسارات الشائعة
-set ISCC=""
-if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set ISCC="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-if exist "C:\Program Files\Inno Setup 6\ISCC.exe"       set ISCC="C:\Program Files\Inno Setup 6\ISCC.exe"
-
-if %ISCC%=="" (
-    echo [ERROR] Inno Setup not found!
-    echo         Install from: https://jrsoftware.org/isdl.php
-    pause
-    exit /b 1
-)
-
-%ISCC% installer.iss
 if errorlevel 1 (
-    echo [ERROR] Inno Setup failed!
-    pause
-    exit /b 1
+    echo [ERROR] Inno Setup build FAILED
+    pause & exit /b 1
 )
-echo       Installer built successfully.
+
+:: ── 6. النتيجة ──────────────────────────────────────────────
+echo.
+echo  ╔══════════════════════════════════════╗
+echo  ║  Build Complete!                     ║
+echo  ╚══════════════════════════════════════╝
 echo.
 
-:: ── 5. النتيجة النهائية ───────────────────────────────────────
-echo [4/4] Done!
-echo.
-echo ============================================================
-if exist dist\LOGIPORT_Setup_1.0.0.exe (
-    echo   Output: dist\LOGIPORT_Setup_1.0.0.exe
-    for %%A in (dist\LOGIPORT_Setup_1.0.0.exe) do echo   Size:   %%~zA bytes
-) else (
-    echo   Output: dist\ folder
+:: اعثر على الـ installer المُنشأ
+for %%f in (dist\LOGIPORT_Setup_*.exe) do (
+    echo  Installer: %%f
+    echo  Size:      %%~zf bytes
 )
-echo ============================================================
+
 echo.
 pause
