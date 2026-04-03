@@ -11,7 +11,7 @@ version.py — LOGIPORT
 from datetime import datetime
 
 APP_NAME    = "LOGIPORT"
-VERSION     = "1.0.0"
+VERSION     = "1.1.0"
 BUILD       = datetime.now().strftime("%Y-%m-%d")
 
 # tuple للمقارنة السريعة: (1, 0, 0)
