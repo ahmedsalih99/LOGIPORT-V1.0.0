@@ -37,6 +37,18 @@ class LoginWindow(BaseDialog):
         self._ = TranslationManager.get_instance().translate
         self.user = None
 
+        # أيقونة + عنوان الـ titlebar
+        try:
+            from core.paths import icons_path
+            from PySide6.QtGui import QIcon
+            icon_file = str(icons_path("logo.ico"))
+            if not __import__("os").path.exists(icon_file):
+                icon_file = str(icons_path("logo.png"))
+            self.setWindowIcon(QIcon(icon_file))
+        except Exception:
+            pass
+        self.setWindowTitle(self._("login_title"))
+
         # إذا لم تكن هناك geometry محفوظة، نضع الحجم الافتراضي
         if not self.settings.get("dialog_geometry_LoginWindow"):
             self._set_responsive_size()

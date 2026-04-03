@@ -26,6 +26,8 @@ _RULES = {
     "invoice.foreign.": "documents.builders.invoice_foreign",
 
     # ── فواتير عامة ───────────────────────────────────────────────────────────
+    "invoice.three_party.":   "documents.builders.invoice_three_party",
+    "invoice.three_party":    "documents.builders.invoice_three_party",
     "invoice.normal.":    "documents.builders.invoice",
     "invoice.normal":     "documents.builders.invoice",
     "invoice.commercial.":"documents.builders.invoice",

@@ -23,6 +23,9 @@ class _DecimalEncoder(json.JSONEncoder):
 # ----------------------------------------------------------------------------
 # Mapping template-code -> document_types.code in DB (no assumptions)
 DOC_TYPE_MAP: dict[str, str] = {
+    # ─── Invoices — three-party ───────────────────────────────────────────────
+    "invoice.three_party":         "INV_THREE_PARTY",   # DB id=24
+
     # ─── Invoices — commercial / foreign ──────────────────────────────────────
     "invoice.foreign.commercial":  "INV_EXT",        # DB id=1
     "invoice.commercial":          "INV_EXT",
@@ -126,14 +129,13 @@ def persist_document(
         ).fetchone()
         transaction_no = str(tx_row[0]) if tx_row and tx_row[0] else str(transaction_id)
 
-        # 3) doc_no = PREFIX-transaction_no
+        # 3) doc_no — استخدام نظام الترقيم الجديد
         if document_no and document_no.strip():
             doc_no = document_no.strip()
         else:
-            prefix = _prefix_for(doc_code)
-            import re as _re
-            safe_tx = _re.sub(r"[\\/]", "-", transaction_no.strip())
-            doc_no = f"{prefix}-{safe_tx}"   # مثال: INV-COM-260006
+            # استخدم الـ counter المستقل لكل عائلة مستندات
+            from services.numbering_service import NumberingService
+            doc_no = NumberingService.get_next_doc_number(s, doc_code)
 
         # 4) upsert في doc_groups بناءً على (transaction_id, doc_no)
         today = date.today()

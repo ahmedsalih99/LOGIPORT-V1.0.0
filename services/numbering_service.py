@@ -34,6 +34,7 @@ class NumberingService:
         "invoice.normal":                   "INV",
         "invoice.commercial":               "INV-COM",
         "invoice.foreign.commercial":       "INV-COM",
+        "invoice.three_party":              "INV-3P",
         "invoice.proforma":                 "INV-PRO",
         "invoice.syrian.entry":             "INV-SE",
         "invoice.syrian.transit":           "INV-ST",
@@ -44,17 +45,127 @@ class NumberingService:
         "packing_list.export.with_line_id": "PKL",
         "certificate_of_origin":            "COO",
         "form_a":                           "FORMA",
-        "form.a":                           "FORMA",   # alias
-        "cmr":                              "CMR",     # بوليصة الشحن البري
+        "form.a":                           "FORMA",
+        "cmr":                              "CMR",
+        "cmr.copy1.sender":                 "CMR",
+        "cmr.copy2.consignee":              "CMR",
+        "cmr.copy3.carrier":                "CMR",
+        "cmr.copy4.archive":                "CMR",
+    }
+
+    # ── counter key لكل عائلة مستندات في app_settings ──────────────────
+    _DOC_COUNTER_KEY = {
+        "INV":     "doc_counter_inv",
+        "INV-COM": "doc_counter_inv",
+        "INV-3P":  "doc_counter_inv",
+        "INV-PRO": "doc_counter_inv",
+        "INV-SE":  "doc_counter_inv",
+        "INV-ST":  "doc_counter_inv",
+        "INV-SI":  "doc_counter_inv",
+        "PKL":     "doc_counter_pkl",
+        "CMR":     "doc_counter_cmr",
+        "FORMA":   "doc_counter_forma",
+        "COO":     "doc_counter_forma",
     }
 
     @staticmethod
     def prefix_for_doc_code(doc_code: str) -> str:
-        """يعيد البادئة المناسبة لنوع المستند (للتسمية)."""
+        """يعيد البادئة المناسبة لنوع المستند."""
         return NumberingService.DOC_PREFIXES.get(
             doc_code,
             doc_code.split(".")[-1].upper()[:6]
         )
+
+    @staticmethod
+    def counter_key_for_doc_code(doc_code: str) -> str:
+        """يعيد مفتاح الـ counter في app_settings لهذا النوع من المستندات."""
+        prefix = NumberingService.prefix_for_doc_code(doc_code)
+        return NumberingService._DOC_COUNTER_KEY.get(prefix, "doc_counter_inv")
+
+    @staticmethod
+    def get_next_doc_number(db_session, doc_code: str) -> str:
+        """
+        يولّد رقم المستند التالي حسب نوعه.
+
+        النتيجة:  PREFIX-YYMM-NNNN
+        مثال:
+          فاتورة خارجية  → INV-COM-2604-0001
+          CMR             → CMR-2604-0001
+          Form A          → FORMA-2604-0001
+          فاتورة سورية   → INV-SE-2604-0001
+
+        الـ counter مستقل لكل عائلة:
+          - كل الفواتير (INV-*) تشترك في counter واحد
+          - CMR counter مستقل
+          - Form A counter مستقل
+          - Packing List counter مستقل
+        """
+        from sqlalchemy import text
+        import datetime
+
+        prefix      = NumberingService.prefix_for_doc_code(doc_code)
+        counter_key = NumberingService._DOC_COUNTER_KEY.get(prefix, "doc_counter_inv")
+        today       = datetime.date.today()
+        yymm        = today.strftime("%y%m")   # مثال: 2604
+
+        try:
+            # قرأ آخر رقم
+            row = db_session.execute(
+                text("SELECT value FROM app_settings WHERE key = :k"),
+                {"k": counter_key}
+            ).fetchone()
+            last = int(row[0]) if row and row[0] else 0
+            next_num = last + 1
+
+            # تحقق من عدم التكرار في doc_groups
+            for _ in range(200):
+                doc_no = f"{prefix}-{yymm}-{next_num:04d}"
+                exists = db_session.execute(
+                    text("SELECT 1 FROM doc_groups WHERE doc_no = :n"),
+                    {"n": doc_no}
+                ).fetchone()
+                if not exists:
+                    break
+                next_num += 1
+
+            # احفظ الرقم الجديد
+            db_session.execute(
+                text("UPDATE app_settings SET value = :v WHERE key = :k"),
+                {"v": str(next_num), "k": counter_key}
+            )
+            db_session.commit()
+
+            return f"{prefix}-{yymm}-{next_num:04d}"
+
+        except Exception as e:
+            db_session.rollback()
+            logger.warning("get_next_doc_number error: %s", e)
+            # fallback: استخدم timestamp
+            ts = datetime.datetime.now().strftime("%y%m%d%H%M")
+            return f"{prefix}-{ts}"
+
+    @staticmethod
+    def peek_next_doc_number(db_session, doc_code: str) -> str:
+        """
+        يعرض الرقم التالي بدون حجزه — للعرض في الـ UI فقط.
+        """
+        from sqlalchemy import text
+        import datetime
+
+        prefix      = NumberingService.prefix_for_doc_code(doc_code)
+        counter_key = NumberingService._DOC_COUNTER_KEY.get(prefix, "doc_counter_inv")
+        today       = datetime.date.today()
+        yymm        = today.strftime("%y%m")
+
+        try:
+            row = db_session.execute(
+                text("SELECT value FROM app_settings WHERE key = :k"),
+                {"k": counter_key}
+            ).fetchone()
+            last = int(row[0]) if row and row[0] else 0
+            return f"{prefix}-{yymm}-{last + 1:04d}"
+        except Exception:
+            return f"{prefix}-{yymm}-????"
 
     @staticmethod
     def get_next_transaction_number(db_session) -> str:

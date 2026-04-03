@@ -72,6 +72,19 @@ class BaseWindow(QMainWindow):
         self._last_title: Optional[str] = None
         self._translatable_actions: List[Tuple] = []
 
+        # أيقونة التطبيق في الـ titlebar وشريط المهام
+        try:
+            from core.paths import icons_path
+            from PySide6.QtGui import QIcon
+            import os
+            icon_file = str(icons_path("logo.ico"))
+            if not os.path.exists(icon_file):
+                icon_file = str(icons_path("logo.png"))
+            if os.path.exists(icon_file):
+                self.setWindowIcon(QIcon(icon_file))
+        except Exception:
+            pass
+
         # Setup
         self.apply_settings()
 

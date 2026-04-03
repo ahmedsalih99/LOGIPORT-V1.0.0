@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>فاتورة تجارية ثلاثية الأطراف</title>
+<style>
+@page {
+  size: A4;
+  margin: 10mm 12mm 14mm 12mm;
+  @bottom-center {
+    content: "صفحة " counter(page) " من " counter(pages);
+    font-size: 8pt; color: #666;
+    font-family: "Noto Naskh Arabic", "Amiri", "Segoe UI", Tahoma, Arial, sans-serif;
+  }
+}
+body {
+    font-family: "Noto Naskh Arabic", "Amiri", "Segoe UI", Tahoma, Arial, sans-serif;
+    margin: 0; padding: 0; color: #333; background: #fff; font-size: 10pt;
+    direction: rtl;
+}
+.invoice-container { width: 100%; max-width: 186mm; margin: 0 auto; padding: 0; }
+
+.header { text-align: center; margin-bottom: 20px; }
+.company-name { font-size: 18pt; font-weight: 700; margin-bottom: 4px; }
+.company-sub  { font-size: 8pt; line-height: 1.4; color: #555; }
+.company-sub p { margin: 2px 0; }
+.invoice-title {
+    font-size: 14pt; margin-top: 14px; margin-bottom: 0;
+    font-weight: 700; color: #1a3a5c;
+    border-top: 2px solid #1a3a5c; border-bottom: 2px solid #1a3a5c;
+    padding: 4px 0;
+}
+
+.parties-row { display: flex; gap: 8px; margin: 14px 0; }
+.party-box { flex: 1; border: 1px solid #d0d0d0; border-radius: 4px; padding: 8px; }
+.party-label {
+    font-size: 7pt; font-weight: 700; text-transform: uppercase;
+    color: #1a3a5c; letter-spacing: 1px; border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 3px; margin-bottom: 5px;
+}
+.party-name   { font-size: 10pt; font-weight: 700; margin-bottom: 3px; }
+.party-detail { font-size: 8pt; color: #555; line-height: 1.4; }
+.party-detail p { margin: 2px 0; }
+
+.meta-row { display: flex; gap: 20px; margin-bottom: 10px; }
+.meta-box { flex: 1; }
+.meta-item { display: flex; gap: 8px; font-size: 9pt; margin-bottom: 3px; }
+.meta-item strong { min-width: 100px; color: #555; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+thead th {
+    background: #1a3a5c; color: #fff; padding: 6px 8px;
+    text-align: center; font-weight: 600; font-size: 8.5pt;
+}
+tbody td { padding: 5px 8px; border-bottom: 1px solid #e8e8e8; vertical-align: middle; }
+tbody tr:nth-child(even) { background: #f7f9fc; }
+.num { text-align: center; }
+.desc { text-align: right; }
+
+.totals-row { display: flex; justify-content: flex-start; margin-top: 10px; }
+.totals-table { border-collapse: collapse; min-width: 300px; }
+.totals-table td { padding: 4px 10px; font-size: 9.5pt; }
+.totals-table tr:last-child td {
+    font-weight: 700; font-size: 11pt; border-top: 2px solid #1a3a5c;
+    background: #eef4ff; color: #1a3a5c;
+}
+
+.words-box {
+    border: 1px solid #d0d0d0; border-radius: 4px; padding: 8px 12px;
+    margin-top: 10px; font-size: 9pt; background: #f7f9fc;
+}
+.words-box p { margin: 3px 0; }
+.words-box span { font-weight: 700; }
+
+.sig-row { display: flex; gap: 30px; margin-top: 20px; }
+.sig-box { flex: 1; border-top: 1px solid #555; padding-top: 5px; text-align: center; font-size: 8.5pt; color: #555; }
+.footer-note { margin-top: 10px; font-size: 7.5pt; color: #888; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 5px; }
+</style>
+</head>
+<body>
+
+{% set exp  = exporter or {} %}
+{% set sel  = seller   or {} %}
+{% set imp  = importer or consignee or {} %}
+{% set items_list = items or [] %}
+{% set tots = totals or {} %}
+{% set cur  = (currency.code if currency and currency.code else (currency or '')) %}
+{% set up_label = unit_price_label or unit_price_per or 'طن' %}
+
+<div class="invoice-container">
+
+    <!-- رأس الشركة المُصدِّرة -->
+    <div class="header">
+        <div class="company-name">{{ exp.name or '' }}</div>
+        <div class="company-sub">
+            {% if exp.address %}<p>{{ exp.address }}</p>{% endif %}
+            {% if exp.phone   %}<p>هاتف: {{ exp.phone }}</p>{% endif %}
+            {% if exp.email   %}<p>{{ exp.email }}</p>{% endif %}
+            {% if exp.tax_no  %}<p>الرقم الضريبي: {{ exp.tax_no }}</p>{% endif %}
+        </div>
+        <div class="invoice-title">فاتورة تجارية</div>
+    </div>
+
+    <!-- تفاصيل الفاتورة -->
+    <div class="meta-row">
+        <div class="meta-box">
+            <div class="meta-item"><strong>رقم الفاتورة :</strong> {{ invoice_no or '' }}</div>
+            <div class="meta-item"><strong>التاريخ :</strong> {{ issue_date or date or '' }}</div>
+            {% if delivery_method %}
+            <div class="meta-item"><strong>طريقة التسليم :</strong> {{ delivery_method }}</div>
+            {% endif %}
+        </div>
+        <div class="meta-box">
+            {% if country_of_origin %}
+            <div class="meta-item"><strong>بلد المنشأ :</strong> {{ country_of_origin }}</div>
+            {% endif %}
+            {% if destination_country %}
+            <div class="meta-item"><strong>الوجهة :</strong> {{ destination_country }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- الأطراف الثلاثة -->
+    <div class="parties-row">
+        <div class="party-box">
+            <div class="party-label">EXPORTER — المُصدِّر</div>
+            <div class="party-name">{{ exp.name or '' }}</div>
+            <div class="party-detail">
+                {% if exp.address %}<p>{{ exp.address }}</p>{% endif %}
+                {% if exp.phone   %}<p>هاتف: {{ exp.phone }}</p>{% endif %}
+                {% if exp.email   %}<p>{{ exp.email }}</p>{% endif %}
+                {% if exp.tax_no  %}<p>ضريبي: {{ exp.tax_no }}</p>{% endif %}
+                {% if exp.reg_no  %}<p>س.ت: {{ exp.reg_no }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div class="party-box">
+            <div class="party-label">SELLER — البائع</div>
+            <div class="party-name">{{ sel.name or '—' }}</div>
+            <div class="party-detail">
+                {% if sel.address %}<p>{{ sel.address }}</p>{% endif %}
+                {% if sel.phone   %}<p>هاتف: {{ sel.phone }}</p>{% endif %}
+                {% if sel.email   %}<p>{{ sel.email }}</p>{% endif %}
+                {% if sel.tax_no  %}<p>ضريبي: {{ sel.tax_no }}</p>{% endif %}
+                {% if sel.reg_no  %}<p>س.ت: {{ sel.reg_no }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div class="party-box">
+            <div class="party-label">IMPORTER — المستورد</div>
+            <div class="party-name">{{ imp.name or '' }}</div>
+            <div class="party-detail">
+                {% if imp.address %}<p>{{ imp.address }}</p>{% endif %}
+                {% if imp.phone   %}<p>هاتف: {{ imp.phone }}</p>{% endif %}
+                {% if imp.email   %}<p>{{ imp.email }}</p>{% endif %}
+                {% if imp.tax_no  %}<p>ضريبي: {{ imp.tax_no }}</p>{% endif %}
+                {% if imp.reg_no  %}<p>س.ت: {{ imp.reg_no }}</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول البضاعة -->
+    <table>
+        <thead>
+            <tr>
+                <th class="desc">البضاعة</th>
+                <th class="num">الكمية<br><small>{{ qty_header_packaging or 'أكياس' }}</small></th>
+                <th class="num">الوزن الإجمالي<br><small>كغ</small></th>
+                <th class="num">الوزن الصافي<br><small>كغ</small></th>
+                <th class="num">سعر الوحدة<br><small>{{ cur }}/{{ up_label }}</small></th>
+                <th class="num">إجمالي القيمة<br><small>{{ cur }}</small></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for it in items_list %}
+            <tr>
+                <td class="desc">{{ it.description or '' }}</td>
+                <td class="num">{{ '{:,.0f}'.format(it.qty   or 0) }}</td>
+                <td class="num">{{ '{:,.0f}'.format(it.gross or 0) }}</td>
+                <td class="num">{{ '{:,.0f}'.format(it.net   or 0) }}</td>
+                <td class="num">{{ '{:,.0f}'.format(it.unit_price or 0) }}</td>
+                <td class="num">{{ '{:,.0f}'.format(it.amount or 0) }} {{ cur }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- المجاميع -->
+    <div class="totals-row">
+        <table class="totals-table">
+            <tr><td>إجمالي الكمية</td><td class="num">{{ '{:,.0f}'.format(tots.qty or 0) }} {{ qty_header_packaging or '' }}</td></tr>
+            <tr><td>إجمالي الوزن الإجمالي</td><td class="num">{{ '{:,.0f}'.format(tots.gross or 0) }} كغ</td></tr>
+            <tr><td>إجمالي الوزن الصافي</td><td class="num">{{ '{:,.0f}'.format(tots.net or 0) }} كغ</td></tr>
+            <tr><td>إجمالي القيمة</td><td class="num">{{ '{:,.0f}'.format(tots.value or 0) }} {{ cur }}</td></tr>
+        </table>
+    </div>
+
+    <!-- التفقيط -->
+    <div class="words-box">
+        {% if qty_in_words   %}<p><span>الكمية :</span> {{ qty_in_words }}</p>{% endif %}
+        {% if gross_in_words %}<p><span>الوزن الإجمالي :</span> {{ gross_in_words }}</p>{% endif %}
+        {% if net_in_words   %}<p><span>الوزن الصافي :</span> {{ net_in_words }}</p>{% endif %}
+        {% if value_in_words %}<p><span>القيمة :</span> {{ value_in_words }}</p>{% endif %}
+    </div>
+
+    <!-- التوقيعات -->
+    <div class="sig-row">
+        <div class="sig-box">المُصدِّر<br><br>{{ exp.name or '' }}</div>
+        <div class="sig-box">البائع<br><br>{{ sel.name or '' }}</div>
+        <div class="sig-box">التوقيع المخوَّل</div>
+    </div>
+
+    <div class="footer-note">هذه الفاتورة صادرة وفق معايير التجارة الدولية.</div>
+
+</div>
+</body>
+</html>

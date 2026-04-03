@@ -20,6 +20,7 @@ DOC_CODES: Dict[str, str] = {
 
     # ── Invoices — Foreign ────────────────────────────────────────────────────
     "invoice.foreign.commercial":   "invoices/commercial",       # legacy alias
+    "invoice.three_party":          "invoices/three_party",      # ثلاثية الأطراف
 
     # ── Packing Lists ─────────────────────────────────────────────────────────
     "packing_list.export.simple":       "packing_list/export/simple",

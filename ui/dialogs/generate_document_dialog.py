@@ -41,6 +41,7 @@ except Exception:
 # ── Mappings (نفس v3) ────────────────────────────────────────────────────────
 _DB_CODE_TO_DOC_CODE: Dict[str, str] = {
     "INV_EXT":                "invoice.foreign.commercial",
+    "INV_THREE_PARTY":        "invoice.three_party",
     "INV_NORMAL":             "invoice.normal",
     "INV_PROFORMA":           "invoice.proforma",
     "INV_SYR_TRANS":          "invoice.syrian.transit",
@@ -57,6 +58,17 @@ _DB_CODE_TO_DOC_CODE: Dict[str, str] = {
     "cmr.copy4.archive":      "cmr.copy4.archive",
     "form_a":                 "form_a",
 }
+
+# ترتيب ثابت للفواتير: السورية أولاً ثم الباقي
+_INVOICE_ORDER = [
+    "invoice.syrian.entry",
+    "invoice.syrian.transit",
+    "invoice.syrian.intermediary",
+    "invoice.foreign.commercial",
+    "invoice.three_party",
+    "invoice.proforma",
+    "invoice.normal",
+]
 _INVOICE_PREFIXES  = ("INV_", "invoice.")
 _PACKING_PREFIXES  = ("PL_", "PACKING", "packing")
 _TRANSPORT_CODES   = ("cmr", "cmr.copy1.sender", "cmr.copy2.consignee", "cmr.copy3.carrier", "cmr.copy4.archive")
@@ -652,6 +664,16 @@ class GenerateDocumentDialog(_BaseDialog):
     # =========================================================================
     # Load from DB
     # =========================================================================
+    def _peek_next_number(self, doc_code: str) -> str:
+        """يعرض الرقم التالي للمستند بدون حجزه."""
+        try:
+            from database.models import get_session_local
+            from services.numbering_service import NumberingService
+            with get_session_local()() as s:
+                return NumberingService.peek_next_doc_number(s, doc_code)
+        except Exception:
+            return ""
+
     def _load_document_types_from_db(self):
         try:
             from database.crud.document_types_crud import DocumentTypesCRUD
@@ -661,7 +683,7 @@ class GenerateDocumentDialog(_BaseDialog):
             self._load_fallback_types()
             return
 
-        invoices = []; packings = []; transports = []; origin_certs = []
+        inv_map = {}; packings = []; transports = []; origin_certs = []
         for dt in all_types:
             if not getattr(dt, "is_active", 1):
                 continue
@@ -671,10 +693,20 @@ class GenerateDocumentDialog(_BaseDialog):
                 continue
             label    = self._doc_type_label(dt) or code
             category = _classify_doc_type(code)
-            if category == "invoice":       invoices.append((label, doc_code))
+            if category == "invoice":
+                inv_map[doc_code] = label
             elif category == "packing":     packings.append((label, doc_code))
             elif category == "transport":   transports.append((label, doc_code))
             elif category == "origin_cert": origin_certs.append((label, doc_code))
+
+        # ترتيب الفواتير: السورية أولاً ثم الباقي
+        invoices = []
+        for code in _INVOICE_ORDER:
+            if code in inv_map:
+                invoices.append((inv_map[code], code))
+        for code, label in inv_map.items():
+            if code not in _INVOICE_ORDER:
+                invoices.append((label, code))
 
         if not invoices:   self._load_fallback_invoices_list(invoices)
         if not packings:   self._load_fallback_packings_list(packings)
@@ -686,10 +718,20 @@ class GenerateDocumentDialog(_BaseDialog):
         ]
         if not origin_certs: origin_certs = [("Form A (GSP)", "form_a")]
 
-        self._card_invoice   = self._add_card("🧾", _("invoice"),       _("invoice_type"),       invoices)
-        self._card_packing   = self._add_card("📦", _("packing_list"),   _("packing_list_type"),  packings)
-        self._card_cmr       = self._add_card("🚚", "CMR",               _("cmr_section_title"),  transports, english_only=True, right_col=True)
-        self._card_forma     = self._add_card("📋", "Form A",            _("forma_section_title"), origin_certs, right_col=True)
+        next_inv   = self._peek_next_number("invoice.foreign.commercial")
+        next_cmr   = self._peek_next_number("cmr")
+        next_forma = self._peek_next_number("form_a")
+        next_pkl   = self._peek_next_number("packing_list.export.simple")
+
+        inv_sub  = _("invoice_type")   + (f"  —  {next_inv}"   if next_inv   else "")
+        pkl_sub  = _("packing_list_type") + (f"  —  {next_pkl}" if next_pkl   else "")
+        cmr_sub  = _("cmr_section_title")  + (f"  —  {next_cmr}"  if next_cmr   else "")
+        fma_sub  = _("forma_section_title") + (f"  —  {next_forma}" if next_forma else "")
+
+        self._card_invoice = self._add_card("🧾", _("invoice"),      inv_sub,  invoices)
+        self._card_packing = self._add_card("📦", _("packing_list"), pkl_sub,  packings)
+        self._card_cmr     = self._add_card("🚚", "CMR",             cmr_sub,  transports, english_only=True, right_col=True)
+        self._card_forma   = self._add_card("📋", "Form A",          fma_sub,  origin_certs, right_col=True)
 
     def _doc_type_label(self, dt) -> str:
         lang = self._ui_lang
