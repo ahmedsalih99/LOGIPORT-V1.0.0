@@ -89,16 +89,33 @@ class RenderResult:
 def _get_output_root() -> Path:
     """
     يعيد مجلد الجذر لحفظ المستندات.
-    إذا حدّد المستخدم مساراً في الإعدادات → يستخدمه.
-    وإلا → يستخدم OUTPUT_DIR الافتراضي داخل التطبيق.
+    إذا حدّد المستخدم مساراً في الإعدادات → يستخدمه (وينشئه إن لم يكن موجوداً).
+    وإلا → يستخدم مجلد Documents الافتراضي في AppData.
     """
     try:
         from core.settings_manager import SettingsManager
         custom = SettingsManager.get_instance().get_documents_output_path()
-        if custom and _Path(custom).exists():
-            return _Path(custom)
+        if custom and custom.strip():
+            p = _Path(custom.strip())
+            try:
+                p.mkdir(parents=True, exist_ok=True)
+                return p
+            except Exception as e:
+                logger.warning("Cannot create custom output path %s: %s", p, e)
     except Exception:
         pass
+
+    # fallback: AppData/LOGIPORT/documents/generated
+    try:
+        from core.paths import get_user_data_dir
+        fallback = get_user_data_dir() / "documents" / "generated"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+    except Exception:
+        pass
+
+    # آخر fallback: OUTPUT_DIR داخل التطبيق
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     return OUTPUT_DIR
 
 
