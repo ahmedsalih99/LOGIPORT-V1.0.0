@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-# main.spec — LOGIPORT
-# =====================
+# main.spec — LOGIPORT v1.0.0
+# ============================
 
 block_cipher = None
 
@@ -9,21 +9,26 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('icons', 'icons'),
-        ('config', 'config'),
-        ('core/i18n/ar.py', 'core/i18n'),
-        ('core/i18n/en.py', 'core/i18n'),
-        ('core/i18n/tr.py', 'core/i18n'),
-        ('core/i18n/__init__.py', 'core/i18n'),
-        ('documents/templates', 'documents/templates'),
-        ('documents/static', 'documents/static'),
-        ('documents/builders', 'documents/builders'),
-        ('documents/__init__.py', 'documents'),
-        ('documents/registry.py', 'documents'),
-        ('data/avatars', 'data/avatars'),
+        # أيقونات
+        ('icons',                    'icons'),
+        # إعدادات وثيمات
+        ('config',                   'config'),
+        # ترجمات
+        ('core/i18n/ar.py',          'core/i18n'),
+        ('core/i18n/en.py',          'core/i18n'),
+        ('core/i18n/tr.py',          'core/i18n'),
+        ('core/i18n/__init__.py',    'core/i18n'),
+        # مستندات — templates كاملة (تشمل three_party الجديدة تلقائياً)
+        ('documents/templates',      'documents/templates'),
+        ('documents/static',         'documents/static'),
+        ('documents/builders',       'documents/builders'),
+        ('documents/__init__.py',    'documents'),
+        ('documents/registry.py',    'documents'),
+        # بيانات
+        ('data/avatars',             'data/avatars'),
     ],
     hiddenimports=[
-        # PySide6
+        # ── PySide6 ───────────────────────────────────────────────────────────
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
@@ -32,7 +37,7 @@ a = Analysis(
         'PySide6.QtWebEngineCore',
         'PySide6.QtWebEngineWidgets',
 
-        # SQLAlchemy
+        # ── SQLAlchemy ────────────────────────────────────────────────────────
         'sqlalchemy',
         'sqlalchemy.orm',
         'sqlalchemy.orm.session',
@@ -41,39 +46,39 @@ a = Analysis(
         'sqlalchemy.sql.default_comparator',
         'sqlalchemy.event',
         'sqlalchemy.pool',
-        'database.models.task',
-        'database.crud.tasks_crud',
         'sqlalchemy.engine',
         'sqlalchemy.engine.url',
 
-        # Jinja2
+        # ── Jinja2 ────────────────────────────────────────────────────────────
         'jinja2',
         'jinja2.ext',
         'jinja2.loaders',
         'markupsafe',
 
-        # bcrypt / passlib
+        # ── bcrypt / passlib ──────────────────────────────────────────────────
         'bcrypt',
         'passlib',
         'passlib.handlers',
         'passlib.handlers.bcrypt',
 
-        # openpyxl
+        # ── openpyxl ─────────────────────────────────────────────────────────
         'openpyxl',
         'openpyxl.styles',
         'openpyxl.utils',
 
-        # dotenv
-        'dotenv',
+        # ── packaging ────────────────────────────────────────────────────────
+        'packaging',
+        'packaging.version',
 
-        # stdlib
+        # ── stdlib extras ────────────────────────────────────────────────────
         'pkgutil',
         'importlib.util',
         'importlib.machinery',
         'concurrent.futures',
         'logging.handlers',
+        'dotenv',
 
-        # UI Tabs
+        # ── UI Tabs ───────────────────────────────────────────────────────────
         'ui.tabs.admin_dashboard_tab',
         'ui.tabs.audit_trail_tab',
         'ui.tabs.clients_tab',
@@ -98,7 +103,7 @@ a = Analysis(
         'ui.tabs.values_tab',
         'ui.tabs.tasks_tab',
 
-        # UI Dialogs
+        # ── UI Dialogs ────────────────────────────────────────────────────────
         'ui.dialogs.about_dialog',
         'ui.dialogs.global_search_dialog',
         'ui.dialogs.add_TransactionWindow.window',
@@ -148,7 +153,7 @@ a = Analysis(
         'ui.dialogs.view_details.view_transaction_dialog',
         'ui.dialogs.view_details.view_user_dialog',
 
-        # UI Widgets
+        # ── UI Windows & Widgets ──────────────────────────────────────────────
         'ui.login_window',
         'ui.main_window',
         'ui.settings_window',
@@ -165,20 +170,19 @@ a = Analysis(
         'ui.widgets.tasks_filter_bar',
         'ui.widgets.container_stats_bar',
 
-        # UI Utils
+        # ── UI Utils ──────────────────────────────────────────────────────────
         'ui.utils',
         'ui.utils.svg_icons',
         'ui.utils.field_navigation',
         'ui.utils.wheel_blocker',
-        'ui.utils.__init___utils',
 
-        # Utils
+        # ── Utils ─────────────────────────────────────────────────────────────
         'utils.auth_utils',
         'utils.password_utils',
         'utils.paths',
         'utils.user_utils',
 
-        # Core
+        # ── Core ──────────────────────────────────────────────────────────────
         'core.admin_columns',
         'core.base_details_view',
         'core.base_dialog',
@@ -199,35 +203,13 @@ a = Analysis(
         'core.theme_manager',
         'core.translator',
 
-        # Database
+        # ── Database Models ───────────────────────────────────────────────────
         'database.audit_helper',
         'database.bootstrap',
-        'database.crud.audit_log_crud',
-        'database.crud.base_crud',
-        'database.crud.clients_crud',
-        'database.crud.companies_crud',
-        'database.crud.company_roles_crud',
-        'database.crud.container_tracking_crud',
-        'database.crud.countries_crud',
-        'database.crud.currencies_crud',
-        'database.crud.delivery_methods_crud',
-        'database.crud.document_types_crud',
-        'database.crud.documents_crud',
-        'database.crud.entries_crud',
-        'database.crud.material_types_crud',
-        'database.crud.materials_crud',
-        'database.crud.offices_crud',
-        'database.crud.packaging_types_crud',
-        'database.crud.permissions_crud',
-        'database.crud.pricing_crud',
-        'database.crud.pricing_types_crud',
-        'database.crud.transactions_crud',
-        'database.crud.users_crud',
-        'database.db_utils',
-        'database.mappers.document_mapper',
         'database.mixins',
-        'database.models.audit_log',
+        'database.db_utils',
         'database.models.base',
+        'database.models.audit_log',
         'database.models.client',
         'database.models.company',
         'database.models.company_role',
@@ -250,13 +232,40 @@ a = Analysis(
         'database.models.role',
         'database.models.role_permission',
         'database.models.sync_models',
+        'database.models.task',
         'database.models.transaction',
         'database.models.transaction_item',
         'database.models.transport_details',
         'database.models.user',
         'database.models.utils',
 
-        # Services
+        # ── Database CRUD ─────────────────────────────────────────────────────
+        'database.crud.base_crud',
+        'database.crud.audit_log_crud',
+        'database.crud.clients_crud',
+        'database.crud.companies_crud',
+        'database.crud.company_roles_crud',
+        'database.crud.container_tracking_crud',
+        'database.crud.countries_crud',
+        'database.crud.currencies_crud',
+        'database.crud.delivery_methods_crud',
+        'database.crud.document_types_crud',
+        'database.crud.documents_crud',
+        'database.crud.entries_crud',
+        'database.crud.material_types_crud',
+        'database.crud.materials_crud',
+        'database.crud.offices_crud',
+        'database.crud.packaging_types_crud',
+        'database.crud.permissions_crud',
+        'database.crud.pricing_crud',
+        'database.crud.pricing_types_crud',
+        'database.crud.tasks_crud',
+        'database.crud.transactions_crud',
+        'database.crud.users_crud',
+        'database.mappers.document_mapper',
+
+        # ── Services ──────────────────────────────────────────────────────────
+        'services.alert_service',
         'services.backup_service',
         'services.builder_router',
         'services.container_report_service',
@@ -267,7 +276,6 @@ a = Analysis(
         'services.healthcheck',
         'services.html_engine',
         'services.notification_service',
-        'services.alert_service',
         'services.numbering_service',
         'services.pdf_renderer',
         'services.persist_generated_doc',
@@ -278,7 +286,19 @@ a = Analysis(
         'services.tafqit_service',
         'services.updater_service',
 
-        # config / themes
+        # ── Documents Builders ────────────────────────────────────────────────
+        'documents.builders.invoice',
+        'documents.builders.invoice_foreign',
+        'documents.builders.invoice_three_party',
+        'documents.builders.invoice_proforma',
+        'documents.builders.invoice_syrian_entry',
+        'documents.builders.invoice_syrian_transit',
+        'documents.builders.invoice_syrian_transit_intermediary',
+        'documents.builders.packing_list',
+        'documents.builders.cmr_builder',
+        'documents.builders.form_a_builder',
+
+        # ── Config / Themes ───────────────────────────────────────────────────
         'config.settings',
         'config.themes',
         'config.themes.builder',
@@ -303,8 +323,6 @@ a = Analysis(
         'config.themes.components.details_view',
         'config.themes.components.dashboard_profile',
         'config.themes.components.transaction_styles',
-        'packaging', 'packaging.version',
-
     ],
     hookspath=['hooks'],
     runtime_hooks=['hooks/runtime_i18n.py'],
