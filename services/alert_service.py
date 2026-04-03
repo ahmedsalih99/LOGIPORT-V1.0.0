@@ -26,8 +26,8 @@ from core.translator import TranslationManager
 
 logger = logging.getLogger(__name__)
 
-# الحالات التي تعني أن الكونتينر لا يزال في الطريق
-_ACTIVE_STATUSES = {"booked", "loaded", "in_transit", "arrived", "customs"}
+# الحالات التي تعني أن الكونتينر لا يزال في الطريق (مطابق لـ ContainerTracking.STATUSES)
+_ACTIVE_STATUSES = {"booked", "in_transit", "arrived", "customs"}
 
 # كم يوم يبقى المعاملة draft قبل التنبيه
 _DRAFT_DAYS_THRESHOLD = 7
@@ -101,7 +101,7 @@ class AlertService(QObject, QObjectSingletonMixin):
                     continue
 
                 eta: date = c.eta
-                no  = c.container_no or f"#{c.id}"
+                no  = c.bl_number or f"#{c.id}"
 
                 if eta < today:
                     # متأخر
@@ -188,10 +188,8 @@ class AlertService(QObject, QObjectSingletonMixin):
             )
 
             for task in tasks:
-                if task.id in getattr(self, "_alerted_tasks", set()):
+                if task.id in self._alerted_tasks:
                     continue
-                if not hasattr(self, "_alerted_tasks"):
-                    self._alerted_tasks = set()
 
                 days_late = (today - task.due_date).days
                 title = (task.title or "")[:40]

@@ -72,6 +72,8 @@ class Notification:
         "roles":              "table_roles",
         "transport_details":  "table_transport_details",
         "container_tracking": "table_container_tracking",
+        "shipment_containers":"table_shipment_containers",
+        "tasks":              "table_tasks",
     }
 
     ACTION_KEYS = {
