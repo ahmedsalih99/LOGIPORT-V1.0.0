@@ -999,6 +999,13 @@ class GenerateDocumentDialog(_BaseDialog):
         except Exception:
             pass
 
+        # إشعار DataBus لتحديث تاب المستندات تلقائياً
+        try:
+            from core.data_bus import DataBus
+            DataBus.get_instance().emit("documents")
+        except Exception:
+            pass
+
         _ResultsDialog(files, result.get("html_only", False), self).exec()
 
     def _on_failed(self, err):

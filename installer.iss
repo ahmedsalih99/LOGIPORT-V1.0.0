@@ -2,7 +2,7 @@
 ; Inno Setup 6.x
 
 #define AppName      "LOGIPORT"
-#define AppVersion   "1.0.0"
+#define AppVersion   "1.1.0"
 #define AppPublisher "LOGIPORT"
 #define AppURL       "https://github.com/ahmedsalih99/LOGIPORT-V1.0.0"
 #define AppExeName   "LOGIPORT.exe"
