@@ -55,6 +55,10 @@ class TransactionsTab(BaseTab):
         "exporting_company":      160,
         "importing_company":      160,
         "office_name":            140,
+        "totals_count":            90,
+        "totals_gross_kg":        110,
+        "totals_net_kg":          110,
+        "totals_value":           120,
     }
 
     required_permissions = {
@@ -86,6 +90,10 @@ class TransactionsTab(BaseTab):
                 {"label": "exporting_company",    "key": "exporter_name"},
                 {"label": "importing_company",    "key": "importer_name"},
                 {"label": "office",             "key": "office_name"},
+                {"label": "col_totals_count",    "key": "totals_count"},
+                {"label": "col_totals_gross_kg",  "key": "totals_gross_kg"},
+                {"label": "col_totals_net_kg",    "key": "totals_net_kg"},
+                {"label": "col_totals_value",     "key": "totals_value"},
                 {"label": "actions",              "key": "actions"},
             ],
             admin_columns=[
@@ -255,6 +263,39 @@ class TransactionsTab(BaseTab):
 
     # ── Data ──────────────────────────────────────────────────────────
 
+    # ── Helpers لتنسيق الأرقام ─────────────────────────────────────────
+    @staticmethod
+    def _fmt_num(val) -> str:
+        """عدد بدون كسور"""
+        if val is None or val == "":
+            return "—"
+        try:
+            n = float(val)
+            return f"{n:,.0f}" if n else "—"
+        except Exception:
+            return str(val)
+
+    @staticmethod
+    def _fmt_kg(val) -> str:
+        """وزن بـ كغ"""
+        if val is None or val == "":
+            return "—"
+        try:
+            n = float(val)
+            return f"{n:,.1f}" if n else "—"
+        except Exception:
+            return str(val)
+
+    def _fmt_val(self, val, currency_id=None) -> str:
+        """قيمة مالية"""
+        if val is None or val == "":
+            return "—"
+        try:
+            n = float(val)
+            return f"{n:,.2f}" if n else "—"
+        except Exception:
+            return str(val)
+
     def reload_data(self):
         self._skip_base_search = True   # البحث يتم server-side أو بـ _apply_search_filter
         self._skip_base_sort   = True   # الترتيب يتم server-side أو يُدار بـ CRUD
@@ -353,6 +394,10 @@ class TransactionsTab(BaseTab):
                 "importer_name":         _pick(id_to_company.get(getattr(t, "importer_company_id", None) or -1, {})),
                 "office_name":           office_name,
                 "status":                trx_status,
+                "totals_count":          self._fmt_num(getattr(t, "totals_count",    None)),
+                "totals_gross_kg":       self._fmt_kg( getattr(t, "totals_gross_kg", None)),
+                "totals_net_kg":         self._fmt_kg( getattr(t, "totals_net_kg",   None)),
+                "totals_value":          self._fmt_val(getattr(t, "totals_value",    None), getattr(t, "currency_id", None)),
                 "actions":               t,
                 "_client_name_raw":      client_name,
             }
@@ -667,6 +712,7 @@ class TransactionsTab(BaseTab):
                 currency_id=original.currency_id,
                 pricing_type_id=original.pricing_type_id,
                 delivery_method_id=original.delivery_method_id,
+                office_id=original.office_id,
                 transport_type=original.transport_type,
                 transport_ref=original.transport_ref,
                 notes=original.notes,

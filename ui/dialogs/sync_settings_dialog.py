@@ -3,36 +3,38 @@ ui/dialogs/sync_settings_dialog.py — LOGIPORT
 ================================================
 Dialog إعدادات المزامنة مع Supabase.
 
-يتيح للمستخدم:
-  - إدخال Supabase URL + Anon Key
-  - اختيار ID المكتب الحالي
-  - تفعيل/إيقاف الـ sync التلقائي
-  - اختبار الاتصال
-  - حفظ الإعدادات
+إصلاحات:
+  - [BUG FIX] لا يُغلق الـ dialog تلقائياً بعد الحفظ
+  - [BUG FIX] البيانات لا تُمسح عند فتح الـ dialog
+      (textChanged كان يُطلق _on_credentials_changed أثناء _load → يمسح combo)
+  - [BUG FIX] اختبار الاتصال يعرض خطأ واضح ولا يعلق
+  - [BUG FIX] timeout قصير لاختبار الاتصال (5 ثوان)
 """
 from __future__ import annotations
 
 import threading
 
 from PySide6.QtCore import Qt, QTimer
-from ui.utils.wheel_blocker import block_wheel_in
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QCheckBox,
-    QPushButton, QFrame, QSpinBox, QMessageBox,
+    QPushButton, QFrame, QSpinBox,
     QWidget,
 )
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
-
-
 from core.base_dialog import BaseDialog
+from ui.utils.wheel_blocker import block_wheel_in
+
+
 class SyncSettingsDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._  = TranslationManager.get_instance().translate
-        self.sm = SettingsManager.get_instance()
+        self._           = TranslationManager.get_instance().translate
+        self.sm          = SettingsManager.get_instance()
+        self._loading    = False   # [FIX] flag لمنع textChanged أثناء _load
+        self._test_thread: threading.Thread | None = None
         self.setWindowTitle(self._("sync_settings_title"))
         self.setMinimumWidth(520)
         self.setModal(True)
@@ -46,7 +48,7 @@ class SyncSettingsDialog(BaseDialog):
         lay.setSpacing(16)
         lay.setContentsMargins(24, 24, 24, 24)
 
-        # ── Header ──────────────────────────────────────
+        # Header
         title = QLabel(self._("sync_supabase_title"))
         title.setObjectName("dialog-title")
         title.setStyleSheet("font-size:16px; font-weight:600;")
@@ -59,7 +61,7 @@ class SyncSettingsDialog(BaseDialog):
 
         lay.addWidget(self._separator())
 
-        # ── Form ────────────────────────────────────────
+        # Form
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
         form.setSpacing(12)
@@ -67,13 +69,16 @@ class SyncSettingsDialog(BaseDialog):
         self._url_edit = QLineEdit()
         self._url_edit.setPlaceholderText("https://xxxxxxxxxxxx.supabase.co")
         self._url_edit.setObjectName("form-input")
+        # [FIX] textChanged يمسح فقط رسالة الحالة — لا يمس الـ combo
+        self._url_edit.textChanged.connect(self._on_credentials_changed)
         form.addRow(self._("sync_project_url_label"), self._url_edit)
 
         self._key_edit = QLineEdit()
         self._key_edit.setPlaceholderText("eyJhbGci...")
         self._key_edit.setObjectName("form-input")
         self._key_edit.setEchoMode(QLineEdit.Password)
-        # زر إظهار/إخفاء
+        self._key_edit.textChanged.connect(self._on_credentials_changed)
+
         key_row = QHBoxLayout()
         key_row.addWidget(self._key_edit)
         self._show_key_btn = QPushButton(self._("show_key"))
@@ -94,7 +99,7 @@ class SyncSettingsDialog(BaseDialog):
 
         lay.addWidget(self._separator())
 
-        # ── Auto-sync options ────────────────────────────
+        # Auto-sync options
         auto_row = QHBoxLayout()
         self._auto_chk = QCheckBox(self._("sync_auto_enable"))
         self._auto_chk.setObjectName("form-checkbox")
@@ -111,16 +116,17 @@ class SyncSettingsDialog(BaseDialog):
         auto_row.addWidget(self._interval_spin)
         lay.addLayout(auto_row)
 
-        # ── Status label ────────────────────────────────
+        # Status label
         self._status_lbl = QLabel("")
         self._status_lbl.setObjectName("form-hint")
         self._status_lbl.setWordWrap(True)
+        self._status_lbl.setMinimumHeight(20)
         lay.addWidget(self._status_lbl)
 
         lay.addStretch()
         lay.addWidget(self._separator())
 
-        # ── Buttons ─────────────────────────────────────
+        # Buttons
         btn_row = QHBoxLayout()
 
         self._test_btn = QPushButton(self._("sync_test_connection"))
@@ -144,20 +150,25 @@ class SyncSettingsDialog(BaseDialog):
     # ── Load / Save ──────────────────────────────────────
 
     def _load(self):
-        self._url_edit.setText(self.sm.get("sync_supabase_url", ""))
-        self._key_edit.setText(self.sm.get("sync_anon_key", ""))
-        self._auto_chk.setChecked(
-            self.sm.get("sync_enabled", "false").lower() == "true"
-        )
-        self._interval_spin.setValue(
-            int(self.sm.get("sync_interval_min", "5") or "5")
-        )
-        # اختيار المكتب الحالي
-        saved_office = str(self.sm.get("sync_office_id", "") or "")
-        for i in range(self._office_combo.count()):
-            if str(self._office_combo.itemData(i)) == saved_office:
-                self._office_combo.setCurrentIndex(i)
-                break
+        # [FIX] نرفع الـ flag حتى textChanged لا يُنفّذ _on_credentials_changed
+        self._loading = True
+        try:
+            self._url_edit.setText(self.sm.get("sync_supabase_url", ""))
+            self._key_edit.setText(self.sm.get("sync_anon_key", ""))
+            self._auto_chk.setChecked(
+                self.sm.get("sync_enabled", "false").lower() == "true"
+            )
+            self._interval_spin.setValue(
+                int(self.sm.get("sync_interval_min", "5") or "5")
+            )
+            # اختيار المكتب المحفوظ
+            saved_office = str(self.sm.get("sync_office_id", "") or "")
+            for i in range(self._office_combo.count()):
+                if str(self._office_combo.itemData(i)) == saved_office:
+                    self._office_combo.setCurrentIndex(i)
+                    break
+        finally:
+            self._loading = False
 
     def _save(self):
         url      = self._url_edit.text().strip().rstrip("/")
@@ -183,11 +194,11 @@ class SyncSettingsDialog(BaseDialog):
                     interval_seconds=interval * 60,
                 )
                 svc.start_auto_sync()
-        except Exception as e:
+        except Exception:
             pass
 
+        # [FIX] لا يُغلق الـ dialog — يعرض رسالة نجاح فقط
         self._show_status(self._("sync_status_saved"), success=True)
-        QTimer.singleShot(800, self.accept)
 
     # ── Test connection ───────────────────────────────────
 
@@ -199,24 +210,70 @@ class SyncSettingsDialog(BaseDialog):
             self._show_status(self._("sync_status_url_key_required"), success=False)
             return
 
+        # منع تشغيل اختبارين متوازيين
+        if self._test_thread and self._test_thread.is_alive():
+            return
+
         self._test_btn.setEnabled(False)
+        self._save_btn.setEnabled(False)
         self._show_status(self._("sync_status_testing"), success=None)
 
+        # [FIX] نحفظ reference للـ widget قبل الـ thread
+        test_btn  = self._test_btn
+        save_btn  = self._save_btn
+        status_fn = self._show_status
+
         def _do_test():
-            from services.supabase_client import SupabaseClient
-            client = SupabaseClient(url, key)
-            ok = client.ping()
-            def _apply():
-                self._test_btn.setEnabled(True)
-                if ok:
-                    self._show_status(self._("sync_status_connected"), success=True)
+            import urllib.error
+            from services.supabase_client import SupabaseClient, SupabaseError
+
+            result_ok    = False
+            result_error = ""
+
+            try:
+                # test_credentials يتحقق فعلياً من الـ key (يُطلق 401 إذا خاطئ)
+                client = SupabaseClient(url, key, ping_timeout=8)
+                result_ok = client.test_credentials()
+
+            except SupabaseError as e:
+                if e.status == 401:
+                    result_error = self._("sync_error_unauthorized")
+                elif e.status == 404:
+                    result_error = self._("sync_error_not_found")
                 else:
-                    self._show_status(self._("sync_status_failed"), success=False)
+                    result_error = f"HTTP {e.status}"
+
+            except urllib.error.URLError as e:
+                result_error = self._("sync_error_network")
+
+            except OSError:
+                result_error = self._("sync_error_network")
+
+            except Exception as e:
+                result_error = str(e)[:80]
+
+            def _apply():
+                if not test_btn or not test_btn.isVisible():
+                    return
+                test_btn.setEnabled(True)
+                save_btn.setEnabled(True)
+                if result_ok:
+                    status_fn(self._("sync_status_connected"), success=True)
+                else:
+                    status_fn(result_error or self._("sync_status_failed"), success=False)
+
             QTimer.singleShot(0, _apply)
 
-        threading.Thread(target=_do_test, daemon=True).start()
+        self._test_thread = threading.Thread(target=_do_test, daemon=True)
+        self._test_thread.start()
 
     # ── Helpers ──────────────────────────────────────────
+
+    def _on_credentials_changed(self):
+        # [FIX] لا نُنفّذ أثناء _load() — ولا نمس الـ combo أبداً
+        if self._loading:
+            return
+        self._status_lbl.clear()
 
     def _load_offices(self):
         self._office_combo.clear()

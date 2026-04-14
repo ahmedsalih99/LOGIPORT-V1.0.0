@@ -512,6 +512,144 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: container_no check skipped: %s", _e)
 
+    # =========================================================================
+    # Migration SYNC-1: جدول local_sync_cursors
+    # يحفظ آخر cursor لكل جدول في كل اتجاه (push/pull) لكل مكتب.
+    # هذا الجدول محلي فقط — لا يُزامَن مع Supabase.
+    # =========================================================================
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS local_sync_cursors (
+                table_name  TEXT     NOT NULL,
+                direction   TEXT     NOT NULL,
+                last_cursor TEXT     NOT NULL DEFAULT '1970-01-01T00:00:00+00:00',
+                updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (table_name, direction)
+            )
+        """)
+        conn.commit()
+        logger.info("Bootstrap: local_sync_cursors جاهز")
+    except Exception as _e:
+        logger.warning("Bootstrap: local_sync_cursors migration skipped: %s", _e)
+
+    # =========================================================================
+    # Migration SYNC-2: عمود server_id على كل الجداول القابلة للمزامنة
+    # UUID نصي — يُولَّد في LOGIPORT ويُرسل لـ Supabase كمفتاح upsert.
+    # =========================================================================
+    _sync_tables_server_id = [
+        # جداول البيانات الرئيسية
+        "clients", "client_contacts", "companies", "company_banks",
+        "company_role_links", "company_partner_links",
+        "entries", "entry_items",
+        "transactions", "transaction_items", "transaction_entries",
+        "transport_details", "doc_groups", "documents",
+        "audit_log", "users",
+        "container_tracking", "shipment_containers", "tasks",
+        # جداول مرجعية — يحتاج server_id للـ upsert في Supabase
+        "offices", "countries", "currencies",
+        "material_types", "materials",
+        "packaging_types", "delivery_methods", "pricing_types",
+        "document_types", "roles", "permissions",
+        "role_permissions", "company_roles",
+    ]
+    for _tbl in _sync_tables_server_id:
+        try:
+            _existing = [r[1] for r in conn.execute(f"PRAGMA table_info({_tbl})").fetchall()]
+            if not _existing:
+                continue   # الجدول غير موجود بعد
+            if "server_id" not in _existing:
+                conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN server_id TEXT")
+                conn.execute(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS ix_{_tbl}_server_id"
+                    f" ON {_tbl}(server_id) WHERE server_id IS NOT NULL"
+                )
+                logger.info("Bootstrap: added server_id to %s", _tbl)
+        except Exception as _e:
+            logger.warning("Bootstrap: server_id(%s) skipped: %s", _tbl, _e)
+    try:
+        conn.commit()
+    except Exception:
+        pass
+
+    # =========================================================================
+    # Migration SYNC-3: عمود updated_at على الجداول التي تفتقده
+    # لازم للـ cursor-based sync — بدونه لا يمكن معرفة ما تغيّر.
+    # =========================================================================
+    # الجداول التي نضيف لها updated_at:
+    # - يجب أن يكون الجدول موجوداً في DB
+    # - company_banks / company_role_links / client_contacts ليس فيهم created_at
+    #   نضيف updated_at فارغ ونملأه بـ datetime('now')
+    # - transaction_entries: جدول ربط بسيط — لا نضيفه
+    _sync_tables_updated_at = [
+        # جداول البيانات — بدون updated_at أصلاً
+        "transaction_items",
+        "entry_items",
+        "company_banks",
+        "company_role_links",
+        "company_partner_links",
+        "client_contacts",
+        "shipment_containers",
+        # جداول مرجعية — بدون updated_at في DBs القديمة
+        "pricing_types",
+        "document_types",
+        "roles",
+        "permissions",
+        "role_permissions",
+        "company_roles",
+    ]
+    for _tbl in _sync_tables_updated_at:
+        try:
+            _existing = [r[1] for r in conn.execute(f"PRAGMA table_info({_tbl})").fetchall()]
+            if not _existing:
+                continue
+            if "updated_at" not in _existing:
+                # [FIX] SQLite لا يقبل DEFAULT CURRENT_TIMESTAMP في ALTER TABLE
+                # نضيف العمود بـ DEFAULT NULL ثم نملأه بـ UPDATE
+                conn.execute(
+                    f"ALTER TABLE {_tbl} ADD COLUMN updated_at DATETIME"
+                )
+                if "created_at" in _existing:
+                    conn.execute(
+                        f"UPDATE {_tbl} SET updated_at = created_at"
+                        f" WHERE updated_at IS NULL"
+                    )
+                else:
+                    conn.execute(
+                        f"UPDATE {_tbl} SET updated_at = datetime('now')"
+                        f" WHERE updated_at IS NULL"
+                    )
+                logger.info("Bootstrap: added updated_at to %s", _tbl)
+        except Exception as _e:
+            logger.warning("Bootstrap: updated_at(%s) skipped: %s", _tbl, _e)
+    try:
+        conn.commit()
+        logger.info("Bootstrap: sync columns (server_id + updated_at) checked/created")
+    except Exception:
+        pass
+
+    # =========================================================================
+    # Migration SYNC-4: indexes على updated_at للجداول الرئيسية (أداء الـ push)
+    # =========================================================================
+    _sync_idx = [
+        ("ix_clients_updated_at",            "CREATE INDEX IF NOT EXISTS ix_clients_updated_at            ON clients(updated_at)"),
+        ("ix_transactions_updated_at",       "CREATE INDEX IF NOT EXISTS ix_transactions_updated_at       ON transactions(updated_at)"),
+        ("ix_entries_updated_at",            "CREATE INDEX IF NOT EXISTS ix_entries_updated_at            ON entries(updated_at)"),
+        ("ix_ct_updated_at",                 "CREATE INDEX IF NOT EXISTS ix_ct_updated_at                 ON container_tracking(updated_at)"),
+        ("ix_tasks_updated_at",              "CREATE INDEX IF NOT EXISTS ix_tasks_updated_at              ON tasks(updated_at)"),
+        ("ix_companies_updated_at",          "CREATE INDEX IF NOT EXISTS ix_companies_updated_at          ON companies(updated_at)"),
+        ("ix_local_sync_cursors_table",      "CREATE INDEX IF NOT EXISTS ix_local_sync_cursors_table      ON local_sync_cursors(table_name)"),
+    ]
+    for _iname, _isql in _sync_idx:
+        try:
+            conn.execute(_isql)
+        except Exception as _ie:
+            logger.warning("Bootstrap: index %s skipped: %s", _iname, _ie)
+    try:
+        conn.commit()
+        logger.info("Bootstrap: sync indexes checked/created")
+    except Exception:
+        pass
+
     conn.commit()
     logger.info("Bootstrap: migrations تمت بنجاح")
 

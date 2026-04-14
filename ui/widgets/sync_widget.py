@@ -172,9 +172,14 @@ class SyncWidget(QWidget):
 
         import threading
         def _check():
-            from services.supabase_client import get_supabase_client
-            client = get_supabase_client()
-            online = client.ping() if client else False
+            online = False
+            try:
+                from services.supabase_client import get_supabase_client
+                client = get_supabase_client()
+                if client:
+                    online = client.ping()
+            except Exception:
+                online = False
             def _apply():
                 self.set_state(self.STATE_OK if online else self.STATE_OFFLINE)
             QTimer.singleShot(0, _apply)

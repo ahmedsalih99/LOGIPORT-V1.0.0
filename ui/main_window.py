@@ -110,6 +110,9 @@ class MainWindow(BaseWindow):
         from PySide6.QtCore import QTimer
         QTimer.singleShot(5000, self._check_for_updates)
 
+        # ── تشغيل المزامنة التلقائية عند بدء التطبيق (بعد 3 ثوانٍ) ─────────
+        QTimer.singleShot(3000, self._start_sync_if_configured)
+
     # ─── update check ────────────────────────────────────────────────────────
 
     def _check_for_updates(self):
@@ -356,6 +359,35 @@ class MainWindow(BaseWindow):
             dlg.exec()
         except Exception as e:
             logger.error(f"Failed to open sync settings: {e}")
+
+    def _start_sync_if_configured(self):
+        """يُشغَّل بعد 3 ثوانٍ من بدء التطبيق — يبدأ auto sync إذا كانت الإعدادات مكتملة."""
+        try:
+            from services.sync_service import get_sync_service
+            from core.settings_manager import SettingsManager
+            sm  = SettingsManager.get_instance()
+            url = sm.get("sync_supabase_url", "")
+            key = sm.get("sync_anon_key", "")
+            office_raw = sm.get("sync_office_id", "")
+            enabled = sm.get("sync_enabled", "false").lower() == "true"
+
+            if not (url and key and office_raw and enabled):
+                logger.info("Sync: auto-start skipped — not fully configured")
+                return
+
+            try:
+                office_id = int(office_raw)
+            except (ValueError, TypeError):
+                logger.warning("Sync: invalid office_id '%s' — skipping auto-start", office_raw)
+                return
+
+            interval = int(sm.get("sync_interval_min", "5") or "5") * 60
+            svc = get_sync_service()
+            svc.configure(office_id=office_id, interval_seconds=interval)
+            svc.start_auto_sync()
+            logger.info("Sync: auto-sync started on app launch (office=%d, interval=%ds)", office_id, interval)
+        except Exception as e:
+            logger.error("Sync: failed to auto-start: %s", e)
 
     def _open_profile(self):
         self.stack.setCurrentWidget(self._get_or_build_profile_tab())

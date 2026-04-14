@@ -67,6 +67,13 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         "last_modified": "",
         "last_modified_by": "",
         "app_version": "1.0.0",
+
+        # Sync — Supabase
+        "sync_supabase_url":  "",
+        "sync_anon_key":      "",
+        "sync_office_id":     "",
+        "sync_enabled":       "false",
+        "sync_interval_min":  "5",
     }
 
     DYNAMIC_PREFIXES = (
@@ -76,6 +83,12 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         "col_settings_",   # عروض الأعمدة من base_tab.enable_col_memory()
         "tab_state_",      # حالة التابات (مستقبلاً)
     )
+
+    # مفاتيح Sync — تُحفظ دائماً حتى لو لم تكن في DEFAULT_SETTINGS
+    SYNC_KEYS = {
+        "sync_supabase_url", "sync_anon_key", "sync_office_id",
+        "sync_enabled", "sync_interval_min",
+    }
 
     # Settings that users can change without special permissions
     USER_SETTINGS = {
@@ -470,11 +483,12 @@ class SettingsManager(QObject, QObjectSingletonMixin):
 
         for key, value in settings.items():
             # Check if key exists in defaults
-            # Allow dynamic UI-related settings
+            # Allow dynamic UI-related settings + sync keys
             if key not in self.DEFAULT_SETTINGS:
-                if any(key.startswith(p) for p in self.DYNAMIC_PREFIXES) or key in (
-                        "window_geometry",
-                        "window_state",
+                if (
+                    any(key.startswith(p) for p in self.DYNAMIC_PREFIXES)
+                    or key in ("window_geometry", "window_state")
+                    or key in self.SYNC_KEYS   # [FIX] لا نحذف إعدادات Sync
                 ):
                     validated[key] = value
                     continue

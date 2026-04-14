@@ -556,6 +556,9 @@ class BaseTab(QWidget):
         # ── رأس الجدول: ارتفاع + فونت Bold ───────────────────────────
         self._apply_header_style()
 
+        # ── إعادة تمركز empty widget عند تغيير حجم الجدول ─────────────
+        self.table.installEventFilter(self)
+
         # ── signals ─────────────────────────────────────────────────────
         self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
@@ -1056,13 +1059,20 @@ class BaseTab(QWidget):
             self._lbl_empty_text.setText(
                 self._("no_search_results") if searched else self._("no_data_available")
             )
-            self._empty_widget.setGeometry(
-                0, 44, self.table.width(), max(self.table.height() - 44, 100)
-            )
+            self._reposition_empty_widget()
             self._empty_widget.show()
             self._empty_widget.raise_()
         else:
             self._empty_widget.hide()
+
+    def _reposition_empty_widget(self):
+        """يُعيد تمركز الـ empty state widget فوق الجدول."""
+        if not hasattr(self, "_empty_widget"):
+            return
+        header_h = self.table.horizontalHeader().height() if self.table.horizontalHeader().isVisible() else 44
+        w = self.table.width()
+        h = max(self.table.height() - header_h, 100)
+        self._empty_widget.setGeometry(0, header_h, w, h)
 
     # ─────────────────────────────────────────────────────────────────────
     # SELECT / NAVIGATE
@@ -1280,6 +1290,14 @@ class BaseTab(QWidget):
     # ─────────────────────────────────────────────────────────────────────
     # EVENT HANDLERS
     # ─────────────────────────────────────────────────────────────────────
+
+    def eventFilter(self, obj, event):
+        """يُعيد تمركز الـ empty widget عند تغيير حجم الجدول."""
+        from PySide6.QtCore import QEvent
+        if obj is self.table and event.type() == QEvent.Type.Resize:
+            if hasattr(self, "_empty_widget") and self._empty_widget.isVisible():
+                self._reposition_empty_widget()
+        return super().eventFilter(obj, event)
 
     def _on_row_double_clicked(self, index: QModelIndex):
         self.row_double_clicked.emit(index.row())

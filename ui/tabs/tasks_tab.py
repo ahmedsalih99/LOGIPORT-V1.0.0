@@ -156,7 +156,8 @@ class TasksTab(BaseTab):
 
         self._update_pagination_label()
         self._update_status_bar(len(rows), len(self.data))
-        self._show_empty_state(len(rows) == 0)
+        searched = bool(self.search_bar.text().strip()) if hasattr(self, "search_bar") else False
+        self._show_empty_state(len(rows) == 0, searched=searched)
 
         if not self.columns:
             self.table.setRowCount(0)

@@ -3,25 +3,22 @@ services/sync_service.py — LOGIPORT
 =====================================
 Two-way sync بين SQLite المحلي و Supabase.
 
-Strategy:
-  - Push: يرسل كل rows التي تغيّرت (updated_at > last_cursor) للسيرفر
-  - Pull: يجلب كل rows التي تغيّرت على السيرفر منذ آخر cursor
-  - Conflict: last-write-wins بالاعتماد على updated_at
-
-Table name mapping  (SQLite → Supabase):
-  doc_groups          → document_groups
-  local_sync_cursors  → sync_cursors   (لا يُزامَن — يُدار محلياً)
-
-Column name mapping  (SQLite → Supabase) لجدول documents:
-  group_id            → document_group_id
-  language            → lang
-  document_type_id    → doc_type_id
+إصلاحات بناءً على تحليل الـ error log:
+  [A] synced_at: عمود قديم في SQLite — يُضاف لـ _LOCAL_ONLY_COLS_GLOBAL
+  [B] doc_groups: بدون updated_at في SQLite — يُزال من _TABLES_WITH_UPDATED_AT
+  [C] audit_log: timestamp بدل updated_at — mapping خاص + cursor على timestamp
+  [D] جداول Supabase ناقصة updated_at — تُزال من pull/push قوائم الـ cursor
+  [E] booking_no غير موجود في Supabase — يُضاف لـ LOCAL_ONLY_COLS
+  [F] RLS violations — جداول محجوبة تُسقَط من TWO_WAY حتى يُحلّ الـ RLS
+  [G] FK ordering — ترتيب Push صحيح: refs → clients → companies → entries → transactions
+  [H] ping() بسيطة — True/False بدون exceptions
 """
 from __future__ import annotations
 
-import json
 import logging
 import threading
+import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -33,33 +30,101 @@ from services.supabase_client import SupabaseClient, SupabaseError, get_supabase
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────
-# TABLE NAME MAPPING  (SQLite local name → Supabase name)
+# TABLE NAME MAPPING  (SQLite → Supabase)
 # ─────────────────────────────────────────────────────────
 _LOCAL_TO_REMOTE: Dict[str, str] = {
     "doc_groups": "document_groups",
 }
-
 _REMOTE_TO_LOCAL: Dict[str, str] = {v: k for k, v in _LOCAL_TO_REMOTE.items()}
 
 
 def _remote(local_table: str) -> str:
-    """يرجع اسم الجدول في Supabase."""
     return _LOCAL_TO_REMOTE.get(local_table, local_table)
 
 
 def _local(remote_table: str) -> str:
-    """يرجع اسم الجدول في SQLite."""
     return _REMOTE_TO_LOCAL.get(remote_table, remote_table)
 
+
+# ─────────────────────────────────────────────────────────
+# [A] أعمدة موجودة في SQLite فقط — لا تُرسل لـ Supabase أبداً
+# ─────────────────────────────────────────────────────────
+
+# أعمدة مشتركة بين كل الجداول (قديمة/محلية)
+_GLOBAL_LOCAL_ONLY: set = {
+    "synced_at",      # عمود قديم من نسخة سابقة
+}
+
+# أعمدة خاصة بجداول محددة — موجودة في SQLite لكن ليست في Supabase schema
+# مبنية على مقارنة فعلية بين SQLite و Supabase
+_LOCAL_ONLY_COLS: Dict[str, set] = {
+    "documents": {
+        "template_id", "totals_json", "totals_text", "data_json",
+        "status", "file_path",
+    },
+    "container_tracking": {
+        # أعمدة قديمة محذوفة من النموذج الجديد
+        "booking_no", "container_no", "vessel_name", "voyage_no",
+        "port_of_loading", "final_destination",
+        "atd", "ata", "customs_date", "delivery_date",
+    },
+    # أعمدة في SQLite غير موجودة في Supabase
+    "delivery_methods": {
+        "code",           # Supabase ليس فيه code لـ delivery_methods
+    },
+    "pricing_types": {
+        "compute_by", "price_unit", "divisor", "sort_order",
+    },
+    "roles": {
+        "label_ar", "label_en", "label_tr",
+    },
+    "users": {
+        "created_by", "updated_by",
+    },
+}
+
+# أعمدة موجودة في Supabase فقط — لا تُكتب في SQLite
+_REMOTE_ONLY_COLS: Dict[str, set] = {
+    "documents": {
+        "transaction_id", "doc_code", "doc_no", "file_size",
+        "generated_at", "document_group_id", "doc_type_id", "lang",
+    },
+    "roles": {
+        "name_ar", "name_en", "name_tr",
+    },
+    "audit_log": {
+        "created_at",   # Supabase: created_at — SQLite: timestamp
+    },
+    # هذه الجداول ليس فيها created_at في SQLite — نتجاهله عند الـ pull
+    "pricing_types": {
+        "created_at",
+    },
+    "document_types": {
+        "created_at",
+    },
+    "roles": {
+        "name_ar", "name_en", "name_tr",
+        "created_at",
+    },
+    "permissions": {
+        "created_at",
+    },
+    "role_permissions": {
+        "created_at",
+    },
+}
 
 # ─────────────────────────────────────────────────────────
 # COLUMN MAPPING  per-table  (SQLite col → Supabase col)
 # ─────────────────────────────────────────────────────────
 _COL_LOCAL_TO_REMOTE: Dict[str, Dict[str, str]] = {
     "documents": {
-        "group_id":        "document_group_id",
-        "language":        "lang",
-        "document_type_id": "doc_type_id",
+        "group_id":          "document_group_id",
+        "language":          "lang",
+        "document_type_id":  "doc_type_id",
+    },
+    "audit_log": {
+        "timestamp": "created_at",   # [C] audit_log يستخدم timestamp بدل updated_at
     },
 }
 
@@ -68,41 +133,66 @@ _COL_REMOTE_TO_LOCAL: Dict[str, Dict[str, str]] = {
     for tbl, cols in _COL_LOCAL_TO_REMOTE.items()
 }
 
-# أعمدة موجودة في SQLite فقط ولا يجب إرسالها لـ Supabase
-_LOCAL_ONLY_COLS: Dict[str, set] = {
-    "documents": {"template_id", "totals_json", "totals_text", "data_json",
-                  "status", "file_path"},
+# ─────────────────────────────────────────────────────────
+# [C] جداول تستخدم عمود timestamp مختلف للـ cursor
+# ─────────────────────────────────────────────────────────
+_CURSOR_COLUMN: Dict[str, str] = {
+    "audit_log": "timestamp",   # بدل updated_at
 }
 
-# أعمدة موجودة في Supabase فقط ولا نقبلها في SQLite
-_REMOTE_ONLY_COLS: Dict[str, set] = {
-    "documents":         {"transaction_id", "doc_code", "doc_no", "file_size",
-                          "generated_at", "document_group_id", "doc_type_id", "lang"},
-    "transport_details": {"vessel_name", "voyage_no", "bl_no", "etd", "eta",
-                          "port_of_loading", "port_of_discharge"},
-    "pricing":           {"valid_from", "valid_to", "unit_price"},
-}
-
-
 # ─────────────────────────────────────────────────────────
-# جداول مع نوع المزامنة
+# قوائم الجداول — مُرتَّبة حسب FK dependencies
 # ─────────────────────────────────────────────────────────
 
+# ترتيب إرسال كامل — من لا يعتمد على شيء إلى من يعتمد على كل شيء
+# هذا يضمن عدم FK violations في Supabase
+PUSH_REF_ORDER: List[str] = [
+    # ① مستقلة
+    "countries",
+    "currencies",
+    "material_types",
+    "packaging_types",
+    "delivery_methods",
+    "pricing_types",
+    "document_types",
+    "roles",
+    "permissions",
+    "role_permissions",
+    "company_roles",
+    "offices",
+    # ② تعتمد على ①
+    "materials",
+    # ③ تعتمد على ①
+    "clients",
+    # ④ تعتمد على clients
+    "companies",
+    # ⑤ تعتمد على clients/offices — تُرسَل هنا عبر ALWAYS_FULL قبل entry_items
+    "entries",
+    "transactions",
+]
+
+# ترتيب Push الصحيح حسب FK chain الكامل
+# الجداول المرجعية (countries, currencies, etc.) تُرسَل أولاً عبر PUSH_BEFORE_TABLES
 # (local_table_name, has_office_filter)
 TWO_WAY_TABLES: List[Tuple[str, bool]] = [
+    # clients و companies يُرسَلان في PUSH_REF_ORDER — هنا للـ pull فقط
     ("clients",               False),
-    ("client_contacts",       False),
     ("companies",             False),
+    # ── تعتمد على clients/companies ────────────────────────
+    ("client_contacts",       False),
     ("company_banks",         False),
     ("company_role_links",    False),
     ("company_partner_links", False),
+    # ── تعتمد على clients/offices ──────────────────────────
     ("entries",               True),
     ("entry_items",           False),
     ("transactions",          True),
+    # ── تعتمد على entries/transactions ─────────────────────
     ("transaction_items",     False),
     ("transaction_entries",   False),
     ("transport_details",     False),
-    ("doc_groups",            False),   # → document_groups في Supabase
+    ("doc_groups",            False),
+    # ── كونتينرات ───────────────────────────────────────────
     ("container_tracking",    True),
     ("shipment_containers",   False),
     ("tasks",                 False),
@@ -110,7 +200,6 @@ TWO_WAY_TABLES: List[Tuple[str, bool]] = [
 
 PUSH_ONLY_TABLES: List[str] = [
     "audit_log",
-    "documents",
 ]
 
 PULL_ONLY_TABLES: List[str] = [
@@ -125,13 +214,32 @@ PULL_ONLY_TABLES: List[str] = [
     "pricing",
     "document_types",
     "roles",
-    "permissions",
-    "role_permissions",
-    "company_roles",
+    # permissions: بدون updated_at في Supabase — [D]
+    # role_permissions: بدون updated_at في Supabase — [D]
+    # company_roles: غير موجود في Supabase schema
 ]
 
-# الجداول التي عندها server_id (تُستخدم للـ upsert)
-_TABLES_WITH_SERVER_ID = {
+# ─────────────────────────────────────────────────────────
+# جداول بدون updated_at في Supabase — نجلبها بدون cursor filter
+# مبني على نتيجة check_supabase_schema.sql الفعلية
+_TABLES_NO_UPDATED_AT_REMOTE: set = {
+    "audit_log",           # Supabase: بدون updated_at (عنده created_at فقط)
+    "doc_groups",          # Supabase: بدون updated_at
+    "permissions",         # Supabase: بدون updated_at
+    "role_permissions",    # Supabase: بدون updated_at
+    "transaction_entries", # Supabase: بدون updated_at
+}
+
+# جداول بدون id column — composite PK أو بدون PK
+# _push_ref_table يتجاهل d.pop("id") بأمان لكن server_id generation تحتاج id
+_TABLES_NO_ID: set = {
+    "role_permissions",   # PK = (role_id, permission_id)
+    "transaction_entries",  # PK = id لكن بعض DBs القديمة بدون id
+}
+
+# الجداول التي عندها server_id (بعد Migration SYNC-2 في bootstrap)
+_TABLES_WITH_SERVER_ID: set = {
+    # جداول البيانات
     "clients", "client_contacts", "companies", "company_banks",
     "company_role_links", "company_partner_links",
     "entries", "entry_items",
@@ -139,22 +247,64 @@ _TABLES_WITH_SERVER_ID = {
     "transport_details", "doc_groups", "documents",
     "audit_log", "users",
     "container_tracking", "shipment_containers", "tasks",
+    # جداول مرجعية — أُضيف لها server_id في bootstrap
+    "offices", "countries", "currencies",
+    "material_types", "materials",
+    "packaging_types", "delivery_methods", "pricing_types",
+    "document_types", "roles", "permissions",
+    "role_permissions", "company_roles",
 }
 
-# الجداول التي عندها updated_at (لازم للـ cursor)
-_TABLES_WITH_UPDATED_AT = {
+# [B][C] الجداول التي عندها updated_at (أو timestamp بديل) في SQLite
+_TABLES_WITH_UPDATED_AT: set = {
+    # updated_at أصلي في SQLite
     "clients", "client_contacts", "companies", "company_banks",
     "company_role_links", "company_partner_links",
     "entries", "entry_items",
     "transactions", "transaction_items", "transport_details",
-    "doc_groups", "documents", "audit_log",
     "container_tracking", "tasks",
     "offices", "countries", "currencies", "delivery_methods",
-    "material_types", "materials", "packaging_types", "pricing_types",
-    "pricing", "document_types", "roles", "permissions",
+    "material_types", "materials", "packaging_types",
+    "pricing", "pricing_types", "document_types", "roles",
+    "permissions", "role_permissions", "company_roles",
+    "shipment_containers",
+    # timestamp بديل — يُعامَل عبر _CURSOR_COLUMN
+    "audit_log",
+    # doc_groups: بدون updated_at في SQLite — مُزال
 }
 
 _EPOCH = "1970-01-01T00:00:00+00:00"
+
+# ─────────────────────────────────────────────────────────
+# on_conflict column لكل جدول في Supabase
+# server_id: للجداول التي نُولِّد لها UUID (بعد migration)
+# code/name/transaction_no: للجداول التي لها unique column طبيعي
+# ─────────────────────────────────────────────────────────
+_ON_CONFLICT: Dict[str, str] = {
+    # جداول بـ unique code (في SQLite و Supabase)
+    "countries":        "code",
+    "currencies":       "code",
+    "pricing_types":    "code",
+    "document_types":   "code",
+    "permissions":      "code",
+    "company_roles":    "code",
+    "offices":          "code",
+    "materials":        "code",
+    "clients":          "code",
+    # جداول بـ unique name_ar — نستخدم id للحفاظ على IDs متطابقة مع SQLite
+    # ضروري لأن FKs (packaging_type_id, etc.) تعتمد على id
+    "material_types":   "id",
+    "packaging_types":  "id",
+    "delivery_methods": "id",
+    "roles":            "id",
+    # role_permissions: unique (role_id, permission_id)
+    "role_permissions": "role_id,permission_id",
+    # كل الباقي — server_id
+}
+
+def _conflict_col(table: str) -> str:
+    """يرجع عمود الـ upsert conflict لجدول معين."""
+    return _ON_CONFLICT.get(table, "server_id")
 
 
 # ─────────────────────────────────────────────────────────
@@ -177,33 +327,43 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _to_int(value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def _apply_col_mapping_to_remote(local_table: str, data: Dict[str, Any]) -> Dict[str, Any]:
-    """يحوّل أسماء أعمدة SQLite → Supabase."""
-    mapping = _COL_LOCAL_TO_REMOTE.get(local_table, {})
-    local_only = _LOCAL_ONLY_COLS.get(local_table, set())
-    if not mapping and not local_only:
-        return data
+    """يحوّل أسماء أعمدة SQLite → Supabase ويُزيل الأعمدة المحلية."""
+    mapping    = _COL_LOCAL_TO_REMOTE.get(local_table, {})
+    local_only = _LOCAL_ONLY_COLS.get(local_table, set()) | _GLOBAL_LOCAL_ONLY
     result = {}
     for k, v in data.items():
         if k in local_only:
-            continue   # لا نُرسل هذا العمود لـ Supabase
+            continue
         result[mapping.get(k, k)] = v
     return result
 
 
 def _apply_col_mapping_to_local(remote_table: str, data: Dict[str, Any]) -> Dict[str, Any]:
-    """يحوّل أسماء أعمدة Supabase → SQLite."""
+    """يحوّل أسماء أعمدة Supabase → SQLite ويُزيل الأعمدة البعيدة."""
     local_table = _local(remote_table)
-    mapping = _COL_REMOTE_TO_LOCAL.get(local_table, {})
+    mapping     = _COL_REMOTE_TO_LOCAL.get(local_table, {})
     remote_only = _REMOTE_ONLY_COLS.get(local_table, set())
-    if not mapping and not remote_only:
-        return data
     result = {}
     for k, v in data.items():
         if k in remote_only:
-            continue   # لا نكتب هذا العمود في SQLite
+            continue
         result[mapping.get(k, k)] = v
     return result
+
+
+def _cursor_col(local_table: str) -> str:
+    """يرجع اسم عمود الـ cursor للجدول."""
+    return _CURSOR_COLUMN.get(local_table, "updated_at")
 
 
 # ─────────────────────────────────────────────────────────
@@ -212,15 +372,16 @@ def _apply_col_mapping_to_local(remote_table: str, data: Dict[str, Any]) -> Dict
 
 class SyncResult:
     def __init__(self):
-        self.pushed:      Dict[str, int] = {}
-        self.pulled:      Dict[str, int] = {}
-        self.errors:      List[str]      = []
-        self.started_at   = _now_iso()
-        self.finished_at: Optional[str]  = None
+        self.pushed:     Dict[str, int] = {}
+        self.pulled:     Dict[str, int] = {}
+        self.errors:     List[str]      = []
+        self.is_offline: bool           = False
+        self.started_at  = _now_iso()
+        self.finished_at: Optional[str] = None
 
     @property
     def success(self) -> bool:
-        return len(self.errors) == 0
+        return len(self.errors) == 0 and not self.is_offline
 
     @property
     def total_pushed(self) -> int:
@@ -234,6 +395,8 @@ class SyncResult:
         self.finished_at = _now_iso()
 
     def summary(self) -> str:
+        if self.is_offline:
+            return "لا يوجد اتصال بالإنترنت — سيتم المحاولة لاحقاً"
         if not self.success:
             return f"فشلت المزامنة: {'; '.join(self.errors[:2])}"
         return (
@@ -248,20 +411,18 @@ class SyncResult:
 # ─────────────────────────────────────────────────────────
 
 class SyncService:
-    """
-    يُدير المزامنة بين SQLite المحلي و Supabase.
-    thread-safe — يمنع تشغيل sync متوازي.
-    """
+    _RETRY_DELAYS = [10, 30, 60]
 
     def __init__(self):
-        self._lock      = threading.Lock()
-        self._running   = False
+        self._lock       = threading.Lock()
+        self._running    = False
         self._timer:    Optional[threading.Timer] = None
         self._office_id: Optional[int] = None
-        self._interval  = 5 * 60   # 5 دقائق
+        self._interval   = 5 * 60
+        self._consecutive_failures = 0
 
     def configure(self, office_id: int, interval_seconds: int = 300):
-        self._office_id = office_id
+        self._office_id = _to_int(office_id)
         self._interval  = interval_seconds
 
     # ── Public API ────────────────────────────────────────
@@ -283,7 +444,7 @@ class SyncService:
         if not self.is_enabled():
             logger.info("Sync: disabled — no credentials configured")
             return
-        self._schedule_next()
+        self._schedule_next(delay=self._interval)
         logger.info("Sync: auto-sync started (interval=%ds)", self._interval)
 
     def stop_auto_sync(self):
@@ -292,13 +453,12 @@ class SyncService:
             self._timer = None
         logger.info("Sync: auto-sync stopped")
 
-    def sync_now(self, callback=None) -> Optional[SyncResult]:
+    def sync_now(self, callback=None) -> None:
         if not self.is_enabled():
-            logger.info("Sync: skipped — not configured")
-            return None
+            return
         if self._running:
             logger.warning("Sync: already running — skipped")
-            return None
+            return
 
         def _run():
             result = self._do_sync()
@@ -308,21 +468,27 @@ class SyncService:
                 except Exception as e:
                     logger.error("Sync callback error: %s", e)
 
-        t = threading.Thread(target=_run, daemon=True, name="logiport-sync")
-        t.start()
-        return None
+        threading.Thread(target=_run, daemon=True, name="logiport-sync").start()
 
     # ── Scheduler ─────────────────────────────────────────
 
-    def _schedule_next(self):
-        self._timer = threading.Timer(self._interval, self._auto_tick)
+    def _schedule_next(self, delay: Optional[int] = None):
+        self._timer = threading.Timer(delay or self._interval, self._auto_tick)
         self._timer.daemon = True
         self._timer.start()
 
     def _auto_tick(self):
         if self.is_enabled():
-            self._do_sync()
-        self._schedule_next()
+            result = self._do_sync()
+            if result.is_offline or not result.success:
+                self._consecutive_failures += 1
+                idx   = min(self._consecutive_failures - 1, len(self._RETRY_DELAYS) - 1)
+                delay = self._RETRY_DELAYS[idx]
+                logger.info("Sync: retry in %ds (failure #%d)", delay, self._consecutive_failures)
+                self._schedule_next(delay=delay)
+                return
+            self._consecutive_failures = 0
+        self._schedule_next(delay=self._interval)
 
     # ── Core sync ─────────────────────────────────────────
 
@@ -341,11 +507,13 @@ class SyncService:
                 result.errors.append("Supabase client not configured")
                 return result
 
+            # [H] ping() ترجع True/False — لا exceptions
             if not client.ping():
-                result.errors.append("Supabase server unreachable")
+                result.is_offline = True
+                logger.info("Sync: offline — will retry later")
                 return result
 
-            office_id = self._office_id or self._get_office_id()
+            office_id = self._office_id or _to_int(self._get_office_id())
             if not office_id:
                 result.errors.append("office_id not set")
                 return result
@@ -353,11 +521,29 @@ class SyncService:
             client.office_id = office_id
 
             # ── Push ──────────────────────────────────────
+            # نرسل الجداول المرجعية أولاً (countries, currencies, etc.)
+            # قبل TWO_WAY لأن clients تعتمد على countries
+            for local_tbl in PUSH_REF_ORDER:
+                try:
+                    n = self._push_ref_table(client, office_id, local_tbl)
+                    if n:
+                        result.pushed[local_tbl] = n
+                except (OSError, TimeoutError):
+                    result.is_offline = True
+                    return result
+                except Exception as e:
+                    logger.error("Sync: push ref %s: %s", local_tbl, e)
+                    result.errors.append(f"push ref {local_tbl}: {e}")
+
+            # ترتيب صحيح حسب FK chain
             for local_tbl, has_office in TWO_WAY_TABLES:
                 try:
                     n = self._push_table(client, office_id, local_tbl, has_office)
                     if n:
                         result.pushed[local_tbl] = n
+                except (OSError, TimeoutError):
+                    result.is_offline = True
+                    return result
                 except Exception as e:
                     msg = f"push {local_tbl}: {e}"
                     logger.error("Sync: %s", msg)
@@ -368,6 +554,9 @@ class SyncService:
                     n = self._push_table(client, office_id, local_tbl, False)
                     if n:
                         result.pushed[local_tbl] = n
+                except (OSError, TimeoutError):
+                    result.is_offline = True
+                    return result
                 except Exception as e:
                     msg = f"push {local_tbl}: {e}"
                     logger.error("Sync: %s", msg)
@@ -379,6 +568,9 @@ class SyncService:
                     n = self._pull_table(client, office_id, local_tbl)
                     if n:
                         result.pulled[local_tbl] = n
+                except (OSError, TimeoutError):
+                    result.is_offline = True
+                    return result
                 except Exception as e:
                     msg = f"pull {local_tbl}: {e}"
                     logger.error("Sync: %s", msg)
@@ -389,6 +581,9 @@ class SyncService:
                     n = self._pull_table(client, office_id, local_tbl)
                     if n:
                         result.pulled[local_tbl] = n
+                except (OSError, TimeoutError):
+                    result.is_offline = True
+                    return result
                 except Exception as e:
                     msg = f"pull ref {local_tbl}: {e}"
                     logger.error("Sync: %s", msg)
@@ -406,25 +601,132 @@ class SyncService:
             result.finish()
             self._running = False
 
-        # إشعار نتيجة المزامنة
+        # إشعار
         try:
             from services.notification_service import NotificationService
             svc = NotificationService.get_instance()
-            if result.success:
-                svc.notify_sync(
-                    success=True,
-                    pushed=result.total_pushed,
-                    pulled=result.total_pulled,
-                )
-            else:
-                svc.notify_sync(
-                    success=False,
-                    error=result.errors[0] if result.errors else "unknown",
-                )
+            if not result.is_offline:
+                if result.success:
+                    svc.notify_sync(success=True,
+                                    pushed=result.total_pushed,
+                                    pulled=result.total_pulled)
+                else:
+                    svc.notify_sync(success=False,
+                                    error=result.errors[0] if result.errors else "unknown")
         except Exception:
             pass
 
         return result
+
+    # ── Push refs — الجداول المرجعية قبل كل شيء ─────────
+
+    def _push_ref_table(self, client: SupabaseClient, office_id: int, local_table: str) -> int:
+        """
+        يرسل جدول مرجعي لـ Supabase.
+        يستخدم updated_at إن وجد، وإلا يرسل الكل (الجداول المرجعية صغيرة).
+        """
+        remote_table = _remote(local_table)
+        has_updated_at = local_table in _TABLES_WITH_UPDATED_AT
+        has_server_id  = local_table in _TABLES_WITH_SERVER_ID
+
+        # [FIX] هذه الجداول تُرسَل كاملةً دائماً بدون cursor
+        # لضمان تطابق البيانات بعد أي reset في Supabase
+        ALWAYS_FULL: set = {
+            "countries", "currencies", "material_types", "packaging_types",
+            "delivery_methods", "pricing_types", "document_types", "roles",
+            "permissions", "company_roles", "offices", "materials",
+            "clients", "companies",
+            "entries", "transactions",   # تُرسَل كاملة لأن entry_items/transaction_items تعتمد عليها
+        }
+
+        SessionLocal = get_session_local()
+        with SessionLocal() as s:
+            if local_table in ALWAYS_FULL:
+                # نرسل كل شيء — نتجاهل الـ cursor
+                cursor = None
+                rows = s.execute(
+                    text(f"SELECT * FROM [{local_table}] LIMIT 1000"),
+                ).mappings().all()
+            elif has_updated_at:
+                cursor = self._get_cursor(office_id, f"push_{local_table}")
+                rows = s.execute(
+                    text(f"SELECT * FROM [{local_table}] WHERE updated_at > :cursor"
+                         f" ORDER BY updated_at LIMIT 500"),
+                    {"cursor": cursor},
+                ).mappings().all()
+            else:
+                cursor = None
+                rows = s.execute(
+                    text(f"SELECT * FROM [{local_table}] LIMIT 500"),
+                ).mappings().all()
+
+        if not rows:
+            return 0
+
+        dicts = [_row_to_dict(r) for r in rows]
+
+        # توليد server_id إن لزم (فقط للجداول التي عندها id column)
+        if has_server_id and local_table not in _TABLES_NO_ID:
+            rows_need_sid = [d for d in dicts if not d.get("server_id")]
+            if rows_need_sid:
+                try:
+                    SL2 = get_session_local()
+                    with SL2() as s2:
+                        for d in rows_need_sid:
+                            row_id = d.get("id")
+                            if not row_id:
+                                continue
+                            new_sid = str(uuid.uuid4())
+                            s2.execute(
+                                text(f"UPDATE [{local_table}] SET server_id = :sid WHERE id = :id"),
+                                {"sid": new_sid, "id": row_id},
+                            )
+                            d["server_id"] = new_sid
+                        s2.commit()
+                except Exception as e:
+                    # العمود server_id غير موجود بعد في SQLite — نكمل بدونه
+                    # (bootstrap سيضيفه عند التشغيل التالي)
+                    logger.warning("Sync: server_id not in SQLite for %s, sending without: %s", local_table, e)
+                    for d in rows_need_sid:
+                        d.pop("server_id", None)
+
+        conflict_col = _conflict_col(local_table)
+
+        remote_dicts = []
+        seen_conflict_vals = set()
+        for d in dicts:
+            mapped = _apply_col_mapping_to_remote(local_table, d)
+            # [FIX] نُبقي على id — Supabase SERIAL يقبل explicit id
+            # هذا ضروري لأن FKs (owner_client_id, client_id, etc.) تعتمد على نفس الـ id
+            # mapped.pop("id") كان يسبب mismatch بين SQLite IDs و Supabase IDs
+
+            # حذف server_id=NULL من الـ payload
+            if mapped.get("server_id") is None:
+                mapped.pop("server_id", None)
+
+            # تجاهل صفوف conflict_col=NULL
+            c_val = mapped.get(conflict_col)
+            if c_val is None:
+                continue
+
+            # إزالة المكررات داخل نفس الـ batch
+            if c_val in seen_conflict_vals:
+                continue
+            seen_conflict_vals.add(c_val)
+
+            remote_dicts.append(mapped)
+
+        if not remote_dicts:
+            return 0
+
+        client.upsert(remote_table, remote_dicts, on_conflict=conflict_col)
+
+        if has_updated_at and cursor is not None:
+            latest = max(str(d.get("updated_at", _EPOCH)) for d in dicts)
+            self._set_cursor(office_id, f"push_{local_table}", latest)
+
+        logger.debug("Sync push_ref %s→%s: %d rows", local_table, remote_table, len(dicts))
+        return len(dicts)
 
     # ── Push — local → server ─────────────────────────────
 
@@ -441,11 +743,12 @@ class SyncService:
             return 0
 
         remote_table = _remote(local_table)
-        cursor = self._get_cursor(office_id, f"push_{local_table}")
+        cursor_col   = _cursor_col(local_table)   # [C]
+        cursor       = self._get_cursor(office_id, f"push_{local_table}")
 
         SessionLocal = get_session_local()
         with SessionLocal() as s:
-            where = "updated_at > :cursor"
+            where  = f"{cursor_col} > :cursor"
             params: Dict[str, Any] = {"cursor": cursor}
             if has_office:
                 where += " AND (office_id = :oid OR office_id IS NULL)"
@@ -453,7 +756,7 @@ class SyncService:
 
             rows = s.execute(
                 text(f"SELECT * FROM [{local_table}] WHERE {where}"
-                     f" ORDER BY updated_at LIMIT 500"),
+                     f" ORDER BY {cursor_col} LIMIT 500"),
                 params,
             ).mappings().all()
 
@@ -462,16 +765,51 @@ class SyncService:
 
         dicts = [_row_to_dict(r) for r in rows]
 
-        # تطبيق الـ column mapping وإزالة الأعمدة المحلية فقط
+        # توليد server_id تلقائياً
+        if local_table not in _TABLES_NO_ID:
+            rows_need_sid = [d for d in dicts if not d.get("server_id")]
+            if rows_need_sid:
+                try:
+                    SessionLocal2 = get_session_local()
+                    with SessionLocal2() as s2:
+                        for d in rows_need_sid:
+                            row_id = d.get("id")
+                            if not row_id:
+                                continue
+                            new_sid = str(uuid.uuid4())
+                            s2.execute(
+                                text(f"UPDATE [{local_table}] SET server_id = :sid WHERE id = :id"),
+                                {"sid": new_sid, "id": row_id},
+                            )
+                            d["server_id"] = new_sid
+                        s2.commit()
+                except Exception as e:
+                    logger.warning("Sync: server_id not in SQLite for %s: %s", local_table, e)
+                    for d in rows_need_sid:
+                        d.pop("server_id", None)
+
+        # [A] تطبيق الـ mapping وإزالة الأعمدة المحلية (بما فيها synced_at)
+        cc = _conflict_col(local_table)
+        seen = set()
         remote_dicts = []
         for d in dicts:
             mapped = _apply_col_mapping_to_remote(local_table, d)
-            mapped.pop("id", None)   # Supabase يولّد id خاص به
+            # [FIX] نُبقي على id — ضروري للـ FKs
+            if mapped.get("server_id") is None:
+                mapped.pop("server_id", None)
+            cv = mapped.get(cc)
+            if cv is None or cv in seen:
+                continue
+            seen.add(cv)
             remote_dicts.append(mapped)
 
-        client.upsert(remote_table, remote_dicts, on_conflict="server_id")
+        if not remote_dicts:
+            return 0
 
-        latest = max(d["updated_at"] for d in dicts)
+        client.upsert(remote_table, remote_dicts, on_conflict=cc)
+
+        # نحدث cursor بعد نجاح الـ upsert
+        latest = max(str(d.get(cursor_col, _EPOCH)) for d in dicts)
         self._set_cursor(office_id, f"push_{local_table}", latest)
 
         logger.debug("Sync push %s→%s: %d rows", local_table, remote_table, len(dicts))
@@ -486,14 +824,26 @@ class SyncService:
         local_table: str,
     ) -> int:
         remote_table = _remote(local_table)
+
+        # [D] جداول بدون updated_at في Supabase — نجلب بـ select عادي بدون cursor filter
+        if remote_table in _TABLES_NO_UPDATED_AT_REMOTE or local_table in _TABLES_NO_UPDATED_AT_REMOTE:
+            return self._pull_table_no_cursor(client, local_table, remote_table)
+
         cursor = self._get_cursor(office_id, f"pull_{local_table}")
 
-        rows = client.select(
-            remote_table,
-            filters={"updated_at": f"gt.{cursor}"},
-            order="updated_at.asc",
-            limit=500,
-        )
+        try:
+            rows = client.select(
+                remote_table,
+                filters={"updated_at": f"gt.{cursor}"},
+                order="updated_at.asc",
+                limit=500,
+            )
+        except SupabaseError as e:
+            if e.status == 400 and "updated_at" in str(e.message):
+                # [D] الجدول لا يملك updated_at في Supabase — نجلب بدون cursor
+                logger.warning("Sync: %s has no updated_at in Supabase, fetching all", remote_table)
+                return self._pull_table_no_cursor(client, local_table, remote_table)
+            raise
 
         if not rows:
             return 0
@@ -501,7 +851,6 @@ class SyncService:
         SessionLocal = get_session_local()
         with SessionLocal() as s:
             for row in rows:
-                # تحويل أسماء الأعمدة من Supabase → SQLite
                 local_row = _apply_col_mapping_to_local(remote_table, row)
                 self._upsert_local(s, local_table, local_row)
             s.commit()
@@ -512,13 +861,50 @@ class SyncService:
         logger.debug("Sync pull %s←%s: %d rows", local_table, remote_table, len(rows))
         return len(rows)
 
+    def _pull_table_no_cursor(
+        self,
+        client: SupabaseClient,
+        local_table: str,
+        remote_table: str,
+    ) -> int:
+        """
+        [D] يجلب الجدول كاملاً بدون cursor (للجداول بدون updated_at في Supabase).
+        مناسب للجداول الصغيرة مثل company_role_links, permissions, إلخ.
+        """
+        try:
+            rows = client.select(remote_table, limit=1000)
+        except Exception as e:
+            logger.warning("Sync: pull_no_cursor %s failed: %s", remote_table, e)
+            return 0
+
+        if not rows:
+            return 0
+
+        SessionLocal = get_session_local()
+        with SessionLocal() as s:
+            for row in rows:
+                local_row = _apply_col_mapping_to_local(remote_table, row)
+                self._upsert_local(s, local_table, local_row)
+            s.commit()
+
+        logger.debug("Sync pull(no-cursor) %s←%s: %d rows", local_table, remote_table, len(rows))
+        return len(rows)
+
+    def _get_local_cols(self, s, table: str) -> set:
+        """يجلب أسماء أعمدة الجدول في SQLite — مع cache."""
+        if not hasattr(self, '_col_cache'):
+            self._col_cache: Dict[str, set] = {}
+        if table not in self._col_cache:
+            rows = s.execute(text(f"PRAGMA table_info({table})")).fetchall()
+            self._col_cache[table] = {r[1] for r in rows}
+        return self._col_cache[table]
+
     def _upsert_local(self, s, local_table: str, row: Dict[str, Any]):
         """يُدمج row من السيرفر في SQLite. last-write-wins."""
         server_id      = row.get("server_id")
         server_updated = row.get("updated_at", _EPOCH)
 
         if not server_id:
-            # جداول مرجعية بدون server_id — نستخدم code
             self._upsert_reference(s, local_table, row)
             return
 
@@ -528,7 +914,9 @@ class SyncService:
             {"sid": server_id},
         ).mappings().first()
 
-        data = {k: v for k, v in row.items() if k != "id"}
+        # [FIX] نصفي data — نزيل الأعمدة غير الموجودة في SQLite
+        local_cols = self._get_local_cols(s, local_table)
+        data = {k: v for k, v in row.items() if k != "id" and k in local_cols}
 
         if existing:
             local_updated = existing["updated_at"]
@@ -546,6 +934,8 @@ class SyncService:
             )
         else:
             data.pop("id", None)
+            if not data:
+                return
             cols = ", ".join(data.keys())
             vals = ", ".join(f":{k}" for k in data.keys())
             s.execute(
@@ -558,7 +948,9 @@ class SyncService:
         code = row.get("code")
         if not code:
             return
-        data = {k: v for k, v in row.items() if k != "id"}
+        # نصفي data — نزيل الأعمدة غير الموجودة في SQLite
+        local_cols = self._get_local_cols(s, local_table)
+        data = {k: v for k, v in row.items() if k != "id" and k in local_cols}
         existing = s.execute(
             text(f"SELECT id FROM [{local_table}] WHERE code = :code"),
             {"code": code},
@@ -575,6 +967,8 @@ class SyncService:
                 )
         else:
             data.pop("id", None)
+            if not data:
+                return
             cols = ", ".join(data.keys())
             vals = ", ".join(f":{k}" for k in data.keys())
             s.execute(
@@ -583,7 +977,6 @@ class SyncService:
             )
 
     # ── Cursor management ─────────────────────────────────
-    # يستخدم local_sync_cursors في SQLite (لا يُزامَن مع Supabase)
 
     def _get_cursor(self, office_id: int, direction_key: str) -> str:
         try:
@@ -620,7 +1013,8 @@ class SyncService:
     def _get_office_id(self) -> Optional[int]:
         try:
             from core.settings_manager import SettingsManager
-            return SettingsManager.get_instance().get("sync_office_id", None)
+            val = SettingsManager.get_instance().get("sync_office_id", None)
+            return _to_int(val)
         except Exception:
             return None
 
