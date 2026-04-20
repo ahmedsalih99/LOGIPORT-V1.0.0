@@ -272,18 +272,44 @@ class TransactionsCRUD(BaseCRUD):
 
     @staticmethod
     def _save_transport_details(session: Session, transaction_id: int, transport: dict) -> None:
-        """يحفظ أو يحدّث TransportDetails. يتجاهل إذا كل القيم None."""
+        """
+        يحفظ أو يحدّث TransportDetails.
+        - يتجاهل إذا كل القيم None.
+        - يحجز رقم CMR تلقائياً إذا كان الحقل فارغاً والناقل محدد.
+        - لا يغيّر رقم CMR موجود مسبقاً (يحترم التعديل).
+        """
         if not transport or not any(transport.values()):
             return
+
         td = session.query(TransportDetails).filter_by(
             transaction_id=transaction_id
         ).first()
-        if td is None:
+        is_new = td is None
+        if is_new:
             td = TransportDetails(transaction_id=transaction_id)
             session.add(td)
+
         for field, value in transport.items():
             if hasattr(td, field):
                 setattr(td, field, value)
+
+        # ── حجز رقم CMR الأول إذا فارغ والناقل محدد ────────────────────
+        if not (td.cmr_no or "").strip() and td.carrier_company_id:
+            try:
+                from services.cmr_numbering_service import allocate_cmr_no
+                td.cmr_no = allocate_cmr_no(td.carrier_company_id)
+            except Exception as _e:
+                import logging
+                logging.getLogger(__name__).warning("CMR auto-number failed: %s", _e)
+
+        # ── حجز رقم CMR الثاني إذا فارغ والناقل الثاني محدد ────────────
+        if not (td.cmr_no_2 or "").strip() and td.carrier_company_id_2:
+            try:
+                from services.cmr_numbering_service import allocate_cmr_no
+                td.cmr_no_2 = allocate_cmr_no(td.carrier_company_id_2)
+            except Exception as _e:
+                import logging
+                logging.getLogger(__name__).warning("CMR2 auto-number failed: %s", _e)
 
     # ── Create Transaction ───────────────────────────────────────────────
 

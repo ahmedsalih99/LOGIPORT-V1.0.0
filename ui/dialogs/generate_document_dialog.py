@@ -125,6 +125,7 @@ class _Worker(QObject):
                     doc_code=j.doc_code, lang=j.lang,
                     force_html_only=force_html_only,
                     explicit_doc_no=self.shared_doc_no,
+                    extra_options=j.options,
                 )
                 files.append({"doc_type": j.doc_type, "language": j.lang,
                                "path": str(res.out_pdf or res.out_html)})
@@ -328,6 +329,11 @@ class _DocCard(QFrame):
             note.setObjectName("text-primary")
             body_lay.addWidget(note)
 
+        # placeholder لـ widget إضافية (مثلاً Dropdown CMR variant)
+        self._extra_widget_slot = QWidget()
+        self._extra_widget_slot.setVisible(False)
+        body_lay.addWidget(self._extra_widget_slot)
+
         root.addWidget(self._body)
         self._update_style()
 
@@ -380,6 +386,17 @@ class _DocCard(QFrame):
     @property
     def is_active(self) -> bool:
         return self._enabled
+
+    def set_extra_widget(self, widget):
+        """يضع widget إضافية (مثلاً QComboBox) داخل البطاقة تحت الخيارات."""
+        lay = self._extra_widget_slot.layout()
+        if lay is None:
+            from PySide6.QtWidgets import QVBoxLayout as _VL
+            lay = _VL(self._extra_widget_slot)
+            lay.setContentsMargins(0, 4, 0, 0)
+            lay.setSpacing(0)
+        lay.addWidget(widget)
+        self._extra_widget_slot.setVisible(True)
 
     @property
     def selected_code(self) -> str:
@@ -669,7 +686,8 @@ class GenerateDocumentDialog(_BaseDialog):
         try:
             from database.models import get_session_local
             from services.numbering_service import NumberingService
-            with get_session_local()() as s:
+            SessionLocal = get_session_local()
+            with SessionLocal() as s:
                 return NumberingService.peek_next_doc_number(s, doc_code)
         except Exception:
             return ""
@@ -733,6 +751,9 @@ class GenerateDocumentDialog(_BaseDialog):
         self._card_cmr     = self._add_card("🚚", "CMR",             cmr_sub,  transports, english_only=True, right_col=True)
         self._card_forma   = self._add_card("📋", "Form A",          fma_sub,  origin_certs, right_col=True)
 
+        # Dropdown اختيار CMR variant (يظهر فقط إذا كان للمعاملة CMR ثانٍ)
+        self._setup_cmr_variant_dropdown()
+
     def _doc_type_label(self, dt) -> str:
         lang = self._ui_lang
         if lang == "ar": return (getattr(dt,"name_ar",None) or getattr(dt,"name_en",None) or getattr(dt,"name_tr",None) or "")
@@ -769,6 +790,57 @@ class GenerateDocumentDialog(_BaseDialog):
             ("CMR — Copy 4 (Archive / Black)", "cmr.copy4.archive"),
         ], english_only=True, right_col=True)
         self._card_forma   = self._add_card("📋", "Form A",          _("forma_section_title"), [("Form A (GSP)", "form_a")], right_col=True)
+        self._setup_cmr_variant_dropdown()
+
+    def _setup_cmr_variant_dropdown(self):
+        """
+        يتحقق إذا كانت المعاملة تملك CMR ثانٍ.
+        إذا نعم → يضيف Dropdown داخل بطاقة CMR لاختيار أي CMR يُولَّد.
+        """
+        try:
+            from database.models import get_session_local
+            SessionLocal = get_session_local()
+            with SessionLocal() as s:
+                from sqlalchemy import text as _sql
+                td = s.execute(_sql(
+                    "SELECT cmr_second_label, cmr_no_2, carrier_company_id_2 "
+                    "FROM transport_details WHERE transaction_id=:i"
+                ), {"i": int(self.trx_id)}).mappings().first()
+        except Exception:
+            td = None
+
+        has_second = td and any([
+            td.get("cmr_second_label"),
+            td.get("cmr_no_2"),
+            td.get("carrier_company_id_2"),
+        ])
+
+        if not has_second:
+            self._cmr_variant_combo = None
+            return
+
+        second_label = (td.get("cmr_second_label") or "").strip() or _("cmr_second_section_title")
+
+        combo = QComboBox()
+        combo.setObjectName("form-input")
+        combo.setMinimumHeight(32)
+        combo.addItem(_("cmr_variant_first"), "1")
+        combo.addItem(second_label, "2")
+        combo.setCurrentIndex(0)
+
+        # label قبل الـ combo
+        from PySide6.QtWidgets import QHBoxLayout as _HL, QLabel as _Lbl
+        row_w = QWidget()
+        row_lay = _HL(row_w)
+        row_lay.setContentsMargins(0, 0, 0, 0)
+        row_lay.setSpacing(8)
+        lbl = _Lbl(_("cmr_variant_select") + ":")
+        lbl.setObjectName("form-dialog-label")
+        row_lay.addWidget(lbl)
+        row_lay.addWidget(combo, 1)
+
+        self._card_cmr.set_extra_widget(row_w)
+        self._cmr_variant_combo = combo
 
     # =========================================================================
     # Preselected & defaults
@@ -863,6 +935,11 @@ class GenerateDocumentDialog(_BaseDialog):
         if not selected_langs:
             raise ValueError(_("select_at_least_one"))
 
+        # قراءة CMR variant المختار
+        cmr_variant = "1"
+        if getattr(self, "_cmr_variant_combo", None) is not None:
+            cmr_variant = self._cmr_variant_combo.currentData() or "1"
+
         jobs = []
         for card in active_cards:
             codes = card.selected_codes   # multi-select: قائمة بكل الأنواع المحددة
@@ -874,9 +951,13 @@ class GenerateDocumentDialog(_BaseDialog):
                 for lg in langs:
                     # CMR copies → doc_type = "cmr" (لا "cmr.copy1" إلخ)
                     doc_type = "cmr" if code.startswith("cmr") else code.split(".")[0]
+                    options = {}
+                    if code.startswith("cmr"):
+                        options["cmr_variant"] = cmr_variant
                     jobs.append(_JobSpec(
                         doc_type=doc_type,
-                        lang=lg, doc_code=code, options={}))
+                        lang=lg, doc_code=code, options=options))
+        return jobs
         return jobs
 
     # =========================================================================

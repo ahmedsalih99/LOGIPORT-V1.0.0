@@ -1234,6 +1234,13 @@ translations ={
 "cmr_no_placeholder": "مثال: CMR-20250101-0001",
 "cmr_no_auto": "توليد تلقائي",
 "cmr_no_auto_tooltip": "يولّد رقم CMR تلقائياً — يمكن تعديله",
+"cmr_add_second": "＋  إضافة CMR ثانٍ",
+"cmr_second_section_title": "CMR الثاني",
+"cmr_second_label_placeholder": "مثال: التركي، السوري...",
+"cmr_second_label": "اسم CMR الثاني",
+"cmr_remove_second": "✕  حذف CMR الثاني",
+"cmr_variant_first": "CMR الأول",
+"cmr_variant_select": "اختر CMR",
 # --- added keys ---
 "cannot_open_generator": "تعذّر فتح منشئ المستندات",
 "generate_selected_documents_now": "توليد المستندات المحددة الآن",

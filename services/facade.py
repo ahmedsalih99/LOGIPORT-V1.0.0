@@ -176,6 +176,7 @@ def render_document(
     lang: str,
     force_html_only: bool = False,
     explicit_doc_no: Optional[str] = None,
+    extra_options: Optional[dict] = None,
 ) -> RenderResult:
     """
     يولّد المستند (HTML/PDF) بالاعتماد على transaction_id فقط.
@@ -242,6 +243,24 @@ def render_document(
             ctx = builder(doc_code, transaction_id, lang)
         else:
             ctx = builder(transaction_id, lang)
+
+        # تمرير extra_options للـ context (مثلاً cmr_variant للـ CMR builder)
+        if extra_options:
+            ctx.update({f"_opt_{k}": v for k, v in extra_options.items()})
+
+        # ── تطبيق CMR variant إذا طُلب CMR الثاني ────────────────────────────
+        if extra_options and extra_options.get("cmr_variant") == "2":
+            cmr2 = ctx.get("_cmr2")
+            if cmr2:
+                ctx["cmr_no"]         = cmr2["cmr_no"]
+                ctx["carrier"]        = cmr2["carrier"]
+                ctx["truck_plate"]    = cmr2["truck_plate"]
+                ctx["driver_name"]    = cmr2["driver_name"]
+                ctx["loading_place"]  = cmr2["loading_place"]
+                ctx["delivery_place"] = cmr2["delivery_place"]
+                if cmr2["shipment_date"] is not None:
+                    ctx["shipment_date"] = cmr2["shipment_date"]
+                    ctx["date"]          = cmr2["shipment_date"]
 
         if not isinstance(ctx, dict):
             raise TypeError("Builder must return dict context")

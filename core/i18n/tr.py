@@ -1234,6 +1234,13 @@ translations ={
 "cmr_no_placeholder": "örn. CMR-20250101-0001",
 "cmr_no_auto": "Otomatik Oluştur",
 "cmr_no_auto_tooltip": "CMR numarası otomatik oluşturulur — düzenlenebilir",
+"cmr_add_second": "＋  İkinci CMR Ekle",
+"cmr_second_section_title": "İkinci CMR",
+"cmr_second_label_placeholder": "örn. Türk, Suriye...",
+"cmr_second_label": "İkinci CMR Adı",
+"cmr_remove_second": "✕  İkinci CMR'ı Kaldır",
+"cmr_variant_first": "Birinci CMR",
+"cmr_variant_select": "CMR Seç",
 # --- added keys ---
 "cannot_open_generator": "Belge oluşturucu açılamıyor",
 "generate_selected_documents_now": "Seçili belgeleri şimdi oluştur",

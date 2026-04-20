@@ -28,6 +28,7 @@ class SearchableComboBox(QComboBox):
         self._items:    List[Any] = []
         self._page_size = page_size
         self._loading   = False
+        self._tracked_value: Any = None   # آخر قيمة اختارها المستخدم
 
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
@@ -66,8 +67,11 @@ class SearchableComboBox(QComboBox):
     def current_value(self) -> Any:
         idx = self.currentIndex()
         if 0 <= idx < len(self._items):
-            return self._value_fn(self._items[idx])
-        return None
+            val = self._value_fn(self._items[idx])
+            self._tracked_value = val
+            return val
+        # fallback: القيمة المحفوظة من آخر اختيار صحيح
+        return self._tracked_value
 
     def set_value(self, value: Any, display_text: str = ""):
         for i, obj in enumerate(self._items):
@@ -75,6 +79,7 @@ class SearchableComboBox(QComboBox):
                 self._loading = True
                 self.setCurrentIndex(i)
                 self.lineEdit().setText(display_text or self.itemText(i))
+                self._tracked_value = value
                 self._loading = False
                 return
         # غير موجود — أضفه مؤقتاً
@@ -82,6 +87,7 @@ class SearchableComboBox(QComboBox):
         self._items.insert(0, _Placeholder(value))
         self.insertItem(0, display_text)
         self.setCurrentIndex(0)
+        self._tracked_value = value
         self._loading = False
 
     def wheelEvent(self, event: QWheelEvent):
@@ -109,6 +115,9 @@ class SearchableComboBox(QComboBox):
     def _on_text_edited(self, text: str):
         if self._loading:
             return
+        # إذا مسح المستخدم الحقل كلياً → صفّر الاختيار المحفوظ
+        if not text.strip():
+            self._tracked_value = None
         self._pending_query = text.strip()
         self._debounce.start()
 
@@ -121,6 +130,8 @@ class SearchableComboBox(QComboBox):
         try:
             idx = labels.index(text)
             self.setCurrentIndex(idx)
+            if 0 <= idx < len(self._items):
+                self._tracked_value = self._value_fn(self._items[idx])
         except ValueError:
             pass
         self._loading = False

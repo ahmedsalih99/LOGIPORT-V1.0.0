@@ -59,6 +59,20 @@ class TransportDetails(Base):
     # ── CMR Number ───────────────────────────────────────────────────────────
     cmr_no              = Column(String(64),  nullable=True)  # رقم CMR — يدوي أو تلقائي من النظام
 
+    # ── CMR الثاني (اختياري) — الناقل + الشاحنة + السائق + رقم CMR فقط ──────
+    cmr_second_label        = Column(String(128), nullable=True)  # اسم CMR الثاني (حر — مثال: التركي)
+    cmr_no_2                = Column(String(64),  nullable=True)  # رقم CMR الثاني
+    carrier_company_id_2    = Column(
+        Integer,
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    truck_plate_2           = Column(String(32),  nullable=True)  # رقم لوحة الشاحنة الثانية
+    driver_name_2           = Column(String(128), nullable=True)  # اسم السائق الثاني
+    loading_place_2         = Column(String(255), nullable=True)  # مكان التحميل الثاني
+    delivery_place_2        = Column(String(255), nullable=True)  # مكان التسليم الثاني
+    shipment_date_2         = Column(Date,        nullable=True)  # تاريخ الشحن الثاني
+
     certificate_no      = Column(String(64),  nullable=True)  # رقم شهادة المنشأ
     issuing_authority   = Column(String(255), nullable=True)  # الجهة المُصدِرة للشهادة
     certificate_date    = Column(Date,        nullable=True)  # تاريخ إصدار الشهادة (Form A) — يدوي مستقل
@@ -74,7 +88,8 @@ class TransportDetails(Base):
 
     # ── Relationships ─────────────────────────────────────────────────────────
     transaction     = relationship("Transaction",  back_populates="transport_details")
-    carrier_company = relationship("Company",      foreign_keys=[carrier_company_id], lazy="joined")
+    carrier_company  = relationship("Company", foreign_keys=[carrier_company_id],   lazy="joined")
+    carrier_company2 = relationship("Company", foreign_keys=[carrier_company_id_2], lazy="joined")
 
     def __repr__(self):
         return f"<TransportDetails(transaction_id={self.transaction_id})>"
@@ -86,6 +101,9 @@ class TransportDetails(Base):
             self.loading_place, self.delivery_place, self.shipment_date,
             self.attached_documents,
             self.cmr_no,
+            self.cmr_second_label, self.cmr_no_2,
+            self.carrier_company_id_2, self.truck_plate_2, self.driver_name_2,
+            self.loading_place_2, self.delivery_place_2, self.shipment_date_2,
             self.certificate_no, self.issuing_authority, self.certificate_date,
             self.origin_country, self.dest_country,
         ])

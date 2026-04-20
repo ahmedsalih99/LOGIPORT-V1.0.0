@@ -298,6 +298,53 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: transport_details migration skipped: %s", _e)
 
+    # Migration: CMR الثاني — أعمدة إضافية في transport_details
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
+        for col, typedef in [
+            ("cmr_second_label",     "VARCHAR(128)"),
+            ("cmr_no_2",             "VARCHAR(64)"),
+            ("carrier_company_id_2", "INTEGER"),
+            ("truck_plate_2",        "VARCHAR(32)"),
+            ("driver_name_2",        "VARCHAR(128)"),
+        ]:
+            if col not in cols:
+                conn.execute(f"ALTER TABLE transport_details ADD COLUMN {col} {typedef}")
+                logger.info("Bootstrap: added %s to transport_details", col)
+        conn.commit()
+    except Exception as _e:
+        logger.warning("Bootstrap: transport_details cmr2 migration skipped: %s", _e)
+
+    # Migration: CMR الثاني — مكان التحميل/التسليم/تاريخ الشحن
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
+        for col, typedef in [
+            ("loading_place_2",  "VARCHAR(255)"),
+            ("delivery_place_2", "VARCHAR(255)"),
+            ("shipment_date_2",  "DATE"),
+        ]:
+            if col not in cols:
+                conn.execute(f"ALTER TABLE transport_details ADD COLUMN {col} {typedef}")
+                logger.info("Bootstrap: added %s to transport_details", col)
+        conn.commit()
+    except Exception as _e:
+        logger.warning("Bootstrap: transport_details cmr2 places migration skipped: %s", _e)
+
+
+    # Migration: جدول cmr_counters — عداد رقم CMR لكل شركة ناقلة
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cmr_counters (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                carrier_prefix TEXT NOT NULL UNIQUE,
+                last_number   INTEGER NOT NULL DEFAULT 0,
+                updated_at    DATETIME DEFAULT (datetime('now'))
+            )
+        """)
+        conn.commit()
+        logger.info("Bootstrap: cmr_counters table ready")
+    except Exception as _e:
+        logger.warning("Bootstrap: cmr_counters migration skipped: %s", _e)
 
     # Migration: performance indexes (safe — CREATE INDEX IF NOT EXISTS)
     _indexes = [

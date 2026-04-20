@@ -1234,6 +1234,13 @@ translations ={
 "cmr_no_placeholder": "e.g. CMR-20250101-0001",
 "cmr_no_auto": "Auto Generate",
 "cmr_no_auto_tooltip": "Auto-generate a CMR number — you can edit it",
+"cmr_add_second": "＋  Add Second CMR",
+"cmr_second_section_title": "Second CMR",
+"cmr_second_label_placeholder": "e.g. Turkish, Syrian...",
+"cmr_second_label": "Second CMR Name",
+"cmr_remove_second": "✕  Remove Second CMR",
+"cmr_variant_first": "First CMR",
+"cmr_variant_select": "Select CMR",
 # --- added keys ---
 "cannot_open_generator": "Cannot open document generator",
 "generate_selected_documents_now": "Generate selected documents now",
