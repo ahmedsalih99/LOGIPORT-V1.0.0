@@ -280,6 +280,16 @@ _ON_CONFLICT: Dict[str, str] = {
     "companies":             "server_id",
 }
 
+# [K] جداول conflict على server_id لكن يجب إبقاء id في الـ payload
+# لأن جداول أخرى تشير إليها بـ FK على id (مثل transactions → companies.id)
+# عند conflict على server_id + merge-duplicates يُحدَّث id في Supabase ليطابق المحلي
+_TABLES_KEEP_ID: set = {
+    "companies",       # ← transaction.exporter/importer/broker_company_id → companies.id
+    "clients",         # ← transactions.client_id → clients.id
+    "transactions",    # ← transaction_items/transport_details.transaction_id → transactions.id
+    "entries",         # ← transaction_items.entry_id / entry_items.entry_id → entries.id
+}
+
 
 def _conflict_col(table: str) -> str:
     return _ON_CONFLICT.get(table, "server_id")
@@ -657,12 +667,14 @@ class SyncService:
         for d in dicts:
             mapped = _apply_col_mapping_to_remote(local_table, d)
 
-            # [I] عند conflict على server_id — احذف id لتجنب PK conflict في Supabase
             if conflict_col == "server_id":
-                mapped.pop("id", None)
+                if local_table not in _TABLES_KEEP_ID:
+                    # [I] احذف id لتجنب PK conflict — الجداول العادية لا تحتاجه
+                    mapped.pop("id", None)
+                # لا ترسل صفوف بدون server_id
                 if mapped.get("server_id") is None:
                     mapped.pop("server_id", None)
-                    continue  # لا ترسل صفوف بدون server_id
+                    continue
             else:
                 if mapped.get("server_id") is None:
                     mapped.pop("server_id", None)
@@ -754,9 +766,10 @@ class SyncService:
         for d in dicts:
             mapped = _apply_col_mapping_to_remote(local_table, d)
 
-            # [I] عند conflict على server_id — احذف id لتجنب PK conflict في Supabase
             if cc == "server_id":
-                mapped.pop("id", None)
+                if local_table not in _TABLES_KEEP_ID:
+                    # [I] احذف id لتجنب PK conflict — الجداول العادية لا تحتاجه
+                    mapped.pop("id", None)
                 if mapped.get("server_id") is None:
                     mapped.pop("server_id", None)
                     continue

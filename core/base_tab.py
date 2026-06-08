@@ -815,6 +815,9 @@ class BaseTab(QWidget):
                     item = QTableWidgetItem(str(val) if val is not None else "")
                     item.setTextAlignment(col.get("align", Qt.AlignCenter))
                     item.setFont(_BOLD_ITEM_FONT)
+                    # [SORT-FIX] نخزن الـ row dict كاملاً في col 1 حتى يُقرأ بعد الترتيب
+                    if j == 0:
+                        item.setData(Qt.UserRole, row)
                     self.table.setItem(i, j + 1, item)
         finally:
             self.table.setUpdatesEnabled(True)
@@ -872,6 +875,9 @@ class BaseTab(QWidget):
                         item = QTableWidgetItem(str(val) if val is not None else "")
                         item.setTextAlignment(col.get("align", Qt.AlignCenter))
                         item.setFont(_BOLD_ITEM_FONT)
+                        # [SORT-FIX] نخزن الـ row dict كاملاً في أول عمود بيانات
+                        if col_idx == 0:
+                            item.setData(Qt.UserRole, row)
                         self.table.setItem(row_idx, real_col, item)
         finally:
             self.table.setUpdatesEnabled(True)
@@ -1184,7 +1190,23 @@ class BaseTab(QWidget):
         self._export_selected_indices = None
 
     def get_selected_rows(self) -> list:
-        return [idx.row() for idx in self.table.selectionModel().selectedRows()]
+        result = []
+        for idx in self.table.selectionModel().selectedRows():
+            visual_row = idx.row()
+            # [SORT-FIX] اقرأ الـ row dict من UserRole في col 1
+            item = self.table.item(visual_row, 1)
+            if item is not None:
+                row_data = item.data(Qt.UserRole)
+                if row_data is not None and self.data:
+                    try:
+                        data_idx = self.data.index(row_data)
+                        result.append(data_idx)
+                        continue
+                    except ValueError:
+                        pass
+            # fallback
+            result.append(visual_row)
+        return result
 
     def _set_row_checkbox(self, row: int):
         """يضع checkbox في col 0 للصف المحدد — الـ selection يحكمه التحديد الفعلي."""
@@ -1300,8 +1322,19 @@ class BaseTab(QWidget):
         return super().eventFilter(obj, event)
 
     def _on_row_double_clicked(self, index: QModelIndex):
-        self.row_double_clicked.emit(index.row())
-        self.request_view.emit(index.row())
+        visual_row = index.row()
+        # [SORT-FIX] اقرأ الـ row dict من UserRole في col 1 وابحث عن index الحقيقي
+        item = self.table.item(visual_row, 1)
+        row = visual_row
+        if item is not None:
+            row_data = item.data(Qt.UserRole)
+            if row_data is not None and self.data:
+                try:
+                    row = self.data.index(row_data)
+                except ValueError:
+                    pass
+        self.row_double_clicked.emit(row)
+        self.request_view.emit(row)
 
     # backward-compat — بعض التابات تعيد تعريف on_row_double_clicked
     def on_row_double_clicked(self, index):

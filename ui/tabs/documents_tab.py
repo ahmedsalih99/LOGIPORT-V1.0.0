@@ -201,8 +201,9 @@ class DocumentsTab(BaseTab):
 
         self._refresh_transactions_seed()
         self.reload_data()
-        DataBus.get_instance().subscribe('documents', self.reload_data)
+        DataBus.get_instance().subscribe('documents',    self.reload_data)
         DataBus.get_instance().subscribe('transactions', self.reload_data)
+        DataBus.get_instance().subscribe('transactions', self._refresh_transactions_seed)
 
     # ------------------------------------------------------------------
     # Override _setup_ui to inject Splitter
@@ -380,12 +381,11 @@ class DocumentsTab(BaseTab):
 
     def _refresh_transactions_seed(self):
         """
-        Fills the combo with the last 50 transactions.
-        - If _selected_transaction_id is set: selects it (fetches it separately if outside top-50).
-        - If _selected_transaction_id is None: sets index to -1 so no transaction is
-          visually pre-selected and the table shows all documents correctly.
+        Fills the combo with the last 200 transactions ordered by id DESC.
+        - If _selected_transaction_id is set: selects it (fetches separately if outside top-200).
+        - If _selected_transaction_id is None: sets index to -1.
         """
-        txs = self._db_find_transactions(limit=50)
+        txs = self._db_find_transactions(limit=200)
         self.cmb_transaction.blockSignals(True)
         self.cmb_transaction.clear()
         for tid, label in txs:
@@ -399,21 +399,29 @@ class DocumentsTab(BaseTab):
                     break
 
             if found_idx == -1:
-                # Transaction not in top-50 — fetch it separately
+                # خارج الـ 200 — جلب منفرد وإضافة في الموضع الصحيح
                 try:
                     extra = self._db_find_transactions(
                         transaction_id=self._selected_transaction_id, limit=1
                     )
                     if extra:
                         tid, label = extra[0]
-                        self.cmb_transaction.insertItem(0, label, tid)
-                        found_idx = 0
+                        # إدراج في الموضع الصحيح حسب id (تنازلي)
+                        insert_pos = 0
+                        for i in range(self.cmb_transaction.count()):
+                            existing_tid = self.cmb_transaction.itemData(i)
+                            if existing_tid is not None and tid > existing_tid:
+                                insert_pos = i
+                                break
+                        else:
+                            insert_pos = self.cmb_transaction.count()
+                        self.cmb_transaction.insertItem(insert_pos, label, tid)
+                        found_idx = insert_pos
                 except Exception:
                     pass
 
             self.cmb_transaction.setCurrentIndex(found_idx)
         else:
-            # No transaction selected — force combo to show placeholder (-1)
             self.cmb_transaction.setCurrentIndex(-1)
 
         self.cmb_transaction.blockSignals(False)
@@ -785,6 +793,7 @@ class DocumentsTab(BaseTab):
     # ------------------------------------------------------------------
 
     @staticmethod
+    @staticmethod
     def _db_find_transactions(limit: int = 50, transaction_id: Optional[int] = None) -> List[Tuple[int, str]]:
         if get_session_local is None or text is None:
             return [(i, f"T{i:04d} - Client X - 2026-01-{i:02d}") for i in range(1, min(limit, 20))]
@@ -810,19 +819,19 @@ class DocumentsTab(BaseTab):
             FROM transactions t
             LEFT JOIN clients c ON c.id = t.client_id
             {where}
-            ORDER BY t.created_at DESC
+            ORDER BY t.id DESC
             LIMIT :lim
         """)
 
-        s = _open_session()
+        # [FIX] استخدام النمط الصحيح للـ session لضمان رؤية أحدث البيانات
         try:
-            rows = s.execute(sql, params).fetchall()
-            return [(int(r[0]), str(r[1])) for r in rows]
-        finally:
-            try:
-                s.close()
-            except Exception:
-                pass
+            SessionLocal = get_session_local()
+            with SessionLocal() as s:
+                s.expire_all()
+                rows = s.execute(sql, params).fetchall()
+                return [(int(r[0]), str(r[1])) for r in rows]
+        except Exception:
+            return []
 
     def _db_list_documents(
         self,

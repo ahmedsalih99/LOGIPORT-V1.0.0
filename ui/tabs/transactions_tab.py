@@ -121,6 +121,7 @@ class TransactionsTab(BaseTab):
         for sig_name, handler in (
             ("request_add",        self.add_new_item),
             ("request_edit",       self.edit_selected_item),
+            ("request_view",       self._on_request_view),
             ("request_delete",     self.delete_selected_items),
             ("row_double_clicked", self.on_row_double_clicked),
             ("request_refresh",    self.reload_data),
@@ -522,12 +523,18 @@ class TransactionsTab(BaseTab):
                         elif status == "draft":    bg = "#FFF9C4"
                         item.setBackground(QBrush(QColor(bg)))
                         item.setFont(_BOLD_ITEM_FONT)
+                        # [SORT-FIX] نخزن الـ row dict إذا كان هذا أول عمود
+                        if ci == 0:
+                            item.setData(Qt.UserRole, row)
                         self.table.setItem(ri, real_c, item)
 
                     else:
                         item = QTableWidgetItem(str(row.get(key, "") or ""))
                         item.setTextAlignment(Qt.AlignCenter)
                         item.setFont(_BOLD_ITEM_FONT)
+                        # [SORT-FIX] نخزن الـ row dict في أول عمود بيانات
+                        if ci == 0:
+                            item.setData(Qt.UserRole, row)
                         self.table.setItem(ri, real_c, item)
 
         finally:
@@ -657,6 +664,35 @@ class TransactionsTab(BaseTab):
         if 0 <= row < len(self.data):
             self._open_view_dialog(self.data[row]["actions"])
 
+    def _on_request_view(self, row_index: int):
+        """يُستدعى عند اختيار 'عرض' من الكليك اليمين."""
+        if 0 <= row_index < len(self.data):
+            self._open_view_dialog(self.data[row_index]["actions"])
+
+    def copy_selected(self):
+        """Override — الـ copy في transactions يعني نسخ المعاملة وليس نسخ النص."""
+        rows = self.get_selected_rows()
+        if rows and 0 <= rows[0] < len(self.data):
+            trx_obj = self.data[rows[0]]["actions"]
+            trx_id  = getattr(trx_obj, "id", None)
+            if trx_id:
+                self._copy_transaction(trx_id)
+
+    def get_extra_context_actions(self, menu) -> list:
+        """يُضيف 'نسخ المعاملة' لقائمة الكليك اليمين."""
+        act_copy_trx = menu.addAction("📋  " + self._("copy_transaction"))
+        rows = self.get_selected_rows()
+        act_copy_trx.setEnabled(len(rows) == 1)
+        return [(act_copy_trx, lambda r: self._copy_trx_from_rows(r))]
+
+    def _copy_trx_from_rows(self, rows: list):
+        if not rows or not (0 <= rows[0] < len(self.data)):
+            return
+        trx_obj = self.data[rows[0]]["actions"]
+        trx_id  = getattr(trx_obj, "id", None)
+        if trx_id:
+            self._copy_transaction(trx_id)
+
     def _open_view_dialog(self, trx_obj):
         from importlib import import_module
         ViewTransactionDialog = None
@@ -750,15 +786,27 @@ class TransactionsTab(BaseTab):
             if orig_td and not orig_td.is_empty():
                 session.add(TransportDetails(
                     transaction_id=new_trx.id,
+                    # ── CMR الأول ──────────────────────────────────────────
                     carrier_company_id=orig_td.carrier_company_id,
                     truck_plate=orig_td.truck_plate,
                     driver_name=orig_td.driver_name,
                     loading_place=orig_td.loading_place,
                     delivery_place=orig_td.delivery_place,
+                    shipment_date=orig_td.shipment_date,
+                    cmr_no=orig_td.cmr_no,
+                    attached_documents=orig_td.attached_documents,
+                    # ── CMR الثاني ─────────────────────────────────────────
+                    cmr_second_label=orig_td.cmr_second_label,
+                    cmr_no_2=orig_td.cmr_no_2,
+                    carrier_company_id_2=orig_td.carrier_company_id_2,
+                    truck_plate_2=orig_td.truck_plate_2,
+                    driver_name_2=orig_td.driver_name_2,
+                    loading_place_2=orig_td.loading_place_2,
+                    delivery_place_2=orig_td.delivery_place_2,
+                    shipment_date_2=orig_td.shipment_date_2,
+                    # ── Override الدول + شهادة المنشأ ─────────────────────
                     origin_country=orig_td.origin_country,
                     dest_country=orig_td.dest_country,
-                    shipment_date=orig_td.shipment_date,
-                    attached_documents=orig_td.attached_documents,
                     certificate_no=orig_td.certificate_no,
                     issuing_authority=orig_td.issuing_authority,
                     certificate_date=orig_td.certificate_date,

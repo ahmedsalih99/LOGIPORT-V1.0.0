@@ -765,11 +765,16 @@ class TransactionsCRUD(BaseCRUD):
             trx = s.execute(
                 select(Transaction)
                 .where(Transaction.id == trx_id)
-                .options(joinedload(Transaction.items))
+                .options(
+                    joinedload(Transaction.items),
+                    joinedload(Transaction.transport_details),  # مطلوب لـ prefill_transport بعد النسخ
+                )
             ).unique().scalar_one_or_none()
             if not trx:
                 return None
             items = list(trx.items)
+            # نجبر تحميل transport_details قبل الـ expunge
+            _ = trx.transport_details
             s.expunge_all()
             return trx, items
 

@@ -38,7 +38,6 @@
         <div class="label">رقم المستند</div><div style="font-family:monospace">{{ trx.no or '' }}</div>
         <div class="label">التاريخ</div><div>{{ trx.issue_date or '' }}</div>
         {% if incoterms %}<div class="label">إنكوترمز</div><div>{{ incoterms }}</div>{% endif %}
-        {% if country_of_origin %}<div class="label">بلد المنشأ</div><div>{{ country_of_origin }}</div>{% endif %}
         {% if port_of_loading %}<div class="label">ميناء الشحن</div><div>{{ port_of_loading }}</div>{% endif %}
         {% if port_of_discharge %}<div class="label">ميناء التفريغ</div><div>{{ port_of_discharge }}</div>{% endif %}
       </div>
@@ -107,9 +106,11 @@
     {% set gross_num = "%.2f"|format((tots or {}).gross_kg or 0) %}
     {% set net_num = "%.2f"|format((tots or {}).net_kg or 0) %}
     <div style="border-top:1pt solid #000; padding-top:8pt; margin-top:8pt;" class="small">
-      <div style="margin:2pt 0;"><strong>إجمالي الكمية:</strong> {{ tafqit_qty or qty_num }} ({{ qty_num }})</div>
-      <div style="margin:2pt 0;"><strong>إجمالي القائم (كغ):</strong> {{ tafqit_gross or gross_num ~ " كيلوغرام" }} ({{ gross_num }} كغ)</div>
-      <div style="margin:2pt 0;"><strong>إجمالي الصافي (كغ):</strong> {{ tafqit_net or net_num ~ " كيلوغرام" }} ({{ net_num }} كغ)</div>
+      {% set pkg_list = rows | map(attribute="packaging_type") | select | unique | list %}
+      {% set wu_label = "طن" if weight_unit == "ton" else "كيلوغرام" %}
+      <div style="margin:2pt 0;"><strong>إجمالي الكمية:</strong> {{ tafqit_qty | upper if tafqit_qty else qty_num }}{% if pkg_list %} {{ pkg_list | join(" / ") | upper }}{% endif %}</div>
+      <div style="margin:2pt 0;"><strong>إجمالي القائم:</strong> {{ tafqit_gross | upper if tafqit_gross else gross_num ~ " " ~ wu_label }}</div>
+      <div style="margin:2pt 0;"><strong>إجمالي الصافي:</strong> {{ tafqit_net | upper if tafqit_net else net_num ~ " " ~ wu_label }}</div>
     </div>
     {% if notes %}<div class="small" style="margin-top:8pt;"><span class="label">ملاحظات:</span> {{ notes }}</div>{% endif %}
   </section>

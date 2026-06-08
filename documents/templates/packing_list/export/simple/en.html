@@ -49,8 +49,6 @@
         <div class="label">PL No.</div><div class="mono">{{ trx.no or '' }}</div>
         <div class="label">Date</div><div>{{ trx.issue_date or '' }}</div>
         {% if incoterms %}<div class="label">Incoterms</div><div>{{ incoterms }}</div>{% endif %}
-        {% if delivery_method %}<div class="label">Delivery</div><div>{{ delivery_method }}</div>{% endif %}
-        {% if country_of_origin %}<div class="label">Origin</div><div>{{ country_of_origin }}</div>{% endif %}
         {% if port_of_loading %}<div class="label">POL</div><div>{{ port_of_loading }}</div>{% endif %}
         {% if port_of_discharge %}<div class="label">POD</div><div>{{ port_of_discharge }}</div>{% endif %}
       </div>
@@ -129,18 +127,11 @@
     {% set net_num = "%.2f"|format((tots or {}).net_kg or 0) %}
 
     <div style="border-top:1pt solid #000; padding-top:8pt; margin-top:8pt;" class="small">
-      <div style="margin:2pt 0;">
-        <strong>Total Quantity:</strong>
-        {{ tafqit_qty or qty_num }} ({{ qty_num }})
-      </div>
-      <div style="margin:2pt 0;">
-        <strong>Total Gross (kg):</strong>
-        {{ tafqit_gross or gross_num ~ " kilograms" }} ({{ gross_num }} KG)
-      </div>
-      <div style="margin:2pt 0;">
-        <strong>Total Net (kg):</strong>
-        {{ tafqit_net or net_num ~ " kilograms" }} ({{ net_num }} KG)
-      </div>
+      {% set pkg_list = rows | map(attribute="packaging_type") | select | unique | list %}
+      {% set wu_label = "tons" if weight_unit == "ton" else "kilograms" %}
+      <div style="margin:2pt 0;"><strong>Total Quantity:</strong> {{ tafqit_qty | upper if tafqit_qty else qty_num }}{% if pkg_list %} {{ pkg_list | join(" / ") | upper }}{% endif %}</div>
+      <div style="margin:2pt 0;"><strong>Total Gross:</strong> {{ tafqit_gross | upper if tafqit_gross else gross_num ~ " " ~ wu_label | upper }}</div>
+      <div style="margin:2pt 0;"><strong>Total Net:</strong> {{ tafqit_net | upper if tafqit_net else net_num ~ " " ~ wu_label | upper }}</div>
     </div>
 
     {% if notes %}
