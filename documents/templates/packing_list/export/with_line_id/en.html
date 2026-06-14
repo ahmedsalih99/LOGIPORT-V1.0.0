@@ -26,7 +26,11 @@
     tfoot td { padding: 5pt 3pt; border-top: 1pt solid #000; font-weight: 700; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .center { text-align: center; }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
   {% set exp = exporter or {} %} {% set imp = importer or consignee or {} %}
@@ -114,5 +118,10 @@
     </div>
     {% if notes %}<div class="small" style="margin-top:8pt;"><span class="label">Notes:</span> {{ notes }}</div>{% endif %}
   </section>
+{% if exp.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exp.stamp_image }}" alt=""/>
+</div>
+{% endif %}
 </body>
 </html>

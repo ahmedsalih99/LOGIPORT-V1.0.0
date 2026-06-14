@@ -69,7 +69,11 @@
     .val { flex:1; border-bottom:1px dotted #000; min-height:18px; }
 
     @media print { .no-print { display:none !important; } }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
 
@@ -170,7 +174,14 @@
     <div class="line"><div class="lbl">Gross weight:</div><div class="val">{{ tafqit_gross_en or totals.total_gross_words_en or "" }}</div></div>
     <div class="line"><div class="lbl">Net weight:</div><div class="val">{{ tafqit_net_en or totals.total_net_words_en or "" }}</div></div>
     <div class="line"><div class="lbl">Grand total:</div><div class="val">{{ tafqit_total_value_en or totals.total_value_words_en or "" }}</div></div>
-  </div>
+  
+{% if exporter.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exporter.stamp_image }}" alt=""/>
+</div>
+{% endif %}
+
+</div>
 
 </body>
 </html>

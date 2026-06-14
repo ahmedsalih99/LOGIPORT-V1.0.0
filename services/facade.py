@@ -296,8 +296,16 @@ def render_document(
 
     # -------------------------------------------------------------------------
     # Render HTML
+    # لـ CMR: نمرر carrier_company_id لاختيار القالب الخاص بالشركة الناقلة
+    _carrier_cid = None
+    if doc_code in ("cmr", "cmr.copy1.sender", "cmr.copy2.consignee",
+                    "cmr.copy3.carrier", "cmr.copy4.archive"):
+        _car = ctx.get("carrier") or {}
+        if isinstance(_car, dict):
+            _carrier_cid = _car.get("id")
     try:
-        html_str = render_html(doc_code, lang, ctx)
+        html_str = render_html(doc_code, lang, ctx,
+                               carrier_company_id=_carrier_cid)
         logger.debug("HTML rendered successfully")
     except Exception:
         logger.exception(

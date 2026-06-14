@@ -27,7 +27,11 @@
     tbody td { padding: 4pt 3pt; vertical-align: top; border-top: .5pt solid #000; font-size: 9.5pt; }
     tfoot td { padding: 5pt 3pt; border-top: 1pt solid #000; font-weight: 700; font-size: 9.5pt; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
   {% set exp = exporter or {} %}
@@ -133,5 +137,10 @@
     <div class="small" style="margin-top:8pt;"><span class="label">Markalar:</span> {{ brands_note }}</div>
     {% endif %}
   </section>
+{% if exp.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exp.stamp_image }}" alt=""/>
+</div>
+{% endif %}
 </body>
 </html>

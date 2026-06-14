@@ -63,7 +63,20 @@ def _default_title_for_proforma(lang: str) -> str:
     return "PROFORMA INVOICE" if lang == "en" else ("ÖN FATURA" if lang == "tr" else "فاتورة أولية")
 
 
-def resolve_template(doc_code: str, lang: str) -> TemplateSpec:
+_CMR_COPY_FILES = {
+    "cmr.copy1.sender":    "copy1_sender.html",
+    "cmr.copy2.consignee": "copy2_consignee.html",
+    "cmr.copy3.carrier":   "copy3_carrier.html",
+    "cmr.copy4.archive":   "copy4_archive.html",
+}
+
+
+def resolve_template(doc_code: str, lang: str,
+                     carrier_company_id: int | None = None) -> TemplateSpec:
+    """
+    يحل مسار القالب المناسب.
+    carrier_company_id: لو مُرر، يبحث أولاً في مجلد company_{id} داخل مجلد CMR.
+    """
     if lang not in LANG_SUFFIX:
         raise FileNotFoundError(f"Unsupported language: {lang}")
 
@@ -73,18 +86,22 @@ def resolve_template(doc_code: str, lang: str) -> TemplateSpec:
 
     # ── CMR وأي مستند English-only: دائماً en.html ────────────────────────────
     if doc_code in _ENGLISH_ONLY_DOCS:
-        # اختر الـ template حسب النسخة
-        _CMR_COPY_FILES = {
-            "cmr.copy1.sender":    "copy1_sender.html",
-            "cmr.copy2.consignee": "copy2_consignee.html",
-            "cmr.copy3.carrier":   "copy3_carrier.html",
-            "cmr.copy4.archive":   "copy4_archive.html",
-        }
         template_file = _CMR_COPY_FILES.get(doc_code, "en.html")
+
+        # 1) قالب خاص بالشركة الناقلة — company_{id}/template_file
+        if carrier_company_id:
+            company_path = TEMPLATES_DIR / rel_folder / f"company_{carrier_company_id}" / template_file
+            if company_path.exists():
+                return TemplateSpec(doc_code, lang, company_path, None)
+            # fallback داخل مجلد الشركة: en.html
+            company_en = TEMPLATES_DIR / rel_folder / f"company_{carrier_company_id}" / "en.html"
+            if company_en.exists():
+                return TemplateSpec(doc_code, lang, company_en, None)
+
+        # 2) القالب الافتراضي
         path = TEMPLATES_DIR / rel_folder / template_file
         if path.exists():
             return TemplateSpec(doc_code, lang, path, None)
-        # fallback للـ en.html لو الملف غير موجود
         path = TEMPLATES_DIR / rel_folder / "en.html"
         if path.exists():
             return TemplateSpec(doc_code, lang, path, None)

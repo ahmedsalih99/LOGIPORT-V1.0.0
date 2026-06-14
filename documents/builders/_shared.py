@@ -134,12 +134,14 @@ def get_bank_info(s: Any, company_id: Optional[int]) -> str:
 
 def company_obj(s: Any, company_id: Optional[int], lang: str) -> Dict[str, Any]:
     """
-    يُعيد dict كامل لشركة مع bank_info محسوبة من company_banks.
+    يُعيد dict كامل لشركة مع bank_info + stamp_image.
     يُستخدم في جميع builders (فواتير + CMR + Form A + ...).
+    stamp_image يُقرأ بـ query منفصلة آمنة حتى لو العمود لم يُضَف بعد في DB القديمة.
     """
     if not company_id:
-        return {"name": "", "address": ""}
+        return {"name": "", "address": "", "stamp_image": ""}
     from sqlalchemy import text
+
     r = s.execute(text("""
         SELECT id,
                name_ar, name_en, name_tr,
@@ -149,7 +151,7 @@ def company_obj(s: Any, company_id: Optional[int], lang: str) -> Dict[str, Any]:
         FROM companies WHERE id=:id
     """), {"id": company_id}).mappings().first()
     if not r:
-        return {"name": "", "address": ""}
+        return {"name": "", "address": "", "stamp_image": ""}
 
     name    = r.get(f"name_{lang}")    or r.get("name_en")    or r.get("name_ar")    or r.get("name_tr")    or ""
     address = r.get(f"address_{lang}") or r.get("address_en") or r.get("address_ar") or r.get("address_tr") or ""
@@ -163,6 +165,23 @@ def company_obj(s: Any, company_id: Optional[int], lang: str) -> Dict[str, Any]:
             pass
 
     bank = get_bank_info(s, company_id)
+
+    # قراءة الختم بـ query منفصلة آمنة — لو العمود غير موجود بعد في DB القديمة لا يكسر شيء
+    stamp_data_url = ""
+    try:
+        rs = s.execute(
+            text("SELECT stamp_image FROM companies WHERE id=:id"),
+            {"id": company_id}
+        ).mappings().first()
+        raw_stamp = (rs.get("stamp_image") or "") if rs else ""
+        if raw_stamp:
+            if raw_stamp.startswith("data:"):
+                stamp_data_url = raw_stamp
+            else:
+                stamp_data_url = f"data:image/png;base64,{raw_stamp}"
+    except Exception:
+        # العمود غير موجود في DB بعد — نتجاهل بصمت
+        stamp_data_url = ""
 
     return {
         "id":                  r.get("id"),
@@ -183,6 +202,7 @@ def company_obj(s: Any, company_id: Optional[int], lang: str) -> Dict[str, Any]:
         "cr_no":               r.get("registration_number") or "",
         "registration_number": r.get("registration_number") or "",
         "bank_info":           bank,
+        "stamp_image":         stamp_data_url,
     }
 
 

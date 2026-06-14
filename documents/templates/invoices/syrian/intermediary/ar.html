@@ -60,7 +60,11 @@
     table.items.compact td { font-size: 10.5pt; }
 
     .hr { height: 2px; background:#000; margin: 8pt 0; }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
 
@@ -186,7 +190,14 @@
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">الوزن القائم:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_gross_ar or "" }}</div></div>
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">الوزن الصافي:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_net_ar or "" }}</div></div>
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">الإجمالي الكلي:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_total_value_ar or "" }}</div></div>
-  </div>
+  
+{% if exporter.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exporter.stamp_image }}" alt=""/>
+</div>
+{% endif %}
+
+</div>
 
 </body>
 </html>

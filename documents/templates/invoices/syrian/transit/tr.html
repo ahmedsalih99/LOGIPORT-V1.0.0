@@ -43,7 +43,11 @@
     tfoot td { font-weight:800; }
 
     @media print { .no-print { display:none !important; } }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
 
@@ -142,7 +146,14 @@ Ticaret Sicil No: {{ importer.cr_no }}{% endif %}
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Brüt ağırlık:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_gross_tr or "" }}</div></div>
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Net ağırlık:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_net_tr or "" }}</div></div>
     <div class="line" style="display:flex;gap:10px;margin:3px 0;"><div style="min-width:160px;font-weight:800;">Genel toplam:</div><div style="flex:1;border-bottom:1px dotted #000;min-height:18px;">{{ tafqit_total_value_tr or "" }}</div></div>
-  </div>
+  
+{% if exporter.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exporter.stamp_image }}" alt=""/>
+</div>
+{% endif %}
+
+</div>
 
 </body>
 </html>

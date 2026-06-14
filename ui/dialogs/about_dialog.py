@@ -50,46 +50,60 @@ class AboutDialog(BaseDialog):
         main.setSpacing(0)
 
         # ── Hero section ──────────────────────────────────────────────
-        try:
-            from core.theme_manager import ThemeManager
-            _c   = ThemeManager.get_instance().current_theme.colors
-            _pri = _c.get("primary",        "#2563EB")
-            _pa  = _c.get("primary_active", "#2C5AA0")
-        except Exception:
-            _pri, _pa = "#2563EB", "#2C5AA0"
-
         hero = QFrame()
         hero.setObjectName("card")
         hero.setStyleSheet(
-            f"QFrame#card {{ background: qlineargradient("
-            f"x1:0,y1:0,x2:1,y2:1, stop:0 {_pa}, stop:1 {_pri});"
-            f"border-radius: 0px; padding: 24px; }}"
+            "QFrame#card { background: qlineargradient("
+            "x1:0,y1:0,x2:1,y2:1, stop:0 #0D1B2A, stop:1 #1B2F4A);"
+            "border-radius: 0px; padding: 28px; }"
         )
         hero_lay = QVBoxLayout(hero)
+        hero_lay.setSpacing(10)
         hero_lay.setAlignment(Qt.AlignCenter)
 
-        logo_lbl = QLabel("🚢")
-        logo_lbl.setFont(QFont("Segoe UI Emoji", 42))
+        # ── Logo image ────────────────────────────────────────────────
+        logo_lbl = QLabel()
         logo_lbl.setAlignment(Qt.AlignCenter)
-        logo_lbl.setStyleSheet("background: transparent; color: white;")
+        logo_lbl.setStyleSheet("background: transparent;")
+        try:
+            from core.paths import icons_path
+            import os
+            logo_path = str(icons_path("logo.png"))
+            if os.path.exists(logo_path):
+                pix = QPixmap(logo_path).scaledToHeight(80, Qt.SmoothTransformation)
+                logo_lbl.setPixmap(pix)
+            else:
+                logo_lbl.setText("LP")
+                logo_lbl.setFont(QFont("Tajawal", 36, QFont.Bold))
+                logo_lbl.setStyleSheet("background: transparent; color: #C9A84C;")
+        except Exception:
+            logo_lbl.setText("LP")
+            logo_lbl.setFont(QFont("Tajawal", 36, QFont.Bold))
+            logo_lbl.setStyleSheet("background: transparent; color: #C9A84C;")
         hero_lay.addWidget(logo_lbl)
 
+        # ── Gold divider ──────────────────────────────────────────────
+        divider = QFrame()
+        divider.setFixedSize(60, 3)
+        divider.setStyleSheet("background: #C9A84C; border-radius: 2px;")
+        hero_lay.addWidget(divider, 0, Qt.AlignHCenter)
+
         name_lbl = QLabel(APP_NAME)
-        name_lbl.setFont(QFont("Tajawal", 28, QFont.Bold))
+        name_lbl.setFont(QFont("Tajawal", 26, QFont.Bold))
         name_lbl.setAlignment(Qt.AlignCenter)
-        name_lbl.setStyleSheet("background: transparent; color: white;")
+        name_lbl.setStyleSheet("background: transparent; color: #FFFFFF; letter-spacing: 3px;")
         hero_lay.addWidget(name_lbl)
 
         sub_lbl = QLabel(self._("app_subtitle"))
-        sub_lbl.setFont(QFont("Tajawal", 12))
+        sub_lbl.setFont(QFont("Tajawal", 11))
         sub_lbl.setAlignment(Qt.AlignCenter)
-        sub_lbl.setStyleSheet("background: transparent; color: rgba(255,255,255,0.85);")
+        sub_lbl.setStyleSheet("background: transparent; color: rgba(201, 168, 76, 0.90);")
         hero_lay.addWidget(sub_lbl)
 
         ver_lbl = QLabel(f"v{APP_VERSION}")
-        ver_lbl.setFont(QFont("Tajawal", 11))
+        ver_lbl.setFont(QFont("Tajawal", 10))
         ver_lbl.setAlignment(Qt.AlignCenter)
-        ver_lbl.setStyleSheet("background: transparent; color: rgba(255,255,255,0.7);")
+        ver_lbl.setStyleSheet("background: transparent; color: rgba(255,255,255,0.55);")
         hero_lay.addWidget(ver_lbl)
 
         main.addWidget(hero)

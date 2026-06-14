@@ -12,10 +12,10 @@ from PySide6.QtWidgets import (
     QLineEdit, QTextEdit, QComboBox, QCheckBox,
     QTabWidget, QScrollArea, QWidget,
     QFormLayout, QLabel, QFrame,
-    QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy,
+    QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy, QFileDialog,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 from ui.utils.wheel_blocker import block_wheel_in
 
 from database.crud.countries_crud import CountriesCRUD
@@ -51,7 +51,7 @@ class AddCompanyDialog(BaseDialog):
     Tab 2 - التفاصيل: owner_client, country, city, phone, email, website
     Tab 3 - العناوين: address_ar, address_en, address_tr
     Tab 4 - المالية:  default_currency, tax_id, registration_number
-    Tab 5 - الإعدادات: is_active, notes
+    Tab 5 - الإعدادات: is_active, notes, stamp_image
     """
 
     def __init__(self, parent=None, company=None, *, currencies=None):
@@ -75,6 +75,9 @@ class AddCompanyDialog(BaseDialog):
             self._clients = ClientsCRUD().get_all() or []
         except Exception:
             self._clients = []
+
+        # حفظ base64 للختم — None يعني "لا تغيير"، "" يعني "احذف الختم"
+        self._stamp_base64 = None
 
         title_key = "add_company" if not company else "edit_company"
         self.set_translated_title(title_key)
@@ -179,6 +182,10 @@ class AddCompanyDialog(BaseDialog):
         f5.addRow(self.chk_active)
         self.notes = _AutoTextEdit()
         self._row(f5, "notes", self.notes)
+
+        # ── قسم الختم والتوقيع ───────────────────────────────────────────
+        self._build_stamp_section(f5)
+
         self._tabs.addTab(tab5, self._("settings"))
 
         root.addWidget(self._tabs, 1)   # stretch=1 → يأخذ كل المساحة المتاحة
@@ -211,6 +218,123 @@ class AddCompanyDialog(BaseDialog):
 
         root.addWidget(sep2)
         root.addWidget(footer)
+
+    def _build_stamp_section(self, form: QFormLayout):
+        """يبني قسم رفع/حذف الختم والتوقيع داخل Tab الإعدادات."""
+        import os
+
+        # عنوان القسم
+        sep_lbl = QLabel()
+        sep_lbl.setObjectName("form-dialog-label")
+        sep_lbl.setTextFormat(Qt.RichText)
+        sep_lbl.setText(
+            "<hr style='margin:6px 0;'>"
+            "<span style='font-weight:700;'>🖊 ختم وتوقيع الشركة (اختياري)</span>"
+        )
+        form.addRow(sep_lbl)
+
+        # معاينة الختم
+        self._stamp_preview = QLabel()
+        self._stamp_preview.setAlignment(Qt.AlignCenter)
+        self._stamp_preview.setFixedSize(180, 100)
+        self._stamp_preview.setStyleSheet(
+            "border: 1px dashed #aaa; border-radius: 6px; background: #fafafa;"
+        )
+        self._stamp_preview.setText("لا يوجد ختم")
+        self._stamp_preview.setObjectName("stamp-preview")
+
+        # أزرار الرفع والحذف
+        btn_upload = QPushButton("📂  رفع ختم (PNG شفاف)")
+        btn_upload.setObjectName("secondary-btn")
+        btn_upload.setMinimumWidth(160)
+        btn_upload.clicked.connect(self._on_upload_stamp)
+
+        self._btn_del_stamp = QPushButton("🗑  حذف الختم")
+        self._btn_del_stamp.setObjectName("danger-btn")
+        self._btn_del_stamp.setMinimumWidth(120)
+        self._btn_del_stamp.setEnabled(False)
+        self._btn_del_stamp.clicked.connect(self._on_delete_stamp)
+
+        btn_row = QWidget()
+        btn_lay = QHBoxLayout(btn_row)
+        btn_lay.setContentsMargins(0, 0, 0, 0)
+        btn_lay.setSpacing(8)
+        btn_lay.addWidget(btn_upload)
+        btn_lay.addWidget(self._btn_del_stamp)
+        btn_lay.addStretch()
+
+        hint = QLabel("PNG بخلفية شفافة، حجم أقصى 500 KB")
+        hint.setStyleSheet("color: #888; font-size: 9pt;")
+
+        form.addRow(self._stamp_preview)
+        form.addRow(btn_row)
+        form.addRow(hint)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stamp handlers
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _on_upload_stamp(self):
+        """يفتح نافذة اختيار ملف PNG ويحفظه كـ base64."""
+        import base64, os
+        path, _ = QFileDialog.getOpenFileName(
+            self, "اختر صورة الختم والتوقيع", "", "PNG Images (*.png)"
+        )
+        if not path:
+            return
+
+        # التحقق من الحجم (500 KB max)
+        size_kb = os.path.getsize(path) / 1024
+        if size_kb > 500:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "حجم كبير",
+                f"حجم الملف {size_kb:.0f} KB أكبر من الحد المسموح (500 KB).\n"
+                "يرجى ضغط الصورة أو تصغيرها."
+            )
+            return
+
+        with open(path, "rb") as f:
+            raw = f.read()
+
+        self._stamp_base64 = base64.b64encode(raw).decode("utf-8")
+        self._refresh_stamp_preview()
+
+    def _on_delete_stamp(self):
+        """يحذف الختم الحالي (يضع قيمة فارغة)."""
+        self._stamp_base64 = ""        # "" = احذف من DB
+        self._stamp_preview.setText("لا يوجد ختم")
+        self._stamp_preview.setPixmap(QPixmap())
+        self._btn_del_stamp.setEnabled(False)
+
+    def _refresh_stamp_preview(self, base64_str: str = None):
+        """يحدّث معاينة الختم من base64 string."""
+        import base64 as b64mod
+        b64 = base64_str if base64_str is not None else self._stamp_base64
+        if not b64:
+            self._stamp_preview.setText("لا يوجد ختم")
+            self._stamp_preview.setPixmap(QPixmap())
+            self._btn_del_stamp.setEnabled(False)
+            return
+        try:
+            raw = b64mod.b64decode(b64)
+            px = QPixmap()
+            px.loadFromData(raw)
+            if not px.isNull():
+                px = px.scaled(
+                    self._stamp_preview.width() - 8,
+                    self._stamp_preview.height() - 8,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+                self._stamp_preview.setPixmap(px)
+                self._stamp_preview.setText("")
+                self._btn_del_stamp.setEnabled(True)
+                return
+        except Exception:
+            pass
+        self._stamp_preview.setText("صورة غير صالحة")
+        self._btn_del_stamp.setEnabled(False)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Tab / row helpers
@@ -347,6 +471,17 @@ class AddCompanyDialog(BaseDialog):
         self.chk_active.setChecked(bool(is_active) if is_active is not None else True)
         self.notes.setPlainText(g("notes") or "")
 
+        # تحميل الختم الموجود للمعاينة
+        existing_stamp = g("stamp_image") or ""
+        # إزالة prefix data URL لو كان موجوداً (نحتاج base64 فقط)
+        if existing_stamp.startswith("data:image"):
+            try:
+                existing_stamp = existing_stamp.split(",", 1)[1]
+            except IndexError:
+                existing_stamp = ""
+        if existing_stamp:
+            self._refresh_stamp_preview(existing_stamp)
+
     def _get(self, key, default=None):
         if isinstance(self._company, dict):
             return self._company.get(key, default)
@@ -363,7 +498,7 @@ class AddCompanyDialog(BaseDialog):
         elif isinstance(self.cmb_owner, QComboBox):
             owner_val = self.cmb_owner.currentData()
 
-        return {
+        data = {
             "name_ar":             (self.name_ar.text() or "").strip().upper(),
             "name_en":             (self.name_en.text() or "").strip().upper(),
             "name_tr":             (self.name_tr.text() or "").strip().upper(),
@@ -382,6 +517,12 @@ class AddCompanyDialog(BaseDialog):
             "is_active":           self.chk_active.isChecked(),
             "notes":               (self.notes.toPlainText() or "").strip(),
         }
+
+        # الختم: None = لا تغيير، "" = احذف، "base64..." = ختم جديد
+        if self._stamp_base64 is not None:
+            data["stamp_image"] = self._stamp_base64 or None
+
+        return data
 
     def accept(self):
         d = self.get_data()

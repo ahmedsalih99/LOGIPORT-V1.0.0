@@ -105,14 +105,29 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
         currency_code = cur["code"] if cur else ""
         delivery_method = _name(dm, lang) if dm else ""
 
-        # الأطراف
-        exp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
-                        {"id": t["exporter_company_id"]}).mappings().first()
+        # الأطراف — نستخدم _company_obj لضمان وجود stamp_image وكل الحقول
+        exp_obj = _company_obj(s, t["exporter_company_id"], lang) or {}
+        _ensure(exp_obj.get("name") or exp_obj.get("id"), "شركة المصدّر غير موجودة.")
 
-        # get_bank_info from _shared
-        _ensure(exp, "شركة المصدّر غير موجودة.")
-        imp = s.execute(text(f"SELECT id, name_{lang} AS name, address_{lang} AS address FROM companies WHERE id=:id"),
-                        {"id": t["importer_company_id"]}).mappings().first()
+        # wrapper يحاكي الـ RowMapping القديم (name/address) مع إضافة stamp_image
+        class _R(dict):
+            def __getitem__(self, k): return self.get(k, "")
+
+        exp = _R({
+            "id":      exp_obj.get("id"),
+            "name":    exp_obj.get("name", ""),
+            "address": exp_obj.get("address", ""),
+            "stamp_image": exp_obj.get("stamp_image", ""),
+        })
+
+        imp_obj = _company_obj(s, t["importer_company_id"], lang) or {}
+        imp = _R({
+            "id":      imp_obj.get("id"),
+            "name":    imp_obj.get("name", ""),
+            "address": imp_obj.get("address", ""),
+            "stamp_image": imp_obj.get("stamp_image", ""),
+        }) if imp_obj.get("id") else None
+
         cli = s.execute(text(f"SELECT id, name_{lang} AS name, COALESCE(address_{lang}, address) AS address FROM clients WHERE id=:id"),
                         {"id": t["client_id"]}).mappings().first()
         # بعض الفواتير قد تستخدم consignee = client
@@ -190,14 +205,20 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
             # لا افتراضات نصية؛ نتركها فارغة إذا الخدمة غير متوفرة
             amount_in_words = ""
 
+        exp_bank = _get_bank_info(s, t["exporter_company_id"])
         ctx: Dict[str, Any] = {
             "title": None,  # العنوان من القالب
             "date": t["transaction_date"],
             "exporter": {"name": exp["name"], "addr": exp["address"],
-                         "bank_info": _get_bank_info(s, t["exporter_company_id"])},
-            "bank_info": _get_bank_info(s, t["exporter_company_id"]),
+                         "bank_info": exp_bank,
+                         "stamp_image": exp.get("stamp_image", "")},
+            "exp": {"name": exp["name"], "addr": exp["address"],
+                    "bank_info": exp_bank,
+                    "stamp_image": exp.get("stamp_image", "")},
+            "bank_info": exp_bank,
             "consignee": {"name": consignee["name"], "addr": consignee["address"]},
-            "importer": {"name": imp["name"], "addr": imp["address"]} if imp else None,
+            "importer": {"name": imp["name"], "addr": imp["address"],
+                         "stamp_image": imp.get("stamp_image", "") if imp else ""} if imp else None,
             "shipment": {
                 "delivery_method": delivery_method,
                 "transport_type": t["transport_type"],

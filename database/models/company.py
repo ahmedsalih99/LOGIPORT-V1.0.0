@@ -35,7 +35,6 @@ class Company(Base):
     # Defaults & meta
     default_currency_id = Column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=True)
 
-
     # Contacts
     phone = Column(String(64), nullable=True)
     email = Column(String(255), nullable=True)
@@ -49,6 +48,9 @@ class Company(Base):
     bank_info = Column(Text, nullable=True)     # IBAN / SWIFT / account info
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="1")
+
+    # ختم وتوقيع الشركة — base64 PNG بخلفية شفافة (nullable = اختياري)
+    stamp_image = Column(Text, nullable=True)
 
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

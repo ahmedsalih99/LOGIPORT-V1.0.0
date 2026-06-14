@@ -227,6 +227,16 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: bank_info migration skipped: %s", _e)
 
+    # Migration: stamp_image column for companies — ختم وتوقيع الشركة (اختياري، base64 PNG)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(companies)").fetchall()]
+        if "stamp_image" not in cols:
+            conn.execute("ALTER TABLE companies ADD COLUMN stamp_image TEXT")
+            conn.commit()
+            logger.info("Bootstrap: added stamp_image to companies")
+    except Exception as _e:
+        logger.warning("Bootstrap: stamp_image migration skipped: %s", _e)
+
     # Migration: avatar_path column for users
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]

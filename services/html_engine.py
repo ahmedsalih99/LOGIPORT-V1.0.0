@@ -16,9 +16,15 @@ _env = Environment(
     lstrip_blocks=True,
 )
 
-def render_html(doc_code: str, lang: str, ctx: Dict) -> str:
+def render_html(doc_code: str, lang: str, ctx: Dict,
+                carrier_company_id: int | None = None) -> str:
+    """
+    يُصيّر HTML من قالب Jinja2.
+    carrier_company_id: لو مُرر مع CMR، يبحث عن قالب خاص بالشركة الناقلة أولاً.
+    """
     try:
-        spec = resolve_template(doc_code, lang)
+        spec = resolve_template(doc_code, lang,
+                                carrier_company_id=carrier_company_id)
     except FileNotFoundError as e:
         raise TemplateNotFoundError(doc_code=doc_code, lang=lang) from e
 

@@ -37,6 +37,10 @@ table th{ background:#f2f2f2; font-weight:bold; }
 .totals-row td{ font-weight:bold; background:#fafafa; }
 .amount-in-words{ margin-top:15px; }
 .amount-in-words p{ margin:4px 0; }
+
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
 </style>
 </head>
 <body>
@@ -144,6 +148,13 @@ table th{ background:#f2f2f2; font-weight:bold; }
     <div class="section-title">Banka Bilgileri</div>
     <div>{{ (bank_info or exp.bank_info) | replace('\n','<br>') | safe }}</div>
     {% endif %}
+
+
+{% if exp.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exp.stamp_image }}" alt=""/>
+</div>
+{% endif %}
 
 </div>
 </body>

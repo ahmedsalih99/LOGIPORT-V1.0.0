@@ -82,11 +82,13 @@ tbody tr:nth-child(even) { background: #f7f9fc; }
 .words-box span { font-weight: 700; }
 
 /* Signature */
-.sig-row { display: flex; gap: 30px; margin-top: 20px; }
-.sig-box { flex: 1; border-top: 1px solid #555; padding-top: 5px; text-align: center; font-size: 8.5pt; color: #555; }
 
 /* Footer note */
 .footer-note { margin-top: 10px; font-size: 7.5pt; color: #888; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 5px; }
+
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
 </style>
 </head>
 <body>
@@ -230,13 +232,14 @@ tbody tr:nth-child(even) { background: #f7f9fc; }
         {% if value_in_words %}<p><span>VALUE :</span> {{ value_in_words | upper }}</p>{% endif %}
     </div>
 
-    <!-- Signatures -->
-    <div class="sig-row">
-        <div class="sig-box">EXPORTER<br><br>{{ exp.name or '' }}</div>
-        <div class="sig-box">SELLER<br><br>{{ sel.name or '' }}</div>
-        <div class="sig-box">AUTHORIZED SIGNATURE</div>
-    </div>
+    
+{% if exp.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exp.stamp_image }}" alt=""/>
+</div>
+{% endif %}
 
+    
     <div class="footer-note">This invoice is issued in accordance with international trade standards.</div>
 
 </div>

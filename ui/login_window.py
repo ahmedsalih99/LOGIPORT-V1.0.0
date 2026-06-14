@@ -130,10 +130,29 @@ class LoginWindow(BaseDialog):
             logo_label.setAlignment(Qt.AlignHCenter)
 
         # ========== App Title ==========
+        # الاسم التجاري ثابت دائماً — لا يُترجم
         self.title_label = QLabel("LOGIPORT")
-        self.title_label.setObjectName("title")
+        self.title_label.setObjectName("login-brand-title")
         self.title_label.setAlignment(Qt.AlignHCenter)
         self.title_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.title_label.setStyleSheet(
+            "font-size: 22px; font-weight: 800; letter-spacing: 4px;"
+            "color: #0D1B2A; background: transparent;"
+        )
+
+        # Subtitle — يُترجم
+        self.subtitle_label = QLabel()
+        self.subtitle_label.setObjectName("login-brand-subtitle")
+        self.subtitle_label.setAlignment(Qt.AlignHCenter)
+        self.subtitle_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.subtitle_label.setStyleSheet(
+            "font-size: 11px; color: #C9A84C; background: transparent; letter-spacing: 1px;"
+        )
+
+        # Gold divider under title
+        self.title_divider = QFrame()
+        self.title_divider.setFixedSize(40, 2)
+        self.title_divider.setStyleSheet("background: #C9A84C; border-radius: 1px;")
 
         # ========== Language Selector ==========
         self.language_box = QComboBox()
@@ -148,9 +167,10 @@ class LoginWindow(BaseDialog):
         self.language_box.currentIndexChanged.connect(self.change_language)
 
         # ✅ Width proportional
-        lang_max_width = int(dialog_width * 0.28)  # 28% of dialog width
-        self.language_box.setMaximumWidth(lang_max_width)
-        self.language_box.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        # عرض كافي لعرض "العربية" / "English" / "Türkçe" بالكامل
+        self.language_box.setMinimumWidth(110)
+        self.language_box.setMaximumWidth(130)
+        self.language_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         # ========== Username Field ==========
         self.label_user = QLabel()
@@ -267,8 +287,12 @@ class LoginWindow(BaseDialog):
         card_layout.addWidget(logo_label, 0, Qt.AlignHCenter)
         card_layout.addSpacing(medium_spacing)
 
-        # Title
+        # Title block
         card_layout.addWidget(self.title_label)
+        card_layout.addSpacing(4)
+        card_layout.addWidget(self.title_divider, 0, Qt.AlignHCenter)
+        card_layout.addSpacing(4)
+        card_layout.addWidget(self.subtitle_label)
         card_layout.addSpacing(large_spacing)
 
         # Username field
@@ -391,9 +415,13 @@ class LoginWindow(BaseDialog):
         # Window title
         self.set_translated_title("login_title")
 
-        # App title
+        # Brand title ثابت دائماً
         if hasattr(self, "title_label") and self.title_label:
-            self.title_label.setText(self._("app_title"))
+            self.title_label.setText("LOGIPORT")
+
+        # Subtitle يتترجم
+        if hasattr(self, "subtitle_label") and self.subtitle_label:
+            self.subtitle_label.setText(self._("app_subtitle"))
 
         # Username field
         if hasattr(self, "edit_user"):

@@ -32,6 +32,7 @@ class TransportTabMixin:
 
     def _build_transport_tab(self):
         """أنشئ التبويب وأضفه لـ self.tabs."""
+        self._cmr2_active = False
         tab = QWidget()
         tab.setObjectName("transport-tab")
 
@@ -120,10 +121,12 @@ class TransportTabMixin:
     def _show_cmr2_section(self):
         self._cmr2_widget.setVisible(True)
         self._btn_add_cmr2.setVisible(False)
+        self._cmr2_active = True
 
     def _hide_cmr2_section(self):
         self._cmr2_widget.setVisible(False)
         self._btn_add_cmr2.setVisible(True)
+        self._cmr2_active = False
         # مسح البيانات عند الإغلاق
         for w in [
             self.txt_cmr2_label, self.txt_cmr2_no,
@@ -456,7 +459,7 @@ class TransportTabMixin:
         }
 
         # CMR الثاني — يُضاف فقط إذا كان القسم مرئياً
-        if getattr(self, "_cmr2_widget", None) and self._cmr2_widget.isVisible():
+        if getattr(self, "_cmr2_active", False):
             # تاريخ الشحن الثاني
             shipment_date_2 = None
             if getattr(self, "_shipment_date_2_set", False):

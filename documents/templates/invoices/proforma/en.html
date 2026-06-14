@@ -92,7 +92,11 @@
 
     /* reduce row breaks across pages when possible */
     tr, td, th { page-break-inside: avoid; }
-  </style>
+  
+.sig-stamp-wrap { margin-top: 20px; text-align: right; }
+.sig-stamp-img  { max-width: 140px; max-height: 75px; object-fit: contain;
+                  mix-blend-mode: multiply; opacity: 0.88; display: inline-block; }
+</style>
 </head>
 <body>
 
@@ -286,7 +290,14 @@
     <strong>Prepared by:</strong> {{ exporter.name }}
     &nbsp;&nbsp;|&nbsp;&nbsp;
     <strong>Date:</strong> {{ date }}
-  </div>
+  
+{% if exporter.stamp_image %}
+<div class="sig-stamp-wrap">
+  <img class="sig-stamp-img" src="{{ exporter.stamp_image }}" alt=""/>
+</div>
+{% endif %}
+
+</div>
 
 </body>
 </html>
