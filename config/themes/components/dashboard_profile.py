@@ -97,13 +97,14 @@ def get_styles(theme):
     }}
 
     QFrame#activity-item {{
-        background: {c["bg_hover"]};
-        border-radius: 10px;
+        background: {c["bg_surface_2"]};
+        border-radius: 8px;
         border: none;
     }}
 
     QFrame#activity-item:hover {{
-        background: {c["bg_active"]};
+        background: {c["bg_surface_1"]};
+        border-left: 2px solid #C9A84C;
     }}
 
     QLabel#activity-msg {{
@@ -122,9 +123,9 @@ def get_styles(theme):
         background: {c["bg_card"]};
         border: none;
         gridline-color: transparent;
-        alternate-background-color: {c["bg_hover"]};
-        selection-background-color: {c["primary_light"]};
-        selection-color: {c["primary"]};
+        alternate-background-color: {c["bg_surface_2"]};
+        selection-background-color: rgba(201,168,76,0.12);
+        selection-color: {c["text_primary"]};
         outline: none;
         font-size: {s["base"]}px;
     }}
@@ -135,8 +136,8 @@ def get_styles(theme):
     }}
 
     QTableWidget#data-table QHeaderView::section {{
-        background: {c["bg_hover"]};
-        color: {c["text_secondary"]};
+        background: #0D1B2A;
+        color: rgba(201, 168, 76, 0.9);
         font-weight: 700;
         font-size: {s["sm"]}px;
         padding: 8px 10px;
@@ -172,27 +173,24 @@ def get_styles(theme):
         color: {c["text_primary"]};
     }}
 
-    /* ===== KPI CARDS (v3.4) ===== */
+    /* ===== KPI CARDS — Brand Navy+Gold ===== */
 
     QFrame#kpi-card {{
         background: {c["bg_card"]};
         border-radius: 10px;
         border: 1px solid {c["border"]};
-        min-height: 78px;
-        max-height: 90px;
+        min-height: 95px;
     }}
     QFrame#kpi-card:hover {{
-        background: {c["bg_hover"]};
+        border-color: #C9A84C55;
+        background: {c["bg_card"]};
     }}
 
-    /* ===== MINI PROGRESS CARDS ===== */
+    /* ===== TYPE PROGRESS ROW ===== */
 
-    QFrame#mini-progress-card {{
-        background: {c["bg_card"]};
-        border-radius: 8px;
-        border: 1px solid {c["border"]};
-        min-height: 68px;
-        max-height: 80px;
+    QFrame#type-progress-row {{
+        background: transparent;
+        border: none;
     }}
 
     /* ===== TASKS STRIP ===== */
@@ -201,6 +199,14 @@ def get_styles(theme):
         background: {c["bg_card"]};
         border-radius: 7px;
         border: 1px solid {c["border"]};
+    }}
+
+    /* ===== HERO BANNER ===== */
+
+    QFrame#hero-banner {{
+        background: #0D1B2A;
+        border-radius: 12px;
+        border: none;
     }}
 
     """

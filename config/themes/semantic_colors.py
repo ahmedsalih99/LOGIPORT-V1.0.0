@@ -60,12 +60,12 @@ class SemanticColors:
             # ========== Backgrounds ==========
             "bg_main":                  "#FFFFFF",
             "bg_card":                  "#FFFFFF",
-            "bg_hover":                 "#F5EDD6",      # Gold 50 warm tint
-            "bg_active":                "#F0E4C0",      # Slightly deeper gold tint
+            "bg_hover":                 "#F4F6F9",      # خلفية hover محايدة
+            "bg_active":                "#EBF0F7",      # خلفية active محايدة
             "bg_disabled":              "#F3F4F6",
-            "bg_selected":              "#FBF7EE",      # Gold 50
+            "bg_selected":              "#EBF0F7",      # selected محايد
             "bg_main_gradient_start":   "#FFFFFF",
-            "bg_main_gradient_end":     "#F8F7F4",      # Warm off-white
+            "bg_main_gradient_end":     "#F5F7FA",      # off-white محايد
             "bg_elevated":              "#FFFFFF",
             "bg_sidebar":               "#0D1B2A",      # Navy Midnight
             "bg_topbar":                "#FFFFFF",
@@ -73,9 +73,9 @@ class SemanticColors:
 
             # Surface levels
             "bg_surface_1":     "#FFFFFF",
-            "bg_surface_2":     "#F8F7F4",
-            "bg_surface_3":     "#FBF7EE",
-            "bg_surface_focus": "#FBF7EE",
+            "bg_surface_2":     "#F4F6F9",
+            "bg_surface_3":     "#EBF0F7",
+            "bg_surface_focus": "#EBF0F7",
 
             # ========== Sidebar Colors ==========
             "sidebar_text":         "#FFFFFF",
@@ -146,7 +146,7 @@ class SemanticColors:
             "chart_green_light":"#6EE7B7",
 
             # ========== Background aliases (legacy support) ==========
-            "background":   "#F8F7F4",
+            "background":   "#F5F7FA",
             "surface":      "#FFFFFF",
         }
 
