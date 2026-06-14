@@ -173,18 +173,8 @@ def get_styles(theme):
         color: {c["text_primary"]};
     }}
 
-    /* ===== KPI CARDS — Brand Navy+Gold ===== */
-
-    QFrame#kpi-card {{
-        background: {c["bg_card"]};
-        border-radius: 10px;
-        border: 1px solid {c["border"]};
-        min-height: 95px;
-    }}
-    QFrame#kpi-card:hover {{
-        border-color: #C9A84C55;
-        background: {c["bg_card"]};
-    }}
+    /* ===== KPI CARDS — مُتحكم بها من dashboard_tab.py مباشرة ===== */
+    /* لا نضع style هنا — كل KpiCard تتحكم بنفسها عبر _apply_theme() */
 
     /* ===== TYPE PROGRESS ROW ===== */
 

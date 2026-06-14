@@ -12,8 +12,7 @@ Enhanced base class for all dialogs with:
 import logging
 from typing import Optional, Any
 from PySide6.QtWidgets import (
-    QDialog, QMessageBox, QApplication,
-    QVBoxLayout, QWidget, QLineEdit)
+    QDialog, QMessageBox, QApplication, QLineEdit)
 
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtCore import Qt, Signal

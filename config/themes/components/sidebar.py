@@ -21,8 +21,8 @@ def get_styles(theme):
     }}
 
     QFrame#pill-inner {{
-        background   : {c["bg_card"]};
-        border       : 1px solid {c["border"]};
+        background   : #0D1B2A;
+        border       : 1px solid rgba(201, 168, 76, 0.20);
         border-radius: 40px;
     }}
 
@@ -43,19 +43,22 @@ def get_styles(theme):
     }}
 
     QToolButton#pill-tab-btn:hover {{
-        background : {c["bg_hover"]};
-        color      : {c["text_primary"]};
+        background: rgba(255, 255, 255, 0.10);
+        color     : rgba(255, 255, 255, 0.90);
     }}
 
     QToolButton#pill-tab-btn:checked {{
-        background : {c["primary"]};
-        color      : #FFFFFF;
-        font-weight: 700;
+        background   : #0D1B2A;
+        color        : #C9A84C;
+        font-weight  : 700;
         border-radius: 12px;
+        border       : 1px solid rgba(201, 168, 76, 0.35);
     }}
 
     QToolButton#pill-tab-btn:checked:hover {{
-        background : {c["primary_hover"]};
+        background: #1B2F4A;
+        color     : #D4B86A;
+        border    : 1px solid rgba(201, 168, 76, 0.55);
     }}
 
     /* ── backward compat — لو في مكان يستخدم sidebar-btn ────────── */

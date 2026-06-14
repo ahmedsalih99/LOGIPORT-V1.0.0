@@ -15,7 +15,6 @@ Public API:
 
 # Settings & Configuration
 from .settings_manager import SettingsManager
-from .config import Config
 
 # Translation
 from .translator import TranslationManager
@@ -49,7 +48,6 @@ from .logging_config import LoggingConfig
 __all__ = [
     # Settings
     "SettingsManager",
-    "Config",
 
     # Translation
     "TranslationManager",

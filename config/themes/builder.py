@@ -157,16 +157,25 @@ class ThemeBuilder:
             color     : {c["primary"]};
         }}
 
-        /* Nav pill buttons — force text color explicitly */
+        /* Nav pill buttons — LOGIPORT Brand Colors */
         QToolButton#pill-tab-btn {{
-            color    : {c["text_secondary"]};
+            color    : #8899AA;
             font-size: 9px;
+            border   : 1px solid transparent;
         }}
         QToolButton#pill-tab-btn:hover {{
-            color: {c["text_primary"]};
+            color     : #CCDDEE;
+            background: rgba(255, 255, 255, 0.08);
         }}
         QToolButton#pill-tab-btn:checked {{
-            color: #FFFFFF;
+            background   : #0D1B2A;
+            color        : #C9A84C;
+            border       : 1px solid rgba(201, 168, 76, 0.35);
+            border-radius: 12px;
+        }}
+        QToolButton#pill-tab-btn:checked:hover {{
+            background: #1B2F4A;
+            color     : #D4B86A;
         }}
         """
 

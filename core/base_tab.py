@@ -1264,7 +1264,32 @@ class BaseTab(QWidget):
     # ─────────────────────────────────────────────────────────────────────
 
     def _show_context_menu(self, pos):
-        rows  = self.get_selected_rows()
+        # احسب الصف الذي تم الكليك اليمين فوقه
+        clicked_index = self.table.indexAt(pos)
+        clicked_visual_row = clicked_index.row() if clicked_index.isValid() else -1
+
+        rows = self.get_selected_rows()
+
+        # إذا الـ selection فارغ أو الصف المكلوك عليه مش ضمن التحديد الحالي
+        # استخدم الصف المكلوك عليه مباشرةً بدون الاعتماد على selectRow
+        if clicked_visual_row >= 0:
+            selected_visual_rows = {
+                idx.row() for idx in self.table.selectionModel().selectedRows()
+            }
+            if not selected_visual_rows or clicked_visual_row not in selected_visual_rows:
+                item = self.table.item(clicked_visual_row, 1)
+                if item is not None:
+                    row_data = item.data(Qt.UserRole)
+                    if row_data is not None and self.data:
+                        try:
+                            rows = [self.data.index(row_data)]
+                        except ValueError:
+                            rows = [clicked_visual_row]
+                    else:
+                        rows = [clicked_visual_row]
+                else:
+                    rows = [clicked_visual_row]
+
         count = len(rows)
         menu  = QMenu(self)
 
@@ -1295,7 +1320,10 @@ class BaseTab(QWidget):
         action = menu.exec(self.table.mapToGlobal(pos))
         if action is None:
             return
-        if action == act_view   and rows: self.request_view.emit(rows[0])
+        if action == act_view and rows:
+            # request_view مش متصل في كل التابات — استخدم row_double_clicked
+            # الذي هو المتصل الموحد لفتح العرض في جميع التابات
+            self.row_double_clicked.emit(rows[0])
         elif action == act_edit and rows: self.request_edit.emit(rows[0])
         elif action == act_copy and rows: self.copy_selected()
         elif action == act_delete and rows: self.request_delete.emit(rows)
@@ -1334,7 +1362,8 @@ class BaseTab(QWidget):
                 except ValueError:
                     pass
         self.row_double_clicked.emit(row)
-        self.request_view.emit(row)
+        # ملاحظة: request_view لا يُطلق من هنا — row_double_clicked هو المتصل الموحد
+        # (request_view كان يسبب فتح الديالوج مرتين في transactions_tab)
 
     # backward-compat — بعض التابات تعيد تعريف on_row_double_clicked
     def on_row_double_clicked(self, index):

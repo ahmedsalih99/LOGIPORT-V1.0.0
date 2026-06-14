@@ -18,7 +18,7 @@ from PySide6.QtCore import Signal
 
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
-from utils.user_utils import get_current_user, get_user_display_name, get_user_id
+from utils.user_utils import get_current_user, get_user_display_name
 
 logger = logging.getLogger(__name__)
 

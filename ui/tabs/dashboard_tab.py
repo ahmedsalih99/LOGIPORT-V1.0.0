@@ -174,7 +174,7 @@ class KpiCard(QFrame):
         super().__init__(parent)
         self._card_key = card_key
         self._accent   = _CARD_ACCENTS.get(card_key, GOLD)
-        self.setObjectName("kpi-card")
+        self.setObjectName("kpi-card-widget")
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self._icon_str = icon
         self._build(title, value, subtitle, icon)
@@ -193,16 +193,20 @@ class KpiCard(QFrame):
         ts  = _c("text_secondary","#64748B")
         bh  = _c("border_hover",  "#C9A84C")
 
+        # نستخدم setStyleSheet مرتين — مرة على الـ widget نفسه بـ * selector
+        # لضمان التغلب على الـ global stylesheet
         self.setStyleSheet(f"""
-            QFrame#kpi-card {{
-                background : {bg};
-                border      : 1px solid {bdr};
-                border-top  : 3px solid {accent};
-                border-radius: 10px;
+            QFrame#kpi-card-widget {{
+                background    : {bg};
+                border        : 1px solid {bdr};
+                border-top    : 3px solid {accent};
+                border-radius : 10px;
+                min-height    : 95px;
             }}
-            QFrame#kpi-card:hover {{
-                border-color: {bh};
-                border-top  : 3px solid {accent};
+            QFrame#kpi-card-widget:hover {{
+                border-color  : {bh};
+                border-top    : 3px solid {accent};
+                background    : {bg};
             }}
             QLabel {{
                 background: transparent;

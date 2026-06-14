@@ -142,8 +142,15 @@ _ICONS: dict[str, str] = {
     </svg>""",
 
     "control_panel": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9"/>
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        <line x1="4" y1="6" x2="9" y2="6"/>
+        <line x1="15" y1="6" x2="20" y2="6"/>
+        <circle cx="12" cy="6" r="3"/>
+        <line x1="4" y1="12" x2="7" y2="12"/>
+        <line x1="13" y1="12" x2="20" y2="12"/>
+        <circle cx="10" cy="12" r="3"/>
+        <line x1="4" y1="18" x2="16" y2="18"/>
+        <line x1="18" y1="18" x2="20" y2="18"/>
+        <circle cx="17" cy="18" r="3"/>
     </svg>""",
 
     "users_permissions": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -222,25 +229,27 @@ _FALLBACK_TEXT: dict[str, str] = {
 }
 
 
-# ── ألوان كل أيقونة في الـ Floating Pill ────────────────────────────────────
-# كل تاب له لون مميز — هذه الألوان تُستخدم في الحالة الغير نشطة
-# الحالة النشطة دائماً أبيض (على خلفية primary)
+# ── ألوان أيقونات الـ Floating Pill ─────────────────────────────────────────
+# لون موحد لكل الأزرار الغير نشطة — يتناسب مع هوية Navy + Gold
+# الحالة النشطة: أبيض على خلفية Navy (من الكود في refresh_sidebar_icons)
+_PILL_ICON_COLOR_INACTIVE = "#8899AA"  # أبيض مائل للرمادي — يظهر على Navy
+
 _PILL_ICON_COLORS: dict[str, str] = {
-    "dashboard":          "#2563EB",   # أزرق
-    "materials":          "#7C3AED",   # بنفسجي
-    "clients":            "#059669",   # أخضر
-    "companies":          "#0891B2",   # سماوي
-    "pricing":            "#D97706",   # ذهبي
-    "entries":            "#DC2626",   # أحمر
-    "transactions":       "#2563EB",   # أزرق
-    "container_tracking": "#0369A1",   # أزرق داكن
-    "tasks":              "#16A34A",   # أخضر
-    "documents":          "#7C3AED",   # بنفسجي
-    "values":             "#D97706",   # ذهبي
-    "offices":            "#64748B",   # رمادي
-    "audit_trail":        "#DC2626",   # أحمر
-    "control_panel":      "#64748B",   # رمادي
-    "users_permissions":  "#0891B2",   # سماوي
+    "dashboard":          _PILL_ICON_COLOR_INACTIVE,
+    "materials":          _PILL_ICON_COLOR_INACTIVE,
+    "clients":            _PILL_ICON_COLOR_INACTIVE,
+    "companies":          _PILL_ICON_COLOR_INACTIVE,
+    "pricing":            _PILL_ICON_COLOR_INACTIVE,
+    "entries":            _PILL_ICON_COLOR_INACTIVE,
+    "transactions":       _PILL_ICON_COLOR_INACTIVE,
+    "container_tracking": _PILL_ICON_COLOR_INACTIVE,
+    "tasks":              _PILL_ICON_COLOR_INACTIVE,
+    "documents":          _PILL_ICON_COLOR_INACTIVE,
+    "values":             _PILL_ICON_COLOR_INACTIVE,
+    "offices":            _PILL_ICON_COLOR_INACTIVE,
+    "audit_trail":        _PILL_ICON_COLOR_INACTIVE,
+    "control_panel":      _PILL_ICON_COLOR_INACTIVE,
+    "users_permissions":  _PILL_ICON_COLOR_INACTIVE,
 }
 
 
@@ -271,6 +280,21 @@ def _icon_from_svg(name: str, size: int, color: str) -> QIcon:
     svg_template = _ICONS.get(name, "")
     if not svg_template:
         return QIcon()
+
+    # QSvgRenderer لا يدعم rgba() — نحوله لـ hex إذا لزم
+    if color.startswith("rgba"):
+        try:
+            parts = color.replace("rgba(","").replace(")","").split(",")
+            r, g, b = int(parts[0].strip()), int(parts[1].strip()), int(parts[2].strip())
+            a = float(parts[3].strip())
+            # دمج الـ alpha مع اللون (على خلفية Navy #0D1B2A)
+            bg = (13, 27, 42)
+            r2 = int(r * a + bg[0] * (1 - a))
+            g2 = int(g * a + bg[1] * (1 - a))
+            b2 = int(b * a + bg[2] * (1 - a))
+            color = f"#{r2:02X}{g2:02X}{b2:02X}"
+        except Exception:
+            color = "#8899AA"
 
     svg_data = svg_template.replace("{color}", color)
     svg_bytes = QByteArray(svg_data.encode("utf-8"))
@@ -347,10 +371,10 @@ def refresh_sidebar_icons(sidebar) -> None:
     for key, btn in sidebar.buttons.items():
         if is_pill:
             if getattr(btn, "isChecked", lambda: False)():
-                # نشط: أبيض على خلفية primary
-                btn_color = "#FFFFFF"
+                # نشط: ذهبي على خلفية Navy — يعكس هوية LOGIPORT
+                btn_color = "#C9A84C"
             else:
-                # غير نشط: لون مميز لكل تاب
+                # غير نشط: أبيض شفاف موحد
                 btn_color = _PILL_ICON_COLORS.get(key, _get_icon_color())
         else:
             btn_color = "#FFFFFF"
