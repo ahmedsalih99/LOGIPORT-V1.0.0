@@ -9,6 +9,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        # خطوط التطبيق المدمجة
+        ('resources/fonts',              'resources/fonts'),
         # أيقونات
         ('icons',                    'icons'),
         # إعدادات وثيمات
@@ -189,6 +191,7 @@ a = Analysis(
         'core.base_tab',
         'core.base_window',
         'core.config',
+        'core.font_loader',
         'core.form_dialog',
         'core.i18n.ar',
         'core.i18n.en',

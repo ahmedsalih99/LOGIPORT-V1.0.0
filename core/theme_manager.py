@@ -31,7 +31,16 @@ FONT_SIZE_MAP: Dict[str, int] = {
 # --------------------------------------------------
 DEFAULT_THEME = "light"
 DEFAULT_FONT_SIZE = 12
-DEFAULT_FONT_FAMILY = "Tajawal"
+DEFAULT_FONT_FAMILY = "IBM Plex Sans Arabic"
+
+# الخط الاحتياطي إذا لم يُحمَّل IBM Plex — يتحدد في runtime
+def _resolve_default_family() -> str:
+    """يُعيد الـ family الفعلية المتاحة في Qt."""
+    try:
+        from core.font_loader import get_loaded_family
+        return get_loaded_family()
+    except Exception:
+        return DEFAULT_FONT_FAMILY
 
 AVAILABLE_THEMES = ["light", "dark"]
 
@@ -64,7 +73,20 @@ class ThemeManager(QObject, QObjectSingletonMixin):
             settings = SettingsManager.get_instance()
 
             theme_name = theme_name or settings.get("theme", DEFAULT_THEME)
-            font_family = font_family or settings.get("font_family", DEFAULT_FONT_FAMILY)
+
+            # font_family: إذا كانت القيمة المحفوظة هي Tajawal القديم،
+            # نستبدلها بـ IBM Plex Sans Arabic الجديد تلقائياً
+            saved_family = font_family or settings.get("font_family", None)
+            if not saved_family or saved_family == "Tajawal":
+                font_family = _resolve_default_family()
+                # احفظ القيمة الجديدة حتى لا يحدث هذا في كل مرة
+                if saved_family == "Tajawal":
+                    try:
+                        settings.set("font_family", font_family)
+                    except Exception:
+                        pass
+            else:
+                font_family = saved_family
             font_size_input = font_size or settings.get("font_size", DEFAULT_FONT_SIZE)
 
             if isinstance(font_size_input, str):

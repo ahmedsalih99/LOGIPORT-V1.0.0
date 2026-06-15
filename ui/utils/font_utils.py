@@ -65,7 +65,11 @@ def app_font(scale: float = BASE, bold: bool = False, weight: QFont.Weight | Non
         family = tm.get_current_font_family()
         base_size = tm.get_current_font_size()
     except Exception:
-        family = "Tajawal"
+        try:
+            from core.font_loader import get_loaded_family
+            family = get_loaded_family()
+        except Exception:
+            family = "IBM Plex Sans Arabic"
         base_size = 12
 
     size = max(7, round(base_size * scale))

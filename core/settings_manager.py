@@ -49,7 +49,7 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         # Theme & UI
         "theme": "light",
         "font_size": "medium",        # small | medium | large | xlarge (string)
-        "font_family": "Tajawal",
+        "font_family": "IBM Plex Sans Arabic",
 
         # Paths
         "document_path": "documents/generated/",

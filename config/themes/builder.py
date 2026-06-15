@@ -22,7 +22,7 @@ class ThemeBuilder:
     Build complete theme with RTL support and modern effects.
 
     Usage:
-        >>> theme = ThemeBuilder("light", font_size=13, font_family="Tajawal")
+        >>> theme = ThemeBuilder("light", font_size=13, font_family="IBM Plex Sans Arabic")
         >>> stylesheet = theme.build()
         >>> app.setStyleSheet(stylesheet)
     """
@@ -31,7 +31,7 @@ class ThemeBuilder:
         self,
         theme_name: str = "light",
         font_size: int = 12,
-        font_family: str = "Tajawal",
+        font_family: str = "IBM Plex Sans Arabic",
         rtl: bool = True
     ):
         """
@@ -194,7 +194,7 @@ class ThemeBuilder:
             background-color: {c["bg_main"]};
             color: {c["text_primary"]};
             font-size: {s["base"]}px;
-            font-family: '{self.font_family}', 'Montserrat', 'Cairo', Arial, sans-serif;
+            font-family: '{self.font_family}', 'Tajawal', 'Cairo', Arial, sans-serif;
         }}
         
         QMainWindow {{

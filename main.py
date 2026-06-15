@@ -33,6 +33,11 @@ def main():
     from core.base_tab import _wheel_filter
     app.installEventFilter(_wheel_filter)
 
+    # تحميل خطوط التطبيق المدمجة (IBM Plex Sans Arabic)
+    # يجب أن يكون قبل apply_all_settings() لأن ThemeManager يحتاج الخط جاهزاً
+    from core.font_loader import load_app_fonts
+    load_app_fonts()
+
     # 3) حمّل الإعدادات وطبّقها (لغة + اتجاه + ثيم)
     settings = SettingsManager.get_instance()
     settings.apply_all_settings()
