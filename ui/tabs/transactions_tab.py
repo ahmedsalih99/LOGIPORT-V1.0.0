@@ -40,9 +40,19 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
 
 # فونت bold مشترك لخلايا الجدول
-_BOLD_ITEM_FONT = QFont()
-_BOLD_ITEM_FONT.setBold(True)
 from datetime import date, timedelta
+
+
+def _bold_font() -> QFont:
+    """ينشئ QFont Bold يراعي حجم الخط الحالي من ThemeManager."""
+    try:
+        from core.theme_manager import ThemeManager
+        tm = ThemeManager.get_instance()
+        f = QFont(tm.get_current_font_family(), tm.get_current_font_size())
+    except Exception:
+        f = QFont()
+    f.setBold(True)
+    return f
 
 
 class TransactionsTab(BaseTab):
@@ -342,8 +352,7 @@ class TransactionsTab(BaseTab):
         id_to_user = {}; id_to_client = {}; id_to_company = {}
         id_to_currency = {}; id_to_office = {}
 
-        s = get_session_local()()
-        try:
+        with get_session_local()() as s:
             if admin and (created_ids | updated_ids):
                 for uid, fn, un in s.query(User.id, User.full_name, User.username).filter(User.id.in_(created_ids | updated_ids)):
                     id_to_user[uid] = fn or un or str(uid)
@@ -367,8 +376,6 @@ class TransactionsTab(BaseTab):
                         id_to_office[oid] = {"ar": nar, "en": nen or nar, "tr": ntr or nar, "code": code}
                 except Exception:
                     pass
-        finally:
-            s.close()
 
         lang = TranslationManager.get_instance().get_current_language()
 
@@ -522,7 +529,7 @@ class TransactionsTab(BaseTab):
                         elif status == "archived": bg = "#F3E5F5"
                         elif status == "draft":    bg = "#FFF9C4"
                         item.setBackground(QBrush(QColor(bg)))
-                        item.setFont(_BOLD_ITEM_FONT)
+                        item.setFont(_bold_font())
                         # [SORT-FIX] نخزن الـ row dict إذا كان هذا أول عمود
                         if ci == 0:
                             item.setData(Qt.UserRole, row)
@@ -531,7 +538,7 @@ class TransactionsTab(BaseTab):
                     else:
                         item = QTableWidgetItem(str(row.get(key, "") or ""))
                         item.setTextAlignment(Qt.AlignCenter)
-                        item.setFont(_BOLD_ITEM_FONT)
+                        item.setFont(_bold_font())
                         # [SORT-FIX] نخزن الـ row dict في أول عمود بيانات
                         if ci == 0:
                             item.setData(Qt.UserRole, row)
@@ -721,12 +728,10 @@ class TransactionsTab(BaseTab):
         from database.models import get_session_local
         from database.models.transaction import Transaction, TransactionItem, TransactionEntry
         from database.models.transport_details import TransportDetails
-        from sqlalchemy.orm import Session
         from datetime import datetime
 
-        SessionLocal = get_session_local()
-        session: Session = SessionLocal()
-        try:
+        with get_session_local()() as session:
+          try:
             original: Transaction = session.query(Transaction).filter(Transaction.id == trx_id).first()
             if not original: return
 
@@ -813,13 +818,13 @@ class TransactionsTab(BaseTab):
                 ))
 
             session.commit()
-            self._open_add_window(transaction=new_trx.id)
+            new_id = new_trx.id
 
-        except Exception as e:
-            session.rollback()
+          except Exception as e:
             QMessageBox.critical(self, self._("error"), f"Copy failed: {e}")
-        finally:
-            session.close()
+            return
+
+        self._open_add_window(transaction=new_id)
 
     def _reprice_transaction(self, trx_id: int):
         if trx_id: self._open_add_window(transaction=trx_id)
@@ -868,62 +873,7 @@ class TransactionsTab(BaseTab):
         except Exception as e:
             QMessageBox.critical(self, self._("error"), str(e))
 
-    # ── Type Badge ────────────────────────────────────────────────────
-    _BADGE_STYLES = {
-        "export":  ("📤", "#10b981", "#d1fae5"),   # أخضر
-        "import":  ("📥", "#3b82f6", "#dbeafe"),   # أزرق
-        "transit": ("🔄", "#f59e0b", "#fef3c7"),   # برتقالي
-    }
-
-    def _make_type_badge(self, code: str, label: str) -> QLabel:
-        ICONS = {"export": "📤", "import": "📥", "transit": "🔄"}
-        icon = ICONS.get(code, "•")
-        badge = QLabel(f"{icon}  {label}")
-        badge.setAlignment(Qt.AlignCenter)
-        # objectName يربطه بالثيم — يستخدم لون primary/accent حسب النوع
-        badge.setObjectName(f"badge-{code}" if code in ("export","import","transit") else "badge-default")
-        badge.setProperty("badge_type", code)
-        # ألوان مدمجة بسيطة — لا تتعارض مع الثيم
-        COLORS = {
-            "export":  ("#065F46", "#D1FAE5"),
-            "import":  ("#1E3A5F", "#DBEAFE"),
-            "transit": ("#78350F", "#FEF3C7"),
-        }
-        fg, bg = COLORS.get(code, ("#374151", "#F3F4F6"))
-        badge.setStyleSheet(
-            f"QLabel {{ color: {fg}; background: {bg};"
-            f"border-radius: 10px; padding: 2px 10px; font-size: 11px; font-weight: 700;"
-            f"min-width: 70px; }}"
-        )
-        return badge
-
     # ── Footer / Totals ───────────────────────────────────────────────
-    def _make_status_badge(self, status: str) -> QLabel:
-        """Badge الحالة — بسيط وواضح."""
-        STATUS_MAP = {
-            "draft":    ("📝", "#4338CA", "#EEF2FF"),
-            "active":   ("✅", "#065F46", "#D1FAE5"),
-            "closed":   ("🔒", "#7F1D1D", "#FEE2E2"),
-            "archived": ("📦", "#374151", "#F3F4F6"),
-        }
-        icon, color, bg = STATUS_MAP.get(status, ("⚪", "#6B7280", "#F9FAFB"))
-        # ترجمة الحالة — جرب المفتاح بكلا الصيغتين
-        try:
-            label_text = self._(f"status_{status}")
-            if label_text == f"status_{status}":
-                label_text = self._(status)
-        except Exception:
-            label_text = status
-        lbl = QLabel(f"{icon}  {label_text}")
-        lbl.setStyleSheet(
-            f"QLabel {{ background: {bg}; color: {color};"
-            f"border-radius: 8px; padding: 2px 8px;"
-            f"font-size: 10px; font-weight: 700; }}"
-        )
-        lbl.setAlignment(Qt.AlignCenter)
-        return lbl
-
-
     def _build_footer(self):
         """شريط الإجماليات أسفل الجدول."""
         footer = QWidget()
@@ -1011,6 +961,40 @@ class TransactionsTab(BaseTab):
         apply_admin_columns_to_table(
             self.table, self.current_user,
             [i for i, c in enumerate(self.columns) if c.get("key") in admin_keys])
+
+    def select_record_by_id(self, record_id: int):
+        """
+        يُحدِّد صف المعاملة ذات record_id في الجدول.
+        يُستدعى من main_window عند التنقل من البحث العام.
+        إذا لم يكن السجل في الصفحة الحالية يُعيد تحميل البيانات بفلتر مؤقت.
+        """
+        # أولاً: ابحث في البيانات المحملة حالياً
+        for ri, row in enumerate(self.data):
+            obj = row.get("actions")
+            if getattr(obj, "id", None) == record_id or row.get("id") == record_id:
+                # +1 offset بسبب checkbox في col 0
+                self.table.selectRow(ri)
+                self.table.scrollTo(self.table.model().index(ri, 1))
+                return
+        # السجل غير موجود في الصفحة الحالية — أعد التحميل بحث بالرقم
+        try:
+            trx_no = None
+            with get_session_local()() as s:
+                from database.models.transaction import Transaction as _Trx
+                t = s.query(_Trx.transaction_no).filter(_Trx.id == record_id).first()
+                if t:
+                    trx_no = t[0]
+            if trx_no and hasattr(self, "search_bar"):
+                self.search_bar.setText(trx_no)
+                self.reload_data()
+                # بعد التحميل: حاول التحديد مجدداً
+                for ri, row in enumerate(self.data):
+                    if row.get("id") == record_id:
+                        self.table.selectRow(ri)
+                        self.table.scrollTo(self.table.model().index(ri, 1))
+                        return
+        except Exception:
+            pass
 
     def _user_display(self, rel, id_to_name, fallback_id=None) -> str:
         if isinstance(rel, User):

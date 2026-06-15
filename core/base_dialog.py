@@ -490,7 +490,7 @@ class BaseDialog(QDialog):
         يُستخدم في dialogs التي لا ترث FormDialog.
         """
         from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
-        from PySide6.QtGui import QFont
+        from ui.utils.font_utils import app_font, LG
         header = QWidget()
         header.setObjectName("form-dialog-header")
         lay = QVBoxLayout(header)
@@ -499,10 +499,7 @@ class BaseDialog(QDialog):
         if title:
             lbl = QLabel(title)
             lbl.setObjectName("form-dialog-title")
-            f = QFont()
-            f.setPointSize(13)
-            f.setWeight(QFont.Bold)
-            lbl.setFont(f)
+            lbl.setFont(app_font(LG, bold=True))
             lay.addWidget(lbl)
             self._primary_header_title_lbl = lbl
         if subtitle:

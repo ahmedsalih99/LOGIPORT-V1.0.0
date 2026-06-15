@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QThread, Signal as _Signal
 from PySide6.QtGui import QFont, QColor, QCursor
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 logger = logging.getLogger(__name__)
 
@@ -123,12 +124,12 @@ class HeroBanner(QFrame):
             col.setAlignment(Qt.AlignCenter)
 
             val_lbl = QLabel("—")
-            val_lbl.setFont(QFont("Tajawal", 28, QFont.Bold))
+            val_lbl.setFont(app_font(HERO, bold=True))
             val_lbl.setStyleSheet(f"color: {GOLD}; background: transparent;")
             val_lbl.setAlignment(Qt.AlignCenter)
 
             txt_lbl = QLabel()
-            txt_lbl.setFont(QFont("Tajawal", 9))
+            txt_lbl.setFont(app_font(SM))
             txt_lbl.setStyleSheet("color: rgba(255,255,255,0.55); background: transparent;")
             txt_lbl.setAlignment(Qt.AlignCenter)
 
@@ -237,7 +238,7 @@ class KpiCard(QFrame):
         top_row.setSpacing(6)
 
         self._title_lbl = QLabel(title)
-        self._title_lbl.setFont(QFont("Tajawal", 9))
+        self._title_lbl.setFont(app_font(SM))
         self._title_lbl.setStyleSheet(f"color:{ts}; background:transparent;")
         top_row.addWidget(self._title_lbl, 1)
 
@@ -251,12 +252,12 @@ class KpiCard(QFrame):
         lay.addLayout(top_row)
 
         self.value_lbl = QLabel(str(value))
-        self.value_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
+        self.value_lbl.setFont(app_font(XL4, bold=True))
         self.value_lbl.setStyleSheet(f"color:{tp}; background:transparent;")
         lay.addWidget(self.value_lbl)
 
         self._sub_lbl = QLabel(subtitle)
-        self._sub_lbl.setFont(QFont("Tajawal", 8))
+        self._sub_lbl.setFont(app_font(XS))
         self._sub_lbl.setStyleSheet(f"color:{ts}; background:transparent;")
         lay.addWidget(self._sub_lbl)
 
@@ -328,7 +329,7 @@ class TypeProgressRow(QFrame):
         info_col.setSpacing(3)
 
         self._lbl_w = QLabel(label)
-        self._lbl_w.setFont(QFont("Tajawal", 9))
+        self._lbl_w.setFont(app_font(SM))
         self._lbl_w.setStyleSheet(f"color:{ts};")
         info_col.addWidget(self._lbl_w)
 
@@ -345,13 +346,13 @@ class TypeProgressRow(QFrame):
         right_col.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         self._count_lbl = QLabel(str(count))
-        self._count_lbl.setFont(QFont("Tajawal", 14, QFont.Bold))
+        self._count_lbl.setFont(app_font(XL, bold=True))
         self._count_lbl.setStyleSheet(f"color:{accent};")
         self._count_lbl.setAlignment(Qt.AlignRight)
         right_col.addWidget(self._count_lbl)
 
         self._val_lbl = QLabel(value_str)
-        self._val_lbl.setFont(QFont("Tajawal", 8))
+        self._val_lbl.setFont(app_font(XS))
         self._val_lbl.setStyleSheet(f"color:{ts};")
         self._val_lbl.setAlignment(Qt.AlignRight)
         right_col.addWidget(self._val_lbl)
@@ -466,12 +467,12 @@ class ActivityItem(QFrame):
         col.setSpacing(0)
 
         msg = QLabel(message)
-        msg.setFont(QFont("Tajawal", 9))
+        msg.setFont(app_font(SM))
         msg.setObjectName("activity-msg")
         col.addWidget(msg)
 
         ts_lbl = QLabel(f"🕒 {timestamp}")
-        ts_lbl.setFont(QFont("Tajawal", 8))
+        ts_lbl.setFont(app_font(XS))
         ts_lbl.setObjectName("activity-ts")
         col.addWidget(ts_lbl)
 
@@ -642,14 +643,14 @@ class DashboardTab(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
 
         self._title_lbl = QLabel(self._("dashboard_main_title"))
-        self._title_lbl.setFont(QFont("Tajawal", 15, QFont.Bold))
+        self._title_lbl.setFont(app_font(XL2, bold=True))
         self._title_lbl.setObjectName("dashboard-title")
         lay.addWidget(self._title_lbl)
         lay.addStretch()
 
         self._update_lbl = QLabel()
         self._update_lbl.setObjectName("text-muted")
-        self._update_lbl.setFont(QFont("Tajawal", 9))
+        self._update_lbl.setFont(app_font(SM))
         self._set_update_time()
         lay.addWidget(self._update_lbl)
         lay.addSpacing(8)
@@ -659,7 +660,7 @@ class DashboardTab(QWidget):
         self._refresh_btn.setMinimumHeight(30)
         self._refresh_btn.setMinimumWidth(80)
         self._refresh_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._refresh_btn.setFont(QFont("Tajawal", 9))
+        self._refresh_btn.setFont(app_font(SM))
         self._refresh_btn.clicked.connect(self.refresh_all_data)
         lay.addWidget(self._refresh_btn)
         return w
@@ -700,7 +701,7 @@ class DashboardTab(QWidget):
         dot.setStyleSheet(f"background:{GOLD}; border-radius:2px; border:none;")
         title_row.addWidget(dot)
         self._type_section_title = QLabel(self._("transactions_overview"))
-        self._type_section_title.setFont(QFont("Tajawal", 11, QFont.Bold))
+        self._type_section_title.setFont(app_font(MD, bold=True))
         self._type_section_title.setObjectName("panel-title")
         title_row.addWidget(self._type_section_title, 1)
         tf_lay.addLayout(title_row)
@@ -737,7 +738,7 @@ class DashboardTab(QWidget):
         dot2.setStyleSheet(f"background:{GOLD}; border-radius:2px; border:none;")
         qa_title_row.addWidget(dot2)
         self._qa_title = QLabel(self._("quick_actions_title"))
-        self._qa_title.setFont(QFont("Tajawal", 11, QFont.Bold))
+        self._qa_title.setFont(app_font(MD, bold=True))
         self._qa_title.setObjectName("panel-title")
         qa_title_row.addWidget(self._qa_title, 1)
         qa_lay.addLayout(qa_title_row)
@@ -797,7 +798,7 @@ class DashboardTab(QWidget):
         txt = (self._("no_overdue_tasks") if is_ok
                else self._("tasks_overdue_count").format(n=overdue))
         self._tasks_lbl = QLabel(txt)
-        self._tasks_lbl.setFont(QFont("Tajawal", 9))
+        self._tasks_lbl.setFont(app_font(SM))
         self._tasks_lbl.setStyleSheet(f"color:{color};")
         lay.addWidget(self._tasks_lbl, 1)
         return f
@@ -817,7 +818,7 @@ class DashboardTab(QWidget):
         dot.setStyleSheet(f"background:{GOLD}; border-radius:2px; border:none;")
         title_row.addWidget(dot)
         self._act_title = QLabel(self._("recent_activities_title"))
-        self._act_title.setFont(QFont("Tajawal", 11, QFont.Bold))
+        self._act_title.setFont(app_font(MD, bold=True))
         self._act_title.setObjectName("panel-title")
         title_row.addWidget(self._act_title, 1)
         lay.addLayout(title_row)
@@ -857,7 +858,7 @@ class DashboardTab(QWidget):
         dot.setStyleSheet(f"background:{GOLD}; border-radius:2px; border:none;")
         title_row.addWidget(dot)
         self._trx_title = QLabel(self._("latest_transactions_title"))
-        self._trx_title.setFont(QFont("Tajawal", 11, QFont.Bold))
+        self._trx_title.setFont(app_font(MD, bold=True))
         self._trx_title.setObjectName("panel-title")
         title_row.addWidget(self._trx_title, 1)
         lay.addLayout(title_row)
@@ -877,7 +878,7 @@ class DashboardTab(QWidget):
         self._trans_table.setShowGrid(False)
         self._trans_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self._trans_table.verticalHeader().setDefaultSectionSize(32)
-        self._trans_table.setFont(QFont("Tajawal", 9))
+        self._trans_table.setFont(app_font(SM))
         self._trans_table.setMinimumHeight(280)
         self._update_trans_headers()
 
@@ -973,7 +974,7 @@ class DashboardTab(QWidget):
             from core.theme_manager import ThemeManager
             _font = QFont(ThemeManager.get_instance().get_current_font_family(), 9)
         except Exception:
-            _font = QFont("Tajawal", 9)
+            _font = app_font(SM)
 
         def _cell(txt, right=False):
             item = QTableWidgetItem(str(txt))

@@ -333,16 +333,17 @@ class MainWindow(BaseWindow):
         ينتقل للتاب المناسب ويحدد السجل.
         يُستدعى عند الضغط على نتيجة في البحث العام.
         """
-        # 1) انتقل للتاب
-        self.switch_section(entity_key)
+        # change_section تُصدر section_changed → switch_section تُنفَّذ تلقائياً
         if hasattr(self.sidebar, "change_section"):
             self.sidebar.change_section(entity_key)
+        else:
+            self.switch_section(entity_key)
 
-        # 2) اطلب من التاب تحديد السجل
+        # اطلب من التاب تحديد السجل بعد اكتمال البناء
         tab = self.tabs.get(entity_key)
         if tab and hasattr(tab, "select_record_by_id"):
             from PySide6.QtCore import QTimer
-            QTimer.singleShot(100, lambda: tab.select_record_by_id(record_id))
+            QTimer.singleShot(150, lambda: tab.select_record_by_id(record_id))
 
     def _open_about(self):
         try:
@@ -350,7 +351,11 @@ class MainWindow(BaseWindow):
             dlg = AboutDialog(self)
             dlg.exec()
         except Exception as e:
-            QMessageBox.information(self, "LOGIPORT", f"v3.2.0\n{e}")
+            try:
+                from version import VERSION
+            except Exception:
+                VERSION = "?"
+            QMessageBox.information(self, "LOGIPORT", f"v{VERSION}\n{e}")
 
     def _open_sync_settings(self):
         try:

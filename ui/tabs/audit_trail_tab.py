@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate, QTimer
 from PySide6.QtGui import QFont, QColor
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
@@ -117,7 +118,7 @@ class AuditTrailTab(QWidget):
         self._tbl.setAlternatingRowColors(True)
         self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self._tbl.setSortingEnabled(True)
-        self._tbl.setFont(QFont("Tajawal", 9))
+        self._tbl.setFont(app_font(SM))
         main.addWidget(self._tbl, 1)
         main.addLayout(self._build_pagination())
 
@@ -126,25 +127,25 @@ class AuditTrailTab(QWidget):
         lay = QHBoxLayout(w)
         lay.setContentsMargins(0, 0, 0, 0)
         self._title_lbl = QLabel(self._("audit_trail_title"))
-        self._title_lbl.setFont(QFont("Tajawal", 20, QFont.Bold))
+        self._title_lbl.setFont(app_font(XL3, bold=True))
         self._title_lbl.setObjectName("dashboard-title")
         lay.addWidget(self._title_lbl)
         lay.addStretch()
         self._ts_lbl = QLabel()
         self._ts_lbl.setObjectName("text-muted")
-        self._ts_lbl.setFont(QFont("Tajawal", 9))
+        self._ts_lbl.setFont(app_font(SM))
         lay.addWidget(self._ts_lbl)
         self._ref_btn = QPushButton(self._("refresh"))
         self._ref_btn.setObjectName("btn-primary")
         self._ref_btn.setMinimumHeight(34)
         self._ref_btn.setCursor(Qt.PointingHandCursor)
-        self._ref_btn.setFont(QFont("Tajawal", 10))
+        self._ref_btn.setFont(app_font(BODY))
         self._ref_btn.clicked.connect(self._reload)
         lay.addWidget(self._ref_btn)
         self._exp_btn = QPushButton(self._("export_csv"))
         self._exp_btn.setObjectName("topbar-btn")
         self._exp_btn.setMinimumHeight(34)
-        self._exp_btn.setFont(QFont("Tajawal", 10))
+        self._exp_btn.setFont(app_font(BODY))
         self._exp_btn.setCursor(Qt.PointingHandCursor)
         self._exp_btn.clicked.connect(self._export_csv)
         lay.addWidget(self._exp_btn)
@@ -224,7 +225,7 @@ class AuditTrailTab(QWidget):
         self._btn_prev.clicked.connect(self._prev_page)
         lay.addWidget(self._btn_prev)
         self._page_lbl = QLabel()
-        self._page_lbl.setFont(QFont("Tajawal", 9))
+        self._page_lbl.setFont(app_font(SM))
         self._page_lbl.setAlignment(Qt.AlignCenter)
         lay.addWidget(self._page_lbl, 1)
         self._btn_next = QPushButton(self._("next_page"))
@@ -246,7 +247,7 @@ class AuditTrailTab(QWidget):
 
     def _lbl(self, text) -> QLabel:
         lbl = QLabel(text)
-        lbl.setFont(QFont("Tajawal", 9))
+        lbl.setFont(app_font(SM))
         return lbl
 
     def _clear_filters(self):
@@ -354,7 +355,7 @@ class AuditTrailTab(QWidget):
 
     def _cell(self, row, col, text, color=None):
         item = QTableWidgetItem(str(text))
-        item.setFont(QFont("Tajawal", 9))
+        item.setFont(app_font(SM))
         item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
         if color:
             item.setForeground(QColor(color))

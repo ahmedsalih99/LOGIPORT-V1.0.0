@@ -28,7 +28,8 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, QSize
-from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
+from PySide6.QtGui import QDesktopServices, QFont, QKeySequence, QShortcut
+from ui.utils.font_utils import app_font, MD
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QWidget, QSizePolicy, QFileDialog, QMessageBox,
@@ -113,8 +114,7 @@ class PdfPreviewDialog(BaseDialog):
 
         # عنوان المستند
         self._title_lbl = QLabel(self._doc_title)
-        from PySide6.QtGui import QFont
-        f = QFont("Tajawal", 11)
+        f = app_font(MD)
         f.setBold(True)
         self._title_lbl.setFont(f)
         self._title_lbl.setObjectName("form-dialog-title")

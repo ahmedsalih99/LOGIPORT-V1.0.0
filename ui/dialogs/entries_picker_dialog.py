@@ -1,4 +1,6 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
+from ui.utils.font_utils import app_font, BASE
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QMessageBox, QHeaderView
@@ -133,7 +135,6 @@ class EntriesPickerDialog(BaseDialog):
             fam = tm.get_current_font_family()
         except Exception:
             fs, fam = 12, "Tajawal"
-        from PySide6.QtGui import QFont
         row_h = max(32, fs * 3 + 6)
         hdr_h = max(40, fs * 3 + 8)
         hdr_f = QFont(fam, fs); hdr_f.setBold(True)
@@ -190,13 +191,12 @@ class EntriesPickerDialog(BaseDialog):
 
             # helpers
             def setc(c, val, align_center=True):
-                from PySide6.QtGui import QFont
                 try:
                     from core.theme_manager import ThemeManager
                     tm = ThemeManager.get_instance()
                     f  = QFont(tm.get_current_font_family(), tm.get_current_font_size())
                 except Exception:
-                    f  = QFont("Tajawal", 12)
+                    f  = app_font(BASE)
                 f.setBold(True)
                 it = QTableWidgetItem(_safe_str(val))
                 it.setFont(f)

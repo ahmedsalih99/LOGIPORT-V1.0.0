@@ -94,6 +94,10 @@ class ThemeManager(QObject, QObjectSingletonMixin):
             assert isinstance(app, QApplication)
             app.setStyleSheet(stylesheet)
 
+            # ضبط QApplication font ليرثه كل QFont() بدون family مُحدَّدة
+            from PySide6.QtGui import QFont as _QFont
+            app.setFont(_QFont(font_family, font_size))
+
             self.current_theme = theme_name
             self._theme_applied = True
             self.current_font_size = font_size

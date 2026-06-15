@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QThread, QObject, QEvent
 from PySide6.QtGui import QFont, QKeyEvent, QColor
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
@@ -150,7 +151,7 @@ class GlobalSearchDialog(QDialog):
         self.search_input.setObjectName("global-search-input")
         self.search_input.setPlaceholderText(self._("search_placeholder"))
         self.search_input.setFrame(False)
-        self.search_input.setFont(QFont("Tajawal", 13))
+        self.search_input.setFont(app_font(LG))
         self.search_input.textChanged.connect(self._on_text_changed)
         self.search_input.returnPressed.connect(self._select_first)
         search_row.addWidget(self.search_input, 1)
@@ -179,13 +180,13 @@ class GlobalSearchDialog(QDialog):
         hist_header = QHBoxLayout()
         hist_title  = QLabel(self._("search_recent_title"))
         hist_title.setObjectName("text-muted")
-        hist_title.setFont(QFont("Tajawal", 9, QFont.Bold))
+        hist_title.setFont(app_font(SM, bold=True))
         hist_header.addWidget(hist_title)
         hist_header.addStretch()
 
         self._clear_btn = QPushButton(self._("search_recent_clear"))
         self._clear_btn.setObjectName("link-btn")
-        self._clear_btn.setFont(QFont("Tajawal", 9))
+        self._clear_btn.setFont(app_font(SM))
         self._clear_btn.setCursor(Qt.PointingHandCursor)
         self._clear_btn.clicked.connect(self._clear_history)
         hist_header.addWidget(self._clear_btn)
@@ -216,12 +217,12 @@ class GlobalSearchDialog(QDialog):
         footer.setContentsMargins(16, 8, 16, 12)
         self.status_lbl = QLabel(self._("search_hint"))
         self.status_lbl.setObjectName("text-muted")
-        self.status_lbl.setFont(QFont("Tajawal", 9))
+        self.status_lbl.setFont(app_font(SM))
         footer.addWidget(self.status_lbl)
         footer.addStretch()
         nav_hint = QLabel("↑↓  " + self._("navigate") + "   ↵  " + self._("open"))
         nav_hint.setObjectName("text-muted")
-        nav_hint.setFont(QFont("Tajawal", 9))
+        nav_hint.setFont(app_font(SM))
         footer.addWidget(nav_hint)
         card_lay.addLayout(footer)
 
@@ -318,7 +319,7 @@ class GlobalSearchDialog(QDialog):
         for q in reversed(history):
             item = QListWidgetItem(f"  🕐  {q}")
             item.setData(Qt.UserRole, q)
-            item.setFont(QFont("Tajawal", 10))
+            item.setFont(app_font(BODY))
             self._history_list.addItem(item)
         self._history_list.setFixedHeight(min(len(history), _MAX_HISTORY) * 34)
 
@@ -387,7 +388,7 @@ class GlobalSearchDialog(QDialog):
             self.status_lbl.setText(self._("no_results"))
             item = QListWidgetItem(self._("no_results_found"))
             item.setFlags(Qt.NoItemFlags)
-            item.setFont(QFont("Tajawal", 10))
+            item.setFont(app_font(BODY))
             self.results_list.addItem(item)
             return
 
@@ -409,7 +410,7 @@ class GlobalSearchDialog(QDialog):
             label, icon = entity_labels.get(entity_key, (entity_key, "📄"))
             header = QListWidgetItem(f"  {icon}  {label}")
             header.setFlags(Qt.NoItemFlags)
-            header.setFont(QFont("Tajawal", 9, QFont.Bold))
+            header.setFont(app_font(SM, bold=True))
             header.setForeground(QColor(text_muted))
             self.results_list.addItem(header)
             for r in entity_results:
@@ -450,12 +451,12 @@ class GlobalSearchDialog(QDialog):
         text_lay.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel(result.title)
-        title.setFont(QFont("Tajawal", 11, QFont.Bold))
+        title.setFont(app_font(MD, bold=True))
         text_lay.addWidget(title)
 
         if result.subtitle:
             sub = QLabel(result.subtitle)
-            sub.setFont(QFont("Tajawal", 9))
+            sub.setFont(app_font(SM))
             sub.setObjectName("text-muted")
             text_lay.addWidget(sub)
 

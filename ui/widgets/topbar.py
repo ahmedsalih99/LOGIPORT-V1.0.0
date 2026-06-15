@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QSize, QRect
 from PySide6.QtGui import QFont, QPixmap, QPainter, QColor, QPainterPath
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
@@ -64,7 +65,7 @@ class _AvatarLabel(QLabel):
         else:
             p.fillRect(0, 0, r, r, QColor(self._color))
             p.setPen(QColor("#FFFFFF"))
-            p.setFont(QFont("Tajawal", 11, QFont.Bold))
+            p.setFont(app_font(MD, bold=True))
             p.drawText(QRect(0, 0, r, r), Qt.AlignCenter, self._letter)
         p.end()
 
@@ -102,7 +103,7 @@ class _UserChip(QFrame):
         display = name or "User"
         self.avatar.set_user(display, avatar_path)
         self.name_lbl.setText(display)
-        self.name_lbl.setFont(QFont("Tajawal", 10, QFont.DemiBold))
+        self.name_lbl.setFont(app_font(BODY, weight=QFont.DemiBold))
 
 
 # ─── OfficeBadge ─────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+from ui.utils.font_utils import app_font, XS, BODY
 """
 ui/widgets/container_timeline.py — LOGIPORT
 =============================================
@@ -132,7 +133,7 @@ class _StageNode(QWidget):
         # اسم المرحلة
         name_lbl = QLabel(self._(f"container_status_{self._stage['key']}"))
         name_lbl.setAlignment(Qt.AlignHCenter)
-        name_font = QFont("Tajawal", 8)
+        name_font = app_font(XS)
         name_font.setBold(self._state == "current")
         name_lbl.setFont(name_font)
         if self._state == "pending":
@@ -145,7 +146,7 @@ class _StageNode(QWidget):
         if self._date and self._state != "pending":
             date_lbl = QLabel(_days_label(self._date, self._))
             date_lbl.setAlignment(Qt.AlignHCenter)
-            date_font = QFont("Tajawal", 7)
+            date_font = app_font(XS)
             date_lbl.setFont(date_font)
             date_lbl.setStyleSheet(f"color: {_get_theme_color('text_muted', '#6B7280')};")
             v.addWidget(date_lbl)
@@ -264,7 +265,7 @@ class ContainerTimeline(QWidget):
 
         # العنوان
         title = QLabel(self._("container_timeline_title"))
-        tf = QFont("Tajawal", 10)
+        tf = app_font(BODY)
         tf.setBold(True)
         title.setFont(tf)
         title.setObjectName("section-title")

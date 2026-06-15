@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QMessageBox, QWidget, QHBoxLayout,
     QPushButton, QLineEdit,
 )
+from ui.utils.font_utils import app_font, SM
 
 from core.base_tab import BaseTab
 from core.permissions import has_perm, is_admin
@@ -181,7 +182,7 @@ class ContainerTrackingTab(BaseTab):
 
         self.table.setSortingEnabled(False)
         self.table.setUpdatesEnabled(False)
-        cell_font = QFont(); cell_font.setPointSize(9)
+        cell_font = app_font(SM)
         try:
             self.table.setRowCount(len(page_rows))
             for row_idx, rec in enumerate(page_rows):

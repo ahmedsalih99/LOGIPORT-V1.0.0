@@ -384,3 +384,30 @@ class CompaniesTab(BaseTab):
             if col.get("key") in admin_keys:
                 admin_cols.append(idx)
         apply_admin_columns_to_table(self.table, self.current_user, admin_cols)
+    def select_record_by_id(self, record_id: int):
+        """
+        يُحدِّد صف الشركة ذات record_id في الجدول.
+        يُستدعى من main_window عند التنقل من البحث العام.
+        """
+        for ri, row in enumerate(self.data):
+            if row.get("id") == record_id:
+                self.table.selectRow(ri)
+                self.table.scrollTo(self.table.model().index(ri, 1))
+                return
+        try:
+            from database.models import get_session_local
+            from database.models.company import Company as _Company
+            with get_session_local()() as s:
+                c = s.query(_Company.name_ar, _Company.name_en).filter(_Company.id == record_id).first()
+                if c and hasattr(self, "search_bar"):
+                    term = c[1] or c[0] or ""
+                    if term:
+                        self.search_bar.setText(term)
+                        self.reload_data()
+                        for ri, row in enumerate(self.data):
+                            if row.get("id") == record_id:
+                                self.table.selectRow(ri)
+                                self.table.scrollTo(self.table.model().index(ri, 1))
+                                return
+        except Exception:
+            pass

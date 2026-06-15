@@ -170,12 +170,9 @@ class TaskDialog(_Base):
     def _load_users(self):
         try:
             from database.models import get_session_local, User
-            s = get_session_local()()
-            try:
+            with get_session_local()() as s:
                 users = s.query(User).filter(User.is_active == True).order_by(User.username).all()
                 return [(u.id, u.full_name or u.username) for u in users]
-            finally:
-                s.close()
         except Exception:
             return []
 

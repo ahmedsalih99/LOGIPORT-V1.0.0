@@ -414,3 +414,31 @@ class ClientsTab(BaseTab):
             return sorted(items, key=lambda c: (getattr(c, "created_at", None) or 0, getattr(c, "id", 0)), reverse=False)
         except Exception:
             return items
+    def select_record_by_id(self, record_id: int):
+        """
+        يُحدِّد صف العميل ذي record_id في الجدول.
+        يُستدعى من main_window عند التنقل من البحث العام.
+        """
+        for ri, row in enumerate(self.data):
+            if row.get("id") == record_id:
+                self.table.selectRow(ri)
+                self.table.scrollTo(self.table.model().index(ri, 1))
+                return
+        # غير موجود في الصفحة الحالية — ابحث بالاسم/الكود
+        try:
+            from database.models import get_session_local
+            from database.models.client import Client as _Client
+            with get_session_local()() as s:
+                c = s.query(_Client.name_ar, _Client.name_en).filter(_Client.id == record_id).first()
+                if c and hasattr(self, "search_bar"):
+                    term = c[1] or c[0] or ""
+                    if term:
+                        self.search_bar.setText(term)
+                        self.reload_data()
+                        for ri, row in enumerate(self.data):
+                            if row.get("id") == record_id:
+                                self.table.selectRow(ri)
+                                self.table.scrollTo(self.table.model().index(ri, 1))
+                                return
+        except Exception:
+            pass

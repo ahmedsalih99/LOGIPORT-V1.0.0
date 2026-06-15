@@ -20,6 +20,7 @@ from datetime import date
 
 from PySide6.QtCore import Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtGui import QFont, QPixmap, QPainter, QBrush, QColor, QPainterPath, QLinearGradient
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QLineEdit, QMessageBox, QScrollArea, QSizePolicy,
@@ -83,10 +84,7 @@ class _Card(QFrame):
             row.setContentsMargins(0, 0, 0, 0)
             self._title_lbl = QLabel(title)
             self._title_lbl.setObjectName("card-title")
-            f = QFont()
-            f.setPointSize(12)
-            f.setBold(True)
-            self._title_lbl.setFont(f)
+            self._title_lbl.setFont(app_font(BASE, bold=True))
             row.addWidget(self._title_lbl)
             row.addStretch()
             lay.addLayout(row)
@@ -118,18 +116,13 @@ class _StatCard(QFrame):
         lay.setSpacing(4)
 
         self._val = QLabel(str(value))
-        f = QFont()
-        f.setPointSize(24)
-        f.setBold(True)
-        self._val.setFont(f)
+        self._val.setFont(app_font(2.0, bold=True))
         self._val.setStyleSheet(f"color: {accent}; background: transparent;")
         self._val.setAlignment(Qt.AlignCenter)
         lay.addWidget(self._val)
 
         self._lbl = QLabel(label)
-        f2 = QFont()
-        f2.setPointSize(9)
-        self._lbl.setFont(f2)
+        self._lbl.setFont(app_font(SM))
         self._lbl.setAlignment(Qt.AlignCenter)
         self._lbl.setObjectName("text-muted")
         lay.addWidget(self._lbl)
@@ -179,9 +172,7 @@ class _InfoRow(QWidget):
 
         lbl = QLabel(label)
         lbl.setObjectName("text-muted")
-        f = QFont()
-        f.setPointSize(10)
-        lbl.setFont(f)
+        lbl.setFont(app_font(BODY))
         lbl.setFixedWidth(130)
         lay.addWidget(lbl)
 
@@ -192,10 +183,7 @@ class _InfoRow(QWidget):
         lay.addWidget(sep)
 
         val = QLabel(value or "—")
-        f2 = QFont()
-        f2.setPointSize(10)
-        f2.setBold(True)
-        val.setFont(f2)
+        val.setFont(app_font(BODY, bold=True))
         val.setTextInteractionFlags(Qt.TextSelectableByMouse)
         lay.addWidget(val, 1)
 
@@ -245,7 +233,11 @@ class _AvatarWidget(QLabel):
         self.setPixmap(QPixmap())
         self.setText("👤")
         f = QFont("Segoe UI Emoji")
-        f.setPointSize(32)
+        try:
+            from core.theme_manager import ThemeManager as _TM
+            f.setPixelSize(round(_TM.get_instance().get_current_font_size() * LOGO))
+        except Exception:
+            f.setPixelSize(round(12 * LOGO))
         self.setFont(f)
         self.setStyleSheet(f"""
             background: rgba(255,255,255,0.25);
@@ -293,10 +285,7 @@ class _ActivityItem(QFrame):
         dot = QLabel(symbol)
         dot.setFixedSize(24, 24)
         dot.setAlignment(Qt.AlignCenter)
-        f = QFont()
-        f.setPointSize(10)
-        f.setBold(True)
-        dot.setFont(f)
+        dot.setFont(app_font(BODY, bold=True))
         dot.setStyleSheet(f"background:{accent}; color:white; border-radius:12px;")
         row.addWidget(dot, 0, Qt.AlignTop)
 
@@ -313,16 +302,12 @@ class _ActivityItem(QFrame):
         c_lay.setContentsMargins(12, 8, 12, 8)
 
         msg = QLabel(f"{action.title()} · {table}")
-        f2 = QFont()
-        f2.setPointSize(10)
-        msg.setFont(f2)
+        msg.setFont(app_font(BODY))
         msg.setObjectName("activity-msg")   # يرث لون النص من الـ theme
         c_lay.addWidget(msg, 1)
 
         ts_lbl = QLabel(timestamp)
-        f3 = QFont()
-        f3.setPointSize(8)
-        ts_lbl.setFont(f3)
+        ts_lbl.setFont(app_font(XS))
         ts_lbl.setObjectName("activity-ts")
         c_lay.addWidget(ts_lbl)
 
@@ -442,10 +427,7 @@ class UserProfileTab(QWidget):
                 )
 
         self._hero_name = QLabel(name)
-        f = QFont()
-        f.setPointSize(18)
-        f.setBold(True)
-        self._hero_name.setFont(f)
+        self._hero_name.setFont(app_font(1.5, bold=True))
         col.addWidget(self._hero_name)
 
         meta_row = QHBoxLayout()
@@ -459,9 +441,7 @@ class UserProfileTab(QWidget):
         col.addLayout(meta_row)
 
         self._hero_username = QLabel(f"@{username_txt}")
-        f2 = QFont()
-        f2.setPointSize(10)
-        self._hero_username.setFont(f2)
+        self._hero_username.setFont(app_font(BODY))
         self._hero_username.setStyleSheet("color: rgba(255,255,255,0.7); background: transparent;")
         col.addWidget(self._hero_username)
 
@@ -512,9 +492,7 @@ class UserProfileTab(QWidget):
 
     def _hero_chip(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        f = QFont()
-        f.setPointSize(9)
-        lbl.setFont(f)
+        lbl.setFont(app_font(SM))
         lbl.setStyleSheet("""
             background: rgba(255,255,255,0.15);
             color: white;

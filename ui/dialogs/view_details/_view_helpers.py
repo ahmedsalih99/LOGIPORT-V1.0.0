@@ -26,6 +26,7 @@ def build_dialog_table(cols: list[str], parent=None, *,
     from PySide6.QtWidgets import QTableWidget, QHeaderView, QAbstractItemView
     from PySide6.QtCore import QTimer
     from PySide6.QtGui import QFont
+    from ui.utils.font_utils import app_font, BASE
 
     def _get_theme():
         try:
@@ -33,7 +34,7 @@ def build_dialog_table(cols: list[str], parent=None, *,
             tm = ThemeManager.get_instance()
             return tm.get_current_font_family(), tm.get_current_font_size()
         except Exception:
-            return "Tajawal", 12
+            return "Tajawal", 12  # fallback
 
     tbl = QTableWidget(0, len(cols), parent)
     tbl.setObjectName(object_name)
@@ -100,12 +101,13 @@ def make_bold_cell(text: str, align=None) -> "QTableWidgetItem":
     from PySide6.QtWidgets import QTableWidgetItem
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QFont
+    from ui.utils.font_utils import app_font, BASE
     try:
         from core.theme_manager import ThemeManager
         tm = ThemeManager.get_instance()
         f  = QFont(tm.get_current_font_family(), tm.get_current_font_size())
     except Exception:
-        f = QFont("Tajawal", 12)
+        f = app_font(BASE)
     f.setBold(True)
     item = QTableWidgetItem(str(text) if text is not None else "")
     item.setFont(f)

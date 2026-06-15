@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
+from ui.utils.font_utils import app_font as _app_font, LG, BODY
 
 from core.base_dialog import BaseDialog
 
@@ -117,10 +118,7 @@ class FormDialog(BaseDialog):
 
         self._lbl_title = QLabel()
         self._lbl_title.setObjectName("form-dialog-title")
-        font = QFont()
-        font.setPointSize(13)
-        font.setWeight(QFont.Bold)
-        self._lbl_title.setFont(font)
+        self._lbl_title.setFont(_app_font(LG, bold=True))
         h_text.addWidget(self._lbl_title)
 
         self._lbl_subtitle = QLabel()
@@ -254,10 +252,7 @@ class FormDialog(BaseDialog):
 
         lbl = QLabel()
         lbl.setObjectName("form-section-title")
-        f = lbl.font()
-        f.setWeight(QFont.Bold)
-        f.setPointSize(10)
-        lbl.setFont(f)
+        lbl.setFont(_app_font(BODY, bold=True))
 
         line = QFrame()
         line.setFrameShape(QFrame.HLine)

@@ -298,4 +298,3 @@ class TasksTab(BaseTab):
         super().retranslate_ui()
         if hasattr(self, "_filter_bar"):
             self._filter_bar.retranslate()
-        self.reload_data()

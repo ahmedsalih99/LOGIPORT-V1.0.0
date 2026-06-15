@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap, QIcon
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 from core.translator import TranslationManager
 
@@ -74,11 +75,11 @@ class AboutDialog(BaseDialog):
                 logo_lbl.setPixmap(pix)
             else:
                 logo_lbl.setText("LP")
-                logo_lbl.setFont(QFont("Tajawal", 36, QFont.Bold))
+                logo_lbl.setFont(app_font(LOGO, bold=True))
                 logo_lbl.setStyleSheet("background: transparent; color: #C9A84C;")
         except Exception:
             logo_lbl.setText("LP")
-            logo_lbl.setFont(QFont("Tajawal", 36, QFont.Bold))
+            logo_lbl.setFont(app_font(LOGO, bold=True))
             logo_lbl.setStyleSheet("background: transparent; color: #C9A84C;")
         hero_lay.addWidget(logo_lbl)
 
@@ -89,19 +90,19 @@ class AboutDialog(BaseDialog):
         hero_lay.addWidget(divider, 0, Qt.AlignHCenter)
 
         name_lbl = QLabel(APP_NAME)
-        name_lbl.setFont(QFont("Tajawal", 26, QFont.Bold))
+        name_lbl.setFont(app_font(XL3 * 1.3, bold=True))
         name_lbl.setAlignment(Qt.AlignCenter)
         name_lbl.setStyleSheet("background: transparent; color: #FFFFFF; letter-spacing: 3px;")
         hero_lay.addWidget(name_lbl)
 
         sub_lbl = QLabel(self._("app_subtitle"))
-        sub_lbl.setFont(QFont("Tajawal", 11))
+        sub_lbl.setFont(app_font(MD))
         sub_lbl.setAlignment(Qt.AlignCenter)
         sub_lbl.setStyleSheet("background: transparent; color: rgba(201, 168, 76, 0.90);")
         hero_lay.addWidget(sub_lbl)
 
         ver_lbl = QLabel(f"v{APP_VERSION}")
-        ver_lbl.setFont(QFont("Tajawal", 10))
+        ver_lbl.setFont(app_font(BODY))
         ver_lbl.setAlignment(Qt.AlignCenter)
         ver_lbl.setStyleSheet("background: transparent; color: rgba(255,255,255,0.55);")
         hero_lay.addWidget(ver_lbl)
@@ -145,7 +146,7 @@ class AboutDialog(BaseDialog):
         foot_lay.setContentsMargins(20, 12, 20, 12)
 
         copy_lbl = QLabel(self._("copyright").format(year=APP_YEAR))
-        copy_lbl.setFont(QFont("Tajawal", 9))
+        copy_lbl.setFont(app_font(SM))
         copy_lbl.setObjectName("text-muted")
         foot_lay.addWidget(copy_lbl)
         foot_lay.addStretch()
@@ -153,7 +154,7 @@ class AboutDialog(BaseDialog):
         self._btn_check_update = QPushButton(self._("check_for_updates"))
         self._btn_check_update.setObjectName("secondary-btn")
         self._btn_check_update.setMinimumHeight(34)
-        self._btn_check_update.setFont(QFont("Tajawal", 10))
+        self._btn_check_update.setFont(app_font(BODY))
         self._btn_check_update.setCursor(Qt.PointingHandCursor)
         self._btn_check_update.clicked.connect(self._check_updates)
         foot_lay.addWidget(self._btn_check_update)
@@ -161,7 +162,7 @@ class AboutDialog(BaseDialog):
         close_btn = QPushButton(self._("close_btn"))
         close_btn.setObjectName("btn-primary")
         close_btn.setMinimumHeight(34)
-        close_btn.setFont(QFont("Tajawal", 10))
+        close_btn.setFont(app_font(BODY))
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
         foot_lay.addWidget(close_btn)
@@ -178,7 +179,7 @@ class AboutDialog(BaseDialog):
         lay.setSpacing(8)
 
         t = QLabel(title)
-        t.setFont(QFont("Tajawal", 11, QFont.Bold))
+        t.setFont(app_font(MD, bold=True))
         lay.addWidget(t)
 
         sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("separator")
@@ -190,13 +191,13 @@ class AboutDialog(BaseDialog):
             r_lay.setContentsMargins(0, 0, 0, 0)
 
             lbl = QLabel(label + ":")
-            lbl.setFont(QFont("Tajawal", 9, QFont.DemiBold))
+            lbl.setFont(app_font(SM, weight=QFont.DemiBold))
             lbl.setFixedWidth(160)
             lbl.setObjectName("info-label")
             r_lay.addWidget(lbl)
 
             val = QLabel(str(value))
-            val.setFont(QFont("Tajawal", 9))
+            val.setFont(app_font(SM))
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextSelectableByMouse)
             r_lay.addWidget(val, 1)

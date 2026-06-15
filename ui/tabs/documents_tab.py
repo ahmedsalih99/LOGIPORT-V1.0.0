@@ -202,8 +202,7 @@ class DocumentsTab(BaseTab):
         self._refresh_transactions_seed()
         self.reload_data()
         DataBus.get_instance().subscribe('documents',    self.reload_data)
-        DataBus.get_instance().subscribe('transactions', self.reload_data)
-        DataBus.get_instance().subscribe('transactions', self._refresh_transactions_seed)
+        DataBus.get_instance().subscribe('transactions', self.refresh_data)
 
     # ------------------------------------------------------------------
     # Override _setup_ui to inject Splitter

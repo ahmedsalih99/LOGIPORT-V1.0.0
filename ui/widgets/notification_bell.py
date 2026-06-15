@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QPoint
 from PySide6.QtGui import QFont, QCursor
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 from services.notification_service import NotificationService, Notification
 from core.translator import TranslationManager
 from ui.utils.svg_icons import set_icon
@@ -66,12 +67,12 @@ class _NotifItem(QFrame):
         txt_col.setSpacing(2)
         w = QFont.DemiBold if not notif.is_read else QFont.Normal
         msg_lbl = QLabel(notif.message)
-        msg_lbl.setFont(QFont("Tajawal", 9, w))
+        msg_lbl.setFont(app_font(SM, weight=w))
         msg_lbl.setWordWrap(True)
         msg_lbl.setStyleSheet(f"color: {text_c}; background: transparent;")
         txt_col.addWidget(msg_lbl)
         time_lbl = QLabel(notif.time_ago)
-        time_lbl.setFont(QFont("Tajawal", 8))
+        time_lbl.setFont(app_font(XS))
         time_lbl.setStyleSheet(f"color: {muted_c}; background: transparent;")
         txt_col.addWidget(time_lbl)
         lay.addLayout(txt_col, 1)
@@ -118,12 +119,12 @@ class NotificationPopup(QFrame):
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(14, 10, 14, 10)
         title_lbl = QLabel(f"🔔  {self._('notifications')}")
-        title_lbl.setFont(QFont("Tajawal", 12, QFont.Bold))
+        title_lbl.setFont(app_font(BASE, bold=True))
         title_lbl.setStyleSheet(f"color: {text_prim}; background: transparent;")
         h_lay.addWidget(title_lbl)
         h_lay.addStretch()
         mark_btn = QPushButton(self._("mark_all_read"))
-        mark_btn.setFont(QFont("Tajawal", 8))
+        mark_btn.setFont(app_font(XS))
         mark_btn.setStyleSheet(f"QPushButton {{ background: transparent; border: none; color: {primary_c}; padding: 2px 6px; }} QPushButton:hover {{ color: {primary_hov}; }}")
         mark_btn.setCursor(Qt.PointingHandCursor)
         mark_btn.clicked.connect(self._mark_all)
@@ -143,7 +144,7 @@ class NotificationPopup(QFrame):
         f_lay = QHBoxLayout(footer)
         f_lay.setContentsMargins(14, 8, 14, 8)
         clear_btn = QPushButton(f"🗑️  {self._('clear_all_notifications')}")
-        clear_btn.setFont(QFont("Tajawal", 9))
+        clear_btn.setFont(app_font(SM))
         clear_btn.setStyleSheet(f"QPushButton {{ background: transparent; border: none; color: {text_muted}; }} QPushButton:hover {{ color: {danger_c}; }}")
         clear_btn.setCursor(Qt.PointingHandCursor)
         clear_btn.clicked.connect(self._clear)
@@ -164,7 +165,7 @@ class NotificationPopup(QFrame):
         notifs = self._svc.notifications
         if not notifs:
             empty = QLabel(self._("no_notifications"))
-            empty.setFont(QFont("Tajawal", 10))
+            empty.setFont(app_font(BODY))
             empty.setAlignment(Qt.AlignCenter)
             empty.setStyleSheet(f"color: {muted_c}; padding: 30px; background: transparent;")
             lay.addWidget(empty)
@@ -211,7 +212,7 @@ class NotificationBell(QWidget):
         danger = c.get("danger", "#E74C3C")
         self._badge = QLabel("0")
         self._badge.setObjectName("notif-badge")
-        self._badge.setFont(QFont("Tajawal", 7, QFont.Bold))
+        self._badge.setFont(app_font(XS, bold=True))
         self._badge.setAlignment(Qt.AlignCenter)
         self._badge.setFixedSize(16, 16)
         self._badge.setStyleSheet(f"QLabel#notif-badge {{ background: {danger}; color: white; border-radius: 8px; font-size: 7px; font-weight: bold; }}")

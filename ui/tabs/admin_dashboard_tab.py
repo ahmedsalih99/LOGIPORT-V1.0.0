@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 
 from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
@@ -40,12 +41,12 @@ class _MiniStat(QFrame):
         lay.addLayout(top)
 
         self._val_lbl = QLabel(str(value))
-        self._val_lbl.setFont(QFont("Tajawal", 28, QFont.Bold))
+        self._val_lbl.setFont(app_font(HERO, bold=True))
         self._val_lbl.setStyleSheet(f"color: {color}; background: transparent;")
         lay.addWidget(self._val_lbl)
 
         self._label_lbl = QLabel(label)
-        self._label_lbl.setFont(QFont("Tajawal", 10))
+        self._label_lbl.setFont(app_font(BODY))
         self._label_lbl.setObjectName("text-muted")
         lay.addWidget(self._label_lbl)
 
@@ -101,7 +102,7 @@ class AdminDashboardTab(QWidget):
         if not _is_admin(user):
             warn = QLabel(self._("admin_only_warning"))
             warn.setObjectName("text-warning")
-            warn.setFont(QFont("Tajawal", 10))
+            warn.setFont(app_font(BODY))
             main.addWidget(warn)
 
         # stat cards
@@ -137,14 +138,14 @@ class AdminDashboardTab(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
 
         self._title_lbl = QLabel(self._("admin_dashboard_title"))
-        self._title_lbl.setFont(QFont("Tajawal", 22, QFont.Bold))
+        self._title_lbl.setFont(app_font(XL4, bold=True))
         self._title_lbl.setObjectName("dashboard-title")
         lay.addWidget(self._title_lbl)
         lay.addStretch()
 
         self._ts_lbl = QLabel()
         self._ts_lbl.setObjectName("text-muted")
-        self._ts_lbl.setFont(QFont("Tajawal", 9))
+        self._ts_lbl.setFont(app_font(SM))
         self._set_ts()
         lay.addWidget(self._ts_lbl)
 
@@ -152,7 +153,7 @@ class AdminDashboardTab(QWidget):
         self._refresh_btn.setObjectName("btn-primary")
         self._refresh_btn.setMinimumHeight(34)
         self._refresh_btn.setCursor(Qt.PointingHandCursor)
-        self._refresh_btn.setFont(QFont("Tajawal", 10))
+        self._refresh_btn.setFont(app_font(BODY))
         self._refresh_btn.clicked.connect(self._refresh_all)
         lay.addWidget(self._refresh_btn)
 
@@ -195,7 +196,7 @@ class AdminDashboardTab(QWidget):
 
         top = QHBoxLayout()
         self._audit_title_lbl = QLabel(self._("audit_log_title"))
-        self._audit_title_lbl.setFont(QFont("Tajawal", 13, QFont.Bold))
+        self._audit_title_lbl.setFont(app_font(LG, bold=True))
         top.addWidget(self._audit_title_lbl)
         top.addStretch()
 
@@ -240,7 +241,7 @@ class AdminDashboardTab(QWidget):
         lay.setSpacing(12)
 
         self._db_title_lbl = QLabel(self._("db_info_title"))
-        self._db_title_lbl.setFont(QFont("Tajawal", 13, QFont.Bold))
+        self._db_title_lbl.setFont(app_font(LG, bold=True))
         lay.addWidget(self._db_title_lbl)
 
         sep = QFrame()
@@ -256,7 +257,7 @@ class AdminDashboardTab(QWidget):
         lay.addWidget(self._db_info_container)
 
         self._sys_title_lbl = QLabel(self._("system_status_title"))
-        self._sys_title_lbl.setFont(QFont("Tajawal", 12, QFont.DemiBold))
+        self._sys_title_lbl.setFont(app_font(BASE, weight=QFont.DemiBold))
         self._sys_title_lbl.setContentsMargins(0, 8, 0, 0)
         lay.addWidget(self._sys_title_lbl)
 
@@ -278,7 +279,7 @@ class AdminDashboardTab(QWidget):
         lay.setSpacing(12)
 
         self._backup_title_lbl = QLabel(self._("backups_title"))
-        self._backup_title_lbl.setFont(QFont("Tajawal", 13, QFont.Bold))
+        self._backup_title_lbl.setFont(app_font(LG, bold=True))
         lay.addWidget(self._backup_title_lbl)
 
         sep = QFrame()
@@ -292,7 +293,7 @@ class AdminDashboardTab(QWidget):
         self._backup_btn = QPushButton(self._("backup_now_btn"))
         self._backup_btn.setObjectName("btn-primary")
         self._backup_btn.setMinimumHeight(38)
-        self._backup_btn.setFont(QFont("Tajawal", 10, QFont.DemiBold))
+        self._backup_btn.setFont(app_font(BODY, weight=QFont.DemiBold))
         self._backup_btn.setCursor(Qt.PointingHandCursor)
         self._backup_btn.clicked.connect(self._do_backup)
         btn_row.addWidget(self._backup_btn)
@@ -300,7 +301,7 @@ class AdminDashboardTab(QWidget):
         self._open_folder_btn = QPushButton(self._("open_backup_folder_btn"))
         self._open_folder_btn.setObjectName("topbar-btn")
         self._open_folder_btn.setMinimumHeight(38)
-        self._open_folder_btn.setFont(QFont("Tajawal", 10))
+        self._open_folder_btn.setFont(app_font(BODY))
         self._open_folder_btn.setCursor(Qt.PointingHandCursor)
         self._open_folder_btn.clicked.connect(self._open_backup_folder)
         btn_row.addWidget(self._open_folder_btn)
@@ -308,7 +309,7 @@ class AdminDashboardTab(QWidget):
         self._restore_btn = QPushButton(self._("restore_backup_btn"))
         self._restore_btn.setObjectName("btn-warning")
         self._restore_btn.setMinimumHeight(38)
-        self._restore_btn.setFont(QFont("Tajawal", 10))
+        self._restore_btn.setFont(app_font(BODY))
         self._restore_btn.setCursor(Qt.PointingHandCursor)
         self._restore_btn.clicked.connect(self._do_restore)
         btn_row.addWidget(self._restore_btn)
@@ -317,7 +318,7 @@ class AdminDashboardTab(QWidget):
         lay.addLayout(btn_row)
 
         self._backup_list_lbl = QLabel()
-        self._backup_list_lbl.setFont(QFont("Tajawal", 9))
+        self._backup_list_lbl.setFont(app_font(SM))
         self._backup_list_lbl.setObjectName("text-muted")
         self._backup_list_lbl.setWordWrap(True)
         QTimer.singleShot(150, self._refresh_backup_list)
@@ -410,7 +411,7 @@ class AdminDashboardTab(QWidget):
         for r, (uname, act, tbl, rid, ts, color) in enumerate(rows):
             def cell(txt, c=None):
                 i = QTableWidgetItem(txt)
-                i.setFont(QFont("Tajawal", 9))
+                i.setFont(app_font(SM))
                 i.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
                 if c:
                     i.setForeground(QColor(c))
@@ -453,13 +454,13 @@ class AdminDashboardTab(QWidget):
             rlay.setContentsMargins(0, 0, 0, 0)
 
             lbl = QLabel(label + ":")
-            lbl.setFont(QFont("Tajawal", 9, QFont.DemiBold))
+            lbl.setFont(app_font(SM, weight=QFont.DemiBold))
             lbl.setFixedWidth(110)
             lbl.setObjectName("info-label")
             rlay.addWidget(lbl)
 
             val = QLabel(value)
-            val.setFont(QFont("Tajawal", 9))
+            val.setFont(app_font(SM))
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextSelectableByMouse)
             rlay.addWidget(val, 1)
@@ -495,7 +496,7 @@ class AdminDashboardTab(QWidget):
             rlay.addWidget(dot)
 
             lbl = QLabel(name)
-            lbl.setFont(QFont("Tajawal", 9))
+            lbl.setFont(app_font(SM))
             lbl.setObjectName("text-success" if ok else "text-danger")
             rlay.addWidget(lbl, 1)
 

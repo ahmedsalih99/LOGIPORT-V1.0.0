@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread, Q_ARG
 from PySide6.QtGui import QFont
+from ui.utils.font_utils import app_font, XS, SM, BODY, MD, BASE, LG, XL, XL2, XL3, XL4, HERO, LOGO
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class UpdateDialog(BaseDialog):
         title_lbl = QLabel(self._("update_available_title"))
         title_lbl.setObjectName("form-dialog-title")
         from PySide6.QtGui import QFont as _QFont
-        f = _QFont(); f.setPointSize(13); f.setBold(True); title_lbl.setFont(f)
+        title_lbl.setFont(app_font(LG, bold=True))
         hl.addWidget(title_lbl)
         root.addWidget(hdr)
         sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("form-dialog-sep"); sep.setFixedHeight(1)
@@ -63,7 +64,7 @@ class UpdateDialog(BaseDialog):
 
         # ── المحتوى ───────────────────────────────────────────────────────
         title = QLabel(self._("update_new_version_title"))
-        title.setFont(QFont("Tajawal", 14, QFont.Bold))
+        title.setFont(app_font(XL, bold=True))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
@@ -75,20 +76,20 @@ class UpdateDialog(BaseDialog):
 
         version_lbl = QLabel(self._("update_version_label").format(current=current, new=self.update_info.version))
         version_lbl.setAlignment(Qt.AlignCenter)
-        version_lbl.setFont(QFont("Tajawal", 10))
+        version_lbl.setFont(app_font(BODY))
         layout.addWidget(version_lbl)
 
         # ── ملاحظات الإصدار ───────────────────────────────────────────────────
         if self.update_info.notes:
             notes_lbl = QLabel(self._("update_whats_new"))
-            notes_lbl.setFont(QFont("Tajawal", 10, QFont.Bold))
+            notes_lbl.setFont(app_font(BODY, bold=True))
             layout.addWidget(notes_lbl)
 
             notes_box = QTextEdit()
             notes_box.setReadOnly(True)
             notes_box.setPlainText(self.update_info.notes)
             notes_box.setMaximumHeight(120)
-            notes_box.setFont(QFont("Tajawal", 9))
+            notes_box.setFont(app_font(SM))
             layout.addWidget(notes_box)
 
         # ── شريط التقدم ───────────────────────────────────────────────────────
