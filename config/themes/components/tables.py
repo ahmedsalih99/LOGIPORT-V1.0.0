@@ -276,4 +276,139 @@ def get_styles(theme):
         font-weight: 500;
         font-size  : {s["base"]}px;
     }}
+
+    /* ── Header الجدول — Navy + Gold هوية LOGIPORT ─────────────────── */
+
+    QHeaderView::section {{
+        background   : #0D1B2A;
+        color        : #C9A84C;
+        padding      : 8px {Spacing.MD};
+        border       : none;
+        border-bottom: 2px solid #C9A84C;
+        border-right : 1px solid rgba(201,168,76,0.2);
+        font-weight  : 700;
+        font-size    : {s["sm"]}px;
+        letter-spacing: 0.4px;
+    }}
+
+    QHeaderView::section:hover {{
+        background: #1B2F4A;
+        color     : #E8C96A;
+    }}
+
+    QHeaderView::section:pressed {{
+        background: #1B2F4A;
+    }}
+
+    QHeaderView::section:first {{
+        border-top-right-radius: {BorderRadius.MD};
+    }}
+    QHeaderView::section:last {{
+        border-top-left-radius : {BorderRadius.MD};
+        border-right           : none;
+    }}
+
+    QTableCornerButton::section {{
+        background   : #0D1B2A;
+        border-bottom: 2px solid #C9A84C;
+        border       : none;
+    }}
+
+    /* ── Row selection — خط جانبي Gold عند التحديد ──────────────────── */
+
+    QTableWidget::item:selected {{
+        background  : rgba(201,168,76,0.12);
+        color       : {c["text_primary"]};
+        border-left : 3px solid #C9A84C;
+    }}
+
+    QTableWidget::item:hover:!selected {{
+        background: {c["bg_hover"]};
+    }}
+
+    /* ── Toolbar Frame ───────────────────────────────────────────────── */
+
+    QFrame#tab-toolbar {{
+        background   : {c["bg_card"]};
+        border       : none;
+        border-bottom: 1px solid {c["border_subtle"]};
+        border-radius: 0;
+    }}
+
+    /* ── Search Wrap ─────────────────────────────────────────────────── */
+
+    QFrame#search-wrap {{
+        background   : {c["bg_main"]};
+        border       : 1.5px solid {c["border"]};
+        border-radius: {BorderRadius.LG};
+    }}
+
+    QFrame#search-wrap:focus-within {{
+        border-color: {c["primary"]};
+        background  : {c["bg_card"]};
+    }}
+
+    QFrame#search-wrap QLineEdit#search-field {{
+        background   : transparent;
+        border       : none;
+        border-radius: 0;
+        padding      : 0;
+        font-size    : {s["base"]}px;
+    }}
+
+    QLabel#search-icon-lbl {{
+        color     : {c["text_muted"]};
+        background: transparent;
+        font-size : 13px;
+    }}
+
+    /* ── Pagination Frame ────────────────────────────────────────────── */
+
+    QFrame#pagination-bar-frame {{
+        background   : {c["bg_card"]};
+        border       : none;
+        border-top   : 1px solid {c["border_subtle"]};
+        border-radius: 0;
+        max-height   : 42px;
+    }}
+
+    QPushButton#pagination-btn {{
+        background   : {c["bg_main"]};
+        color        : {c["text_secondary"]};
+        border       : 1.5px solid {c["border"]};
+        border-radius: {BorderRadius.SM};
+        font-weight  : 700;
+        font-size    : {s["base"]}px;
+        padding      : 0;
+    }}
+
+    QPushButton#pagination-btn:hover {{
+        background  : {c["bg_hover"]};
+        color       : {c["primary"]};
+        border-color: {c["primary"]};
+    }}
+
+    QPushButton#pagination-btn:pressed {{
+        background: {c["primary_light"]};
+        color     : {c["primary"]};
+    }}
+
+    QPushButton#pagination-btn:disabled {{
+        background: {c["bg_disabled"]};
+        color     : {c["text_disabled"]};
+        border-color: {c["border_subtle"]};
+    }}
+
+    QLabel#pagination-lbl {{
+        color      : {c["text_primary"]};
+        font-weight: 600;
+        font-size  : {s["sm"]}px;
+        background : transparent;
+    }}
+
+    QLabel#rows-per-page-lbl {{
+        color      : {c["text_muted"]};
+        font-size  : {s["xs"]}px;
+        background : transparent;
+    }}
     """

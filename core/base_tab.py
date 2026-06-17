@@ -367,23 +367,39 @@ class BaseTab(QWidget):
 
     def _setup_ui(self):
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(6, 6, 6, 6)
-        self._layout.setSpacing(4)
+        self._layout.setContentsMargins(8, 8, 8, 6)
+        self._layout.setSpacing(6)
 
-        # ── شريط الأدوات ──────────────────────────────────────────────
-        self.top_bar = QHBoxLayout()
-        self.top_bar.setSpacing(5)
+        # ── شريط الأدوات في Frame موحّد ───────────────────────────────
+        toolbar_frame = QFrame()
+        toolbar_frame.setObjectName("tab-toolbar")
+        self.top_bar = QHBoxLayout(toolbar_frame)
+        self.top_bar.setContentsMargins(10, 6, 10, 6)
+        self.top_bar.setSpacing(6)
 
+        # Search bar — داخل frame مع أيقونة بحث
+        search_wrap = QFrame()
+        search_wrap.setObjectName("search-wrap")
+        sw_lay = QHBoxLayout(search_wrap)
+        sw_lay.setContentsMargins(8, 0, 4, 0)
+        sw_lay.setSpacing(4)
+        search_icon = QLabel("🔍")
+        search_icon.setObjectName("search-icon-lbl")
+        search_icon.setFixedWidth(18)
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText(self._("search") + "...")
         self.search_bar.setObjectName("search-field")
         self.search_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.top_bar.addWidget(self.search_bar)
+        self.search_bar.setFrame(False)
+        sw_lay.addWidget(search_icon)
+        sw_lay.addWidget(self.search_bar)
+        search_wrap.setMinimumWidth(200)
+        search_wrap.setMaximumWidth(360)
+        search_wrap.setFixedHeight(34)
+        self.top_bar.addWidget(search_wrap)
+        self.top_bar.addStretch(1)
 
-        # spacer
-        self.top_bar.addSpacerItem(QSpacerItem(8, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-
-        # أعمدة الأدمن — checkbox مرئي للأدمن فقط
+        # أعمدة الأدمن
         self.chk_admin_cols = QCheckBox(self._("show_admin_columns"))
         self.chk_admin_cols.setVisible(self.is_admin)
         self.chk_admin_cols.setChecked(False)
@@ -391,29 +407,27 @@ class BaseTab(QWidget):
         self.top_bar.addWidget(self.chk_admin_cols)
 
         # ── أزرار الأدوات ──────────────────────────────────────────────
-        self.btn_add     = self._toolbar_btn("add",              "add")
-        self.btn_export  = self._toolbar_btn("export to excel",  "export")
-        self.btn_refresh = self._toolbar_btn("refresh",          "refresh")
+        self.btn_add     = self._toolbar_btn("add",             "add",     primary=True)
+        self.btn_export  = self._toolbar_btn("export to excel", "export",  primary=False)
+        self.btn_refresh = self._toolbar_btn("refresh",         "refresh", primary=False)
 
-        # زر إظهار/إخفاء الأعمدة
         self.btn_col_visibility = QPushButton("⚙")
         self.btn_col_visibility.setObjectName("toolbar-icon-btn")
-        self.btn_col_visibility.setFixedSize(32, 32)
+        self.btn_col_visibility.setFixedSize(34, 34)
         self.btn_col_visibility.setToolTip(self._("columns_visibility") if hasattr(self, "_") else "Columns")
         self.btn_col_visibility.clicked.connect(self._show_col_visibility_menu)
 
-        # Row density selector
         self._btn_density = QPushButton("≡")
         self._btn_density.setObjectName("toolbar-icon-btn")
-        self._btn_density.setFixedSize(32, 32)
-        self._btn_density.setToolTip(self._("row_density") if hasattr(self,"_") else "Row Density")
+        self._btn_density.setFixedSize(34, 34)
+        self._btn_density.setToolTip(self._("row_density") if hasattr(self, "_") else "Row Density")
         self._btn_density.clicked.connect(self._show_density_menu)
-        self._density = "comfortable"   # compact / comfortable / spacious
+        self._density = "comfortable"
 
         for btn in (self.btn_add, self.btn_export, self.btn_refresh, self.btn_col_visibility, self._btn_density):
             self.top_bar.addWidget(btn)
 
-        self._layout.addLayout(self.top_bar)
+        self._layout.addWidget(toolbar_frame)
 
         # ── Selection Action Bar ──────────────────────────────────────────
         # يظهر عند count=1 (سطر واحد) وعند count>1 (متعدد)
@@ -500,27 +514,36 @@ class BaseTab(QWidget):
         _ev.addWidget(self._lbl_empty_text)
         self._empty_widget.hide()
 
-        # ── pagination ────────────────────────────────────────────────
-        self.pagination_bar = QHBoxLayout()
+        # ── pagination — في Frame موحّد ───────────────────────────────
+        pag_frame = QFrame()
+        pag_frame.setObjectName("pagination-bar-frame")
+        self.pagination_bar = QHBoxLayout(pag_frame)
+        self.pagination_bar.setContentsMargins(12, 5, 12, 5)
+        self.pagination_bar.setSpacing(6)
 
         self.btn_prev = QPushButton("◀")
         self.btn_prev.setObjectName("pagination-btn")
-        self.btn_prev.setFixedWidth(32)
+        self.btn_prev.setFixedSize(32, 28)
+        self.btn_prev.setCursor(Qt.PointingHandCursor)
 
         self.btn_next = QPushButton("▶")
         self.btn_next.setObjectName("pagination-btn")
-        self.btn_next.setFixedWidth(32)
+        self.btn_next.setFixedSize(32, 28)
+        self.btn_next.setCursor(Qt.PointingHandCursor)
 
         self.lbl_pagination = QLabel()
         self.lbl_pagination.setAlignment(Qt.AlignCenter)
         self.lbl_pagination.setObjectName("pagination-lbl")
+        self.lbl_pagination.setMinimumWidth(180)
 
         self.cmb_rows_per_page = QComboBox()
         self.cmb_rows_per_page.addItems(["10", "20", "50", "100"])
         self.cmb_rows_per_page.setCurrentText(str(self.rows_per_page))
         self.cmb_rows_per_page.setFixedWidth(64)
+        self.cmb_rows_per_page.setFixedHeight(28)
 
         self._lbl_rows_per_page = QLabel(self._("rows_per_page"))
+        self._lbl_rows_per_page.setObjectName("rows-per-page-lbl")
 
         self.pagination_bar.addStretch(1)
         self.pagination_bar.addWidget(self.btn_prev)
@@ -529,13 +552,20 @@ class BaseTab(QWidget):
         self.pagination_bar.addStretch(1)
         self.pagination_bar.addWidget(self._lbl_rows_per_page)
         self.pagination_bar.addWidget(self.cmb_rows_per_page)
-        self._layout.addLayout(self.pagination_bar)
+        self._layout.addWidget(pag_frame)
 
-    def _toolbar_btn(self, label_key: str, obj_name: str) -> QPushButton:
-        btn = QPushButton(self._(label_key))
-        btn.setObjectName("action-btn")
-        btn.setMinimumWidth(72)
-        btn.setMaximumWidth(130)
+    def _toolbar_btn(self, label_key: str, obj_name: str, primary: bool = False) -> QPushButton:
+        # أيقونات الأزرار
+        _icons = {"add": "＋", "export": "↓", "refresh": "↻"}
+        icon = _icons.get(obj_name, "")
+        label = self._(label_key)
+        text = f"{icon}  {label}" if icon else label
+        btn = QPushButton(text)
+        btn.setObjectName("tab-primary-btn" if primary else "action-btn")
+        btn.setFixedHeight(34)
+        btn.setMinimumWidth(80)
+        btn.setMaximumWidth(140)
+        btn.setCursor(Qt.PointingHandCursor)
         return btn
 
     def _setup_table(self):
@@ -1702,7 +1732,7 @@ class BaseTab(QWidget):
     def retranslate_ui(self):
         try:
             self._ = TranslationManager.get_instance().translate
-            self.btn_add.setText(self._("add"))
+            self.btn_add.setText("＋  " + self._("add"))
             self.btn_export.setText(self._("export to excel"))
             self.btn_refresh.setText(self._("refresh"))
             self.chk_admin_cols.setText(self._("show_admin_columns"))

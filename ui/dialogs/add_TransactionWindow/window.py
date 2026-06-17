@@ -1,10 +1,11 @@
-from PySide6.QtCore import Qt, QDate, Signal, QSize
+from PySide6.QtCore import Qt, QDate, Signal, QSize, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QComboBox, QPushButton,
     QTabWidget, QFrame, QMessageBox, QSplitter, QLabel
 )
 from PySide6.QtGui import QShortcut, QKeySequence, QIcon
+from ui.utils.font_utils import app_font, SM, BODY, MD, LG, XL2
 
 # ---- App core (guarded) -------------------------------------------------
 try:
@@ -105,7 +106,7 @@ import re
 class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, DocumentsTabMixin, TransportTabMixin, BaseWindow):
     saved = Signal(int)
 
-    def __init__(self, parent=None, current_user=None, transaction=None):
+    def __init__(self, parent=None, current_user=None, transaction=None, copy_from_id=None):
         super().__init__(parent)
         tm = TranslationManager.get_instance()
         self._ = tm.translate
@@ -143,93 +144,44 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
         self._setup_shortcuts()
         self._prefill_if_edit()
 
+    # ── Type badge colors ──────────────────────────────────────────────────
+    _TYPE_COLORS = {
+        "export":  ("#065F46", "#D1FAE5"),
+        "import":  ("#1E3A5F", "#DBEAFE"),
+        "transit": ("#78350F", "#FEF3C7"),
+    }
+    _TYPE_ICONS = {
+        "export": "📤",
+        "import": "📥",
+        "transit": "🔄",
+    }
+
     def _build_ui(self):
         root = QWidget(self)
         root.setObjectName("transaction-dialog-root")
         self.setCentralWidget(root)
 
-        splitter = QSplitter(Qt.Vertical, root)
-        splitter.setObjectName("main-splitter")
+        main_lay = QVBoxLayout(root)
+        main_lay.setContentsMargins(0, 0, 0, 0)
+        main_lay.setSpacing(0)
 
-        top = QWidget()
-        top.setObjectName("top-section")
-        top_layout = QVBoxLayout(top)
-        # ✨ تحسين: margins أكبر للتنفس
-        top_layout.setContentsMargins(16, 8, 16, 8)  # ✅ أقل من 20
-        top_layout.setSpacing(8)
+        # ══ HEADER ═══════════════════════════════════════════════════════════
+        self._header = self._build_header()
+        main_lay.addWidget(self._header)
 
-        bottom = QWidget()
-        bottom.setObjectName("bottom-section")
-        bottom_layout = QVBoxLayout(bottom)
-        bottom_layout.setContentsMargins(8, 8, 8, 8)
-        bottom_layout.setSpacing(0)
+        # ══ GENERAL STRIP ════════════════════════════════════════════════════
+        self.cmb_trx_type = QComboBox()
+        general_strip = self._build_tab_general()
+        main_lay.addWidget(general_strip)
 
-        # Top actions
-        actions = QHBoxLayout()
-        actions.setSpacing(12)  # ✨ مسافة أكبر بين الأزرار
-
-        self.btn_save = QPushButton(self._("save"))
-        self.btn_save.setObjectName("primary-btn")
-        self.btn_save.setToolTip(self._("save") + " (Ctrl+S)")
-        # ✨ تحسين: حجم أكبر للأزرار
-        self.btn_save.setFixedHeight(36)
-        self.btn_save.setMinimumWidth(110)
-        try:
-            self.btn_save.setIcon(QIcon.fromTheme("document-save"))
-        except:
-            pass
-
-        self.btn_cancel = QPushButton(self._("cancel"))
-        self.btn_cancel.setObjectName("secondary-btn")
-        self.btn_cancel.setToolTip(self._("cancel") + " (Esc)")
-        self.btn_cancel.setFixedHeight(36)
-        self.btn_cancel.setMinimumWidth(110)
-        try:
-            self.btn_cancel.setIcon(QIcon.fromTheme("dialog-cancel"))
-        except:
-            pass
-
-        self.btn_generate_docs = QPushButton(self._("generate_documents"))
-        self.btn_generate_docs.setObjectName("secondary-btn")
-        self.btn_generate_docs.setToolTip(self._("generate_documents") + " (Ctrl+G)")
-        self.btn_generate_docs.setFixedHeight(36)
-        self.btn_generate_docs.setMinimumWidth(140)
-        try:
-            self.btn_generate_docs.setIcon(QIcon.fromTheme("document-new"))
-        except:
-            pass
-
-        actions.addStretch()
-        actions.addWidget(self.btn_save)
-        actions.addWidget(self.btn_generate_docs)
-        actions.addWidget(self.btn_cancel)
-        top_layout.addLayout(actions)
-
-        # Status bar
-        self.status_bar = QWidget()
-        self.status_bar.setObjectName("status-bar")
-        status_layout = QHBoxLayout(self.status_bar)
-        status_layout.setContentsMargins(12, 12, 12, 12)
-        self.status_label = QLabel("")
-        self.status_label.setObjectName("status-label")
-        self.status_label.setMinimumHeight(32)
-        status_layout.addWidget(self.status_label)
-        status_layout.addStretch()
-        self.status_bar.setVisible(False)
-        top_layout.addWidget(self.status_bar)
-
-        # General card — مبني بواسطة GeneralTabMixin
-        self.cmb_trx_type = QComboBox()   # يجب إنشاؤه قبل _build_tab_general
-        general_card = self._build_tab_general()
-        top_layout.addWidget(general_card)
-
-        # ── Horizontal splitter: tabs (يسار/وسط) + docs panel (يمين) ──────────
+        # ══ CONTENT (tabs + docs) ════════════════════════════════════════════
         h_splitter = QSplitter(Qt.Horizontal)
         h_splitter.setObjectName("content-splitter")
 
-        # التبويبات (Parties, Pricing, Items)
         self.tabs = QTabWidget()
         self.tabs.setObjectName("transaction-tabs")
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
         try:
             self._build_parties_geo_tab()
         except Exception:
@@ -245,42 +197,181 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
 
         h_splitter.addWidget(self.tabs)
 
-        # ── Docs side panel ──────────────────────────────────────────────────
         try:
             self._docs_side_panel = self.build_documents_panel()
             h_splitter.addWidget(self._docs_side_panel)
         except Exception:
             pass
 
-        # نسب: التبويبات تأخذ ~75% والـ panel ~25%
         h_splitter.setStretchFactor(0, 3)
         h_splitter.setStretchFactor(1, 1)
         h_splitter.setSizes([900, 260])
+        main_lay.addWidget(h_splitter, 1)
 
-        bottom_layout.addWidget(h_splitter)
+        # ══ TOAST ════════════════════════════════════════════════════════════
+        self._toast = self._build_toast()
+        # Toast يُوضع فوق كل شيء — يُحرَّك في resizeEvent
+        self._toast.setParent(root)
+        self._toast.raise_()
+        self._toast.hide()
 
-        splitter.addWidget(top)
-        splitter.addWidget(bottom)
-        splitter.setStretchFactor(0, 0)   # top: حجم ثابت
-        splitter.setStretchFactor(1, 1)   # bottom: يأخذ الباقي
-        # الارتفاع المحسوب: أزرار(40) + card(~160) + margins/spacing(~36) = ~236px
-        splitter.setSizes([236, 600])
-
-        lay = QVBoxLayout(root)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(splitter)
+        # ربط نوع المعاملة بالـ badge في الـ header
+        self.cmb_trx_type.currentIndexChanged.connect(
+            lambda _: self._update_header_badge(self.cmb_trx_type.currentData() or "")
+        )
 
         # Signals
         self.btn_cancel.clicked.connect(self.close)
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_generate_docs.clicked.connect(self._open_generate_docs)
 
-        # حجب ScrollWheel على كل ComboBox و SpinBox في النافذة
+        # حجب ScrollWheel
         try:
             from ui.utils.wheel_blocker import block_wheel_in
             block_wheel_in(root)
         except Exception:
             pass
+
+    # ── Header ───────────────────────────────────────────────────────────────
+    def _build_header(self) -> QWidget:
+        """Header ثابت: عنوان + badge نوع المعاملة + أزرار."""
+        hdr = QFrame()
+        hdr.setObjectName("trx-dialog-header")
+        hdr.setFixedHeight(56)
+
+        lay = QHBoxLayout(hdr)
+        lay.setContentsMargins(20, 0, 16, 0)
+        lay.setSpacing(12)
+
+        # عنوان النافذة
+        self._hdr_title = QLabel(
+            self._("edit_transaction") if self._is_edit else self._("add_transaction")
+        )
+        self._hdr_title.setObjectName("trx-header-title")
+        self._hdr_title.setFont(app_font(LG, bold=True))
+
+        # رقم المعاملة (يظهر عند التعديل)
+        self._hdr_trx_no = QLabel("")
+        self._hdr_trx_no.setObjectName("trx-header-no")
+        self._hdr_trx_no.setFont(app_font(BODY))
+        trx_no = getattr(self.transaction, "transaction_no", "") or ""
+        if trx_no:
+            self._hdr_trx_no.setText(f"  ·  {trx_no}")
+
+        # badge نوع المعاملة
+        self._hdr_badge = QLabel("")
+        self._hdr_badge.setObjectName("trx-header-badge")
+        self._hdr_badge.setFont(app_font(SM, bold=True))
+        self._hdr_badge.setAlignment(Qt.AlignCenter)
+        self._hdr_badge.setFixedHeight(26)
+        self._hdr_badge.setMinimumWidth(80)
+
+        lay.addWidget(self._hdr_title)
+        lay.addWidget(self._hdr_trx_no)
+        lay.addWidget(self._hdr_badge)
+        lay.addStretch()
+
+        # ── الأزرار ─────────────────────────────────────────────────────────
+        self.btn_generate_docs = QPushButton("📄  " + self._("generate_documents"))
+        self.btn_generate_docs.setObjectName("secondary-btn")
+        self.btn_generate_docs.setFixedHeight(34)
+        self.btn_generate_docs.setMinimumWidth(140)
+        self.btn_generate_docs.setToolTip(self._("generate_documents") + " (Ctrl+G)")
+
+        self.btn_save = QPushButton("💾  " + self._("save"))
+        self.btn_save.setObjectName("primary-btn")
+        self.btn_save.setFixedHeight(34)
+        self.btn_save.setMinimumWidth(100)
+        self.btn_save.setToolTip(self._("save") + " (Ctrl+S)")
+        self.btn_save.setFont(app_font(BODY, bold=True))
+
+        self.btn_cancel = QPushButton(self._("cancel"))
+        self.btn_cancel.setObjectName("secondary-btn")
+        self.btn_cancel.setFixedHeight(34)
+        self.btn_cancel.setMinimumWidth(80)
+        self.btn_cancel.setToolTip(self._("cancel") + " (Esc)")
+
+        lay.addWidget(self.btn_generate_docs)
+        lay.addWidget(self.btn_save)
+        lay.addWidget(self.btn_cancel)
+
+        return hdr
+
+    def _update_header_badge(self, trx_type: str):
+        """يُحدِّث badge نوع المعاملة في الـ Header."""
+        if not hasattr(self, "_hdr_badge"):
+            return
+        icon  = self._TYPE_ICONS.get(trx_type, "•")
+        label = self._(trx_type) if trx_type else ""
+        fg, bg = self._TYPE_COLORS.get(trx_type, ("#374151", "#F3F4F6"))
+        self._hdr_badge.setText(f"{icon}  {label}")
+        self._hdr_badge.setStyleSheet(
+            f"QLabel {{ background:{bg}; color:{fg}; border-radius:10px;"
+            f"padding:2px 10px; font-weight:700; }}"
+        )
+
+    def _on_tab_changed(self, index: int):
+        """يُحدِّث Tab titles عند تغيير التاب (للـ future use)."""
+        pass
+
+    # ── Toast notification ────────────────────────────────────────────────────
+    def _build_toast(self) -> QLabel:
+        toast = QLabel("")
+        toast.setObjectName("trx-toast")
+        toast.setAlignment(Qt.AlignCenter)
+        toast.setFont(app_font(BODY))
+        toast.setWordWrap(False)
+        toast.setFixedHeight(40)
+        toast.setAttribute(Qt.WA_TransparentForMouseEvents)
+        return toast
+
+    def _show_toast(self, message: str, kind: str = "success", duration_ms: int = 2800):
+        """يعرض Toast notification في أسفل النافذة."""
+        if not hasattr(self, "_toast"):
+            return
+
+        colors = {
+            "success": ("#065F46", "#D1FAE5", "#6EE7B7"),
+            "error":   ("#7F1D1D", "#FEE2E2", "#FCA5A5"),
+            "info":    ("#1E3A5F", "#DBEAFE", "#93C5FD"),
+        }
+        fg, bg, border = colors.get(kind, colors["info"])
+        icon = {"success": "✓", "error": "✗", "info": "ℹ"}.get(kind, "•")
+
+        self._toast.setText(f"  {icon}  {message}  ")
+        self._toast.setStyleSheet(
+            f"QLabel {{ background:{bg}; color:{fg}; border:1px solid {border};"
+            f"border-radius:8px; padding:0 16px; font-weight:600; }}"
+        )
+
+        # تحديد موضع Toast في أسفل المنتصف
+        self._reposition_toast()
+        self._toast.show()
+        self._toast.raise_()
+
+        # إخفاء تلقائي
+        if hasattr(self, "_toast_timer"):
+            self._toast_timer.stop()
+        self._toast_timer = QTimer(self)
+        self._toast_timer.setSingleShot(True)
+        self._toast_timer.timeout.connect(self._toast.hide)
+        self._toast_timer.start(duration_ms)
+
+    def _reposition_toast(self):
+        if not hasattr(self, "_toast"):
+            return
+        cw = self.centralWidget()
+        if not cw:
+            return
+        w = min(480, cw.width() - 40)
+        x = (cw.width() - w) // 2
+        y = cw.height() - 60
+        self._toast.setFixedWidth(w)
+        self._toast.move(x, y)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_toast()
 
     def showEvent(self, event):
         """استعادة حجم النافذة بعد اكتمال بناء الـ UI"""
@@ -316,16 +407,19 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
             self.tabs.setCurrentIndex(prev_idx)
 
     def _show_status(self, message: str, message_type: str = "info"):
-        if hasattr(self, 'status_label') and hasattr(self, 'status_bar'):
-            self.status_label.setText(message)
-            self.status_label.setProperty("message_type", message_type)
-            self.status_label.style().unpolish(self.status_label)
-            self.status_label.style().polish(self.status_label)
-            self.status_bar.setVisible(True)
+        """يعرض Toast بدل status bar."""
+        self._show_toast(message, kind=message_type)
 
     def _hide_status(self):
-        if hasattr(self, 'status_bar'):
-            self.status_bar.setVisible(False)
+        if hasattr(self, "_toast"):
+            self._toast.hide()
+
+    def _reset_save_btn(self):
+        """يُعيد زر الحفظ لحالته الطبيعية."""
+        if hasattr(self, "btn_save"):
+            self.btn_save.setEnabled(True)
+            self.btn_save.setText("💾  " + self._("save"))
+            self.btn_save.setStyleSheet("")
 
     def _prefill_if_edit(self):
         if not self.transaction:
@@ -448,7 +542,10 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
     def _on_save_clicked(self):
         from datetime import date as _pydate
 
-        self._show_status(self._("saving"), "info")
+        # زر الحفظ → حالة loading
+        self.btn_save.setEnabled(False)
+        self.btn_save.setText("⏳  " + self._("saving"))
+        self._show_toast(self._("saving"), kind="info", duration_ms=5000)
 
         data = {}
         if hasattr(self, "get_general_data"):
@@ -532,7 +629,13 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
             trx_id_saved = int(getattr(trx, "id", 0) or 0)
             trx_no_saved = str(getattr(trx, "transaction_no", "") or "").strip()
 
-            self._show_status(self._("transaction_saved_successfully"), "success")
+            # استعادة زر الحفظ بلون النجاح لـ 800ms
+            self.btn_save.setText("✓  " + self._("saved"))
+            self.btn_save.setStyleSheet(
+                "QPushButton { background:#065F46; color:white; border-radius:6px; }"
+            )
+            QTimer.singleShot(800, self._reset_save_btn)
+            self._show_toast(self._("transaction_saved_successfully"), kind="success")
 
             # جمع المستندات المختارة من الـ side panel
             selected_doc_ids: List[int] = []
@@ -573,12 +676,15 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
                         QMessageBox.warning(self, self._("warning"),
                                             self._("doc_generation_error").format(error=doc_err))
             else:
-                QMessageBox.information(self, self._("success"), self._("transaction_saved_successfully"))
+                self._show_toast(self._("transaction_saved_successfully"), kind="success")
 
             self.close()
 
         except Exception as e:
-            self._show_status(f"{self._('save_failed')}: {e}", "error")
+            self.btn_save.setEnabled(True)
+            self.btn_save.setText("💾  " + self._("save"))
+            self.btn_save.setStyleSheet("")
+            self._show_toast(f"{self._('save_failed')}: {e}", kind="error", duration_ms=4000)
             QMessageBox.critical(self, self._("error"), f"{self._('save_failed')}: {e}")
 
     def _open_generate_docs(self):

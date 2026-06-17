@@ -115,6 +115,27 @@ def get_styles(theme):
         color     : {c["text_disabled"]};
     }}
 
+    /* tab-primary-btn — زر "إضافة" الرئيسي في شريط أدوات التابات */
+    QPushButton#tab-primary-btn {{
+        background   : {c["primary"]};
+        color        : {c["text_white"]};
+        border       : none;
+        border-radius: {R};
+        font-weight  : 700;
+        padding      : {PAD_MD};
+        letter-spacing: 0.3px;
+    }}
+    QPushButton#tab-primary-btn:hover {{
+        background: {c["primary_hover"]};
+    }}
+    QPushButton#tab-primary-btn:pressed {{
+        background: {c["primary_active"]};
+    }}
+    QPushButton#tab-primary-btn:disabled {{
+        background: {c["bg_disabled"]};
+        color     : {c["text_disabled"]};
+    }}
+
     /* ═══════════════════════════════════════════════════════════════════
        SECONDARY — الإجراءات الثانوية (إلغاء، رجوع)
     ═══════════════════════════════════════════════════════════════════ */

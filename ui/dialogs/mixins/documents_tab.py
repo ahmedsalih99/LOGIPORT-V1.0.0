@@ -84,14 +84,13 @@ class DocumentsTabMixin:
 
         lbl_title = QLabel("📄 " + self._get_tr("documents"))
         lbl_title.setObjectName("docs-panel-title")
-        f = QFont()
-        f.setBold(True)
-        lbl_title.setFont(f)
+        from ui.utils.font_utils import app_font, MD
+        lbl_title.setFont(app_font(MD, bold=True))
 
         self.lbl_selected_count = QLabel("0/0")
         self.lbl_selected_count.setObjectName("docs-count-badge")
         self.lbl_selected_count.setAlignment(Qt.AlignCenter)
-        self.lbl_selected_count.setFixedSize(42, 20)
+        self.lbl_selected_count.setFixedSize(52, 22)
 
         header_row.addWidget(lbl_title)
         header_row.addStretch()
@@ -149,10 +148,8 @@ class DocumentsTabMixin:
 
             g_hdr = QLabel(f"{group_icon} {group_label}")
             g_hdr.setObjectName("doc-group-header")
-            gf = QFont()
-            gf.setBold(True)
-            gf.setPointSize(8)
-            g_hdr.setFont(gf)
+            from ui.utils.font_utils import app_font, SM
+            g_hdr.setFont(app_font(SM, bold=True))
             self._docs_vlay.addWidget(g_hdr)
 
             for d in group_docs:
@@ -278,18 +275,19 @@ class DocumentsTabMixin:
                 pass
         self._update_selected_count()
 
-    def _update_selected_count(self) -> None:
-        if not hasattr(self, "lbl_selected_count"):
-            return
-        enabled = [cb for cb in (getattr(self, "doc_checkboxes", []) or []) if cb.isEnabled()]
-        count = sum(1 for cb in enabled if cb.isChecked())
-        total = len(enabled)
-        self.lbl_selected_count.setText(f"{count}/{total}")
-        if hasattr(self.lbl_selected_count, "setProperty"):
-            state = "none" if count == 0 else ("all" if count == total else "some")
-            self.lbl_selected_count.setProperty("count_state", state)
-            self.lbl_selected_count.style().unpolish(self.lbl_selected_count)
-            self.lbl_selected_count.style().polish(self.lbl_selected_count)
+    def _update_selected_count(self, *_):
+        total    = len([cb for cb in getattr(self, "doc_checkboxes", []) if cb.isEnabled()])
+        selected = len([cb for cb in getattr(self, "doc_checkboxes", []) if cb.isChecked()])
+        if hasattr(self, "lbl_selected_count"):
+            self.lbl_selected_count.setText(f"{selected}/{total}")
+            is_any = selected > 0
+            self.lbl_selected_count.setStyleSheet(
+                "QLabel { background:#D1FAE5; color:#065F46; border-radius:10px; "
+                "font-weight:700; font-size:10px; }" if is_any else
+                "QLabel { background:#F3F4F6; color:#6B7280; border-radius:10px; "
+                "font-weight:600; font-size:10px; }"
+            )
+
 
     def _load_document_types(self) -> List[Dict[str, Any]]:
         try:

@@ -63,7 +63,11 @@ def get_styles(theme):
         border    : 1px solid {c["border_subtle"]};
     }}
     QLineEdit#search-field {{
-        border-radius: {BorderRadius.LG};
+        border       : none;
+        border-radius: 0;
+        background   : transparent;
+        padding      : 2px 4px;
+        font-size    : {s["base"]}px;
     }}
     QLineEdit[error="true"] {{
         border    : {BORDER_ERROR};

@@ -471,6 +471,117 @@ def get_styles(theme):
         background: transparent;
     }}
 
+    /* ── Transaction Dialog Header ─────────────────────────────────────────── */
+
+    QFrame#trx-dialog-header {{
+        background: {c["bg_card"]};
+        border-bottom: 1px solid {c["border"]};
+        border-top: none;
+        border-left: none;
+        border-right: none;
+    }}
+
+    QLabel#trx-header-title {{
+        color: {c["text_primary"]};
+        background: transparent;
+    }}
+
+    QLabel#trx-header-no {{
+        color: {c["text_secondary"]};
+        background: transparent;
+    }}
+
+    QLabel#trx-header-badge {{
+        background: {c["bg_main"]};
+        border-radius: 10px;
+        padding: 2px 10px;
+    }}
+
+    /* ── General Info Strip ────────────────────────────────────────────────── */
+
+    QFrame#general-info-strip {{
+        background: {c["bg_card"]};
+        border-bottom: 1px solid {c["border"]};
+        border-top: none;
+        border-left: none;
+        border-right: none;
+    }}
+
+    /* ── Transaction Type Pills ────────────────────────────────────────────── */
+
+    QPushButton#trx-pill-import,
+    QPushButton#trx-pill-export,
+    QPushButton#trx-pill-transit {{
+        background: {c["bg_main"]};
+        color: {c["text_secondary"]};
+        border: 1.5px solid {c["border"]};
+        border-radius: 8px;
+        padding: 0 12px;
+        font-weight: 600;
+    }}
+
+    QPushButton#trx-pill-import:hover,
+    QPushButton#trx-pill-export:hover,
+    QPushButton#trx-pill-transit:hover {{
+        border-color: {c["primary"]};
+        color: {c["primary"]};
+        background: {c["bg_secondary"]};
+    }}
+
+    QPushButton#trx-pill-import:checked {{
+        background: #DBEAFE;
+        color: #1E3A5F;
+        border-color: #3B82F6;
+    }}
+
+    QPushButton#trx-pill-export:checked {{
+        background: #D1FAE5;
+        color: #065F46;
+        border-color: #10B981;
+    }}
+
+    QPushButton#trx-pill-transit:checked {{
+        background: #FEF3C7;
+        color: #78350F;
+        border-color: #F59E0B;
+    }}
+
+    /* ── Notes Popover ─────────────────────────────────────────────────────── */
+
+    QFrame#notes-popover {{
+        background: {c["bg_card"]};
+        border: 1px solid {c["border"]};
+        border-radius: {BorderRadius.MD};
+        padding: 4px;
+    }}
+
+    /* ── Totals Cards ──────────────────────────────────────────────────────── */
+
+    QLabel#total-card-label {{
+        color: {c["text_secondary"]};
+        background: transparent;
+    }}
+
+    QLabel#total-value-label {{
+        color: {c["primary"]};
+        background: transparent;
+        font-weight: 700;
+    }}
+
+    QLabel#total-label {{
+        color: {c["text_primary"]};
+        background: transparent;
+        font-weight: 700;
+    }}
+
+    /* ── Toast ─────────────────────────────────────────────────────────────── */
+
+    QLabel#trx-toast {{
+        border-radius: 8px;
+        padding: 0 16px;
+        font-weight: 600;
+    }}
+
     /* ============================================================================
        End of Transaction Styles
        ============================================================================ */

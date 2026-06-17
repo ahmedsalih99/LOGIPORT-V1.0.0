@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QDate, QPoint
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSplitter,
     QTableWidget, QTableWidgetItem, QComboBox, QDateEdit, QMessageBox, QDialog,
-    QAbstractItemView, QMenu, QHeaderView
+    QAbstractItemView, QMenu, QHeaderView, QFrame
 )
 from PySide6.QtGui import QAction, QIcon
 from ui.utils.wheel_blocker import block_wheel_in
@@ -166,8 +166,12 @@ class ItemsTabMixin:
             self._("unit_price"), self._("total_price")
         ])
 
-        self.tbl.verticalHeader().setVisible(False)
-        self.tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl.verticalHeader().setVisible(True)
+        self.tbl.verticalHeader().setDefaultSectionSize(48)
+        self.tbl.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.tbl.verticalHeader().setDefaultAlignment(Qt.AlignCenter)
+        # عرض ثابت للترقيم
+        self.tbl.verticalHeader().setFixedWidth(36)
         self.tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         # DoubleClicked | SelectedClicked | EditKeyPressed فقط — بدون CurrentChanged
         # AllEditTriggers كانت تُحدِّد السطر بمجرد مرور الماوس
@@ -178,12 +182,35 @@ class ItemsTabMixin:
         )
         self.tbl.setAlternatingRowColors(True)
 
-        # Header + row height (ثيم)
+        # Header + row height
         hdr = self.tbl.horizontalHeader()
-        hdr.setStretchLastSection(True)
+        hdr.setStretchLastSection(False)   # لا stretch — نستخدم عروض ثابتة
         hdr.setDefaultAlignment(Qt.AlignCenter)
-        hdr.setSectionResizeMode(QHeaderView.Interactive)
-        self.tbl.verticalHeader().setDefaultSectionSize(32)
+        hdr.setSectionResizeMode(QHeaderView.Interactive)  # المستخدم يقدر يعدّل
+        self.tbl.verticalHeader().setDefaultSectionSize(48)
+
+        # ── عروض الأعمدة الافتراضية ───────────────────────────────────────────
+        _COL_WIDTHS = {
+            self.COL_SOURCE:     90,   # المصدر
+            self.COL_TRUCK:     140,   # رقم السيارة/الكونتينر
+            self.COL_MATERIAL:  160,   # المادة
+            self.COL_PACK:      110,   # نوع التغليف
+            self.COL_QTY:        80,   # الكمية
+            self.COL_GROSS:     100,   # الوزن القائم
+            self.COL_NET:       100,   # الوزن الصافي
+            self.COL_PROD:      115,   # تاريخ الإنتاج
+            self.COL_EXP:       115,   # تاريخ الانتهاء
+            self.COL_CURR:      110,   # العملة
+            self.COL_PTYPE:     140,   # نوع التسعير
+            self.COL_UNIT_PRICE: 90,   # سعر الوحدة
+            self.COL_TOTAL:      90,   # الإجمالي
+        }
+        for col, w in _COL_WIDTHS.items():
+            self.tbl.setColumnWidth(col, w)
+
+        # Scroll أفقي دائم ظاهر حتى يعرف المستخدم أن فيه أعمدة مخفية
+        self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         # Context menu
         self.tbl.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -191,28 +218,44 @@ class ItemsTabMixin:
 
         self.tbl.itemChanged.connect(self._on_cell_changed)
 
-        # ================= Totals =================
-        self.lbl_q = QLabel(self._("count") + ": 0")
-        self.lbl_q.setObjectName("total-label")
+        # ================= Totals Cards =================
+        def _make_total_card(icon, label_key, obj_name, val_name, accent):
+            from PySide6.QtWidgets import QVBoxLayout as _VL
+            from ui.utils.font_utils import app_font as _af, SM as _SM, LG as _LG
+            card = QFrame()
+            card.setObjectName("totals-card")
+            card.setStyleSheet(
+                f"QFrame#totals-card {{ border-left: 3px solid {accent};"
+                f"background: transparent; border-radius:0; padding-left:8px; }}"
+            )
+            cl = _VL(card)
+            cl.setContentsMargins(8, 4, 8, 4)
+            cl.setSpacing(1)
+            lbl = QLabel(self._(label_key))
+            lbl.setObjectName("total-card-label")
+            lbl.setFont(_af(_SM))
+            val = QLabel("0")
+            val.setObjectName(obj_name)
+            val.setFont(_af(_LG, bold=True))
+            cl.addWidget(lbl)
+            cl.addWidget(val)
+            setattr(self, val_name, val)
+            return card
 
-        self.lbl_g = QLabel(self._("gross_weight_kg") + ": 0")
-        self.lbl_g.setObjectName("total-label")
-
-        self.lbl_n = QLabel(self._("net_weight_kg") + ": 0")
-        self.lbl_n.setObjectName("total-label")
-
-        self.lbl_v = QLabel(self._("total_price") + ": 0")
-        self.lbl_v.setObjectName("total-value-label")
+        card_q = _make_total_card("📦", "count",          "total-label",       "lbl_q", "#6366F1")
+        card_g = _make_total_card("⚖",  "gross_weight_kg","total-label",       "lbl_g", "#F59E0B")
+        card_n = _make_total_card("🎯", "net_weight_kg",  "total-label",       "lbl_n", "#10B981")
+        card_v = _make_total_card("💰", "total_price",    "total-value-label", "lbl_v", "#C9A84C")
 
         # ================= Layout assemble =================
         tl.addLayout(tools)
         tl.addWidget(self.tbl)
 
         bl.addStretch()
-        bl.addWidget(self.lbl_q)
-        bl.addWidget(self.lbl_g)
-        bl.addWidget(self.lbl_n)
-        bl.addWidget(self.lbl_v)
+        bl.addWidget(card_q)
+        bl.addWidget(card_g)
+        bl.addWidget(card_n)
+        bl.addWidget(card_v)
 
         splitter.addWidget(top)
         splitter.addWidget(bottom)
@@ -223,7 +266,9 @@ class ItemsTabMixin:
 
         # ================= Add tab =================
         tabs = cast("QTabWidget", getattr(self, "tabs"))
+        self._items_tab_index = tabs.count()
         tabs.addTab(self.tab_items, self._("items"))
+        self._update_items_tab_title()
 
         # ================= Load caches =================
         self._materials = self._load_table(Material)
@@ -362,6 +407,7 @@ class ItemsTabMixin:
                 widget.setDate(QDate.currentDate())
 
         self._recalc_totals()
+        self._refresh_row_numbers()
 
     # --------------------------- DB helpers ---------------------------
     def _load_table(self, model_cls) -> List[tuple]:
@@ -428,6 +474,7 @@ class ItemsTabMixin:
         self.tbl.insertRow(r)
 
         self._set_text(r, self.COL_SOURCE, "manual")
+        self._refresh_row_numbers()
         self._set_text(r, self.COL_TRUCK, "")
         self._set_combo(r, self.COL_MATERIAL, self._items_from_cache(self._materials), None)
         self._set_combo(r, self.COL_PACK, self._items_from_cache(self._packs), None)
@@ -450,6 +497,7 @@ class ItemsTabMixin:
         for r in rows:
             self.tbl.removeRow(r)
         self._recalc_totals()
+        self._refresh_row_numbers()
 
     def _pick_entries(self) -> None:
         """فتح dialog لاختيار الإدخالات وإضافة موادها للجدول"""
@@ -623,6 +671,7 @@ class ItemsTabMixin:
                 self._recalc_row(r)
 
         self._recalc_totals()
+        self._refresh_row_numbers()
 
     def _process_pick_entries_data(self, selected_entries):
         """
@@ -710,6 +759,7 @@ class ItemsTabMixin:
                 self._recalc_row(r)
 
         self._recalc_totals()
+        self._refresh_row_numbers()
 
     def _on_cell_changed(self, item: QTableWidgetItem) -> None:
         """معالجة تغيير الخلية"""
@@ -733,17 +783,42 @@ class ItemsTabMixin:
         except Exception:
             pass
         try:
-            _ = getattr(self, "_", lambda k: k)
             if hasattr(self, "lbl_q"):
-                self.lbl_q.setText(f'{_("count")}: {total_qty:,.3f}')
+                self.lbl_q.setText(f"{total_qty:,.3f}")
             if hasattr(self, "lbl_g"):
-                self.lbl_g.setText(f'{_("gross_weight_kg")}: {total_gross:,.3f}')
+                self.lbl_g.setText(f"{total_gross:,.3f}")
             if hasattr(self, "lbl_n"):
-                self.lbl_n.setText(f'{_("net_weight_kg")}: {total_net:,.3f}')
+                self.lbl_n.setText(f"{total_net:,.3f}")
             if hasattr(self, "lbl_v"):
-                self.lbl_v.setText(f'{_("total_price")}: {total_val:,.2f}')
+                self.lbl_v.setText(f"{total_val:,.2f}")
+            # تحديث عداد التاب
+            self._update_items_tab_title()
         except Exception:
             pass
+
+    def _update_items_tab_title(self):
+        """يُحدِّث عنوان تاب البضائع بعدد الأصناف."""
+        try:
+            tabs = getattr(self, "tabs", None)
+            idx = getattr(self, "_items_tab_index", None)
+            if tabs is None or idx is None:
+                return
+            count = self.tbl.rowCount() if hasattr(self, "tbl") else 0
+            _ = getattr(self, "_", lambda k: k)
+            label = self._("items")
+            if count > 0:
+                tabs.setTabText(idx, f"{label}  ({count})")
+            else:
+                tabs.setTabText(idx, label)
+        except Exception:
+            pass
+
+    def _refresh_row_numbers(self) -> None:
+        """يُحدِّث أرقام الصفوف في الـ vertical header بعد كل إضافة أو حذف."""
+        for r in range(self.tbl.rowCount()):
+            self.tbl.setVerticalHeaderItem(
+                r, QTableWidgetItem(str(r + 1))
+            )
 
     def _recalc_row(self, row: int) -> None:
         """إعادة حساب الإجمالي للصف حسب نوع التسعير الفعلي"""
@@ -1046,8 +1121,7 @@ class ItemsTabMixin:
             self.tbl.blockSignals(False)
 
         self._recalc_totals()
-
-    def _auto_price_all(self) -> None:
+        self._refresh_row_numbers()
         """جلب الأسعار من جدول pricing ثم إعادة حساب الإجماليات"""
         # 1. اجلب seller/buyer من نافذة المعاملة
         seller_id = None
