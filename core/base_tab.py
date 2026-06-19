@@ -523,12 +523,12 @@ class BaseTab(QWidget):
 
         self.btn_prev = QPushButton("◀")
         self.btn_prev.setObjectName("pagination-btn")
-        self.btn_prev.setFixedSize(32, 28)
+        self.btn_prev.setFixedSize(30, 30)
         self.btn_prev.setCursor(Qt.PointingHandCursor)
 
         self.btn_next = QPushButton("▶")
         self.btn_next.setObjectName("pagination-btn")
-        self.btn_next.setFixedSize(32, 28)
+        self.btn_next.setFixedSize(30, 30)
         self.btn_next.setCursor(Qt.PointingHandCursor)
 
         self.lbl_pagination = QLabel()
@@ -540,7 +540,7 @@ class BaseTab(QWidget):
         self.cmb_rows_per_page.addItems(["10", "20", "50", "100"])
         self.cmb_rows_per_page.setCurrentText(str(self.rows_per_page))
         self.cmb_rows_per_page.setFixedWidth(64)
-        self.cmb_rows_per_page.setFixedHeight(28)
+        self.cmb_rows_per_page.setFixedHeight(30)
 
         self._lbl_rows_per_page = QLabel(self._("rows_per_page"))
         self._lbl_rows_per_page.setObjectName("rows-per-page-lbl")

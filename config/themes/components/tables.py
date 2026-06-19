@@ -61,34 +61,6 @@ def get_styles(theme):
         border    : none;
     }}
 
-    QHeaderView::section {{
-        background   : {c["bg_disabled"]};
-        color        : {c["text_secondary"]};
-        padding      : 6px {Spacing.MD};
-        border       : none;
-        border-bottom: 2px solid {c["border"]};
-        border-right : 1px solid {c["border_subtle"]};
-        font-weight  : 700;
-        font-size    : {s["sm"]}px;
-        letter-spacing: 0.3px;
-    }}
-
-    QHeaderView::section:hover {{
-        background: {c["bg_hover"]};
-        color     : {c["primary"]};
-        cursor    : pointer;
-    }}
-
-    QHeaderView::section:pressed {{
-        background: {c["primary_light"]};
-        color     : {c["primary"]};
-    }}
-
-    QHeaderView::section:checked {{
-        background: {c["primary_light"]};
-        color     : {c["primary"]};
-    }}
-
     /* Sort indicator arrows */
     QHeaderView::down-arrow {{
         width : 10px;
@@ -99,13 +71,7 @@ def get_styles(theme):
         height: 10px;
     }}
 
-    QHeaderView::section:first {{
-        border-top-right-radius: {BorderRadius.MD};
-    }}
-    QHeaderView::section:last {{
-        border-top-left-radius : {BorderRadius.MD};
-        border-right           : none;
-    }}
+
 
     /* ── Corner Button ── */
 
@@ -277,41 +243,61 @@ def get_styles(theme):
         font-size  : {s["base"]}px;
     }}
 
-    /* ── Header الجدول — Navy + Gold هوية LOGIPORT ─────────────────── */
+    /* ── Horizontal Header — Navy + Gold هوية LOGIPORT ─────────────── */
 
-    QHeaderView::section {{
+    QHeaderView::section:horizontal {{
         background   : #0D1B2A;
         color        : #C9A84C;
         padding      : 8px {Spacing.MD};
         border       : none;
         border-bottom: 2px solid #C9A84C;
-        border-right : 1px solid rgba(201,168,76,0.2);
+        border-right : 1px solid rgba(201,168,76,0.15);
         font-weight  : 700;
         font-size    : {s["sm"]}px;
         letter-spacing: 0.4px;
+        border-radius: 0;
     }}
 
-    QHeaderView::section:hover {{
+    QHeaderView::section:horizontal:hover {{
         background: #1B2F4A;
         color     : #E8C96A;
     }}
 
-    QHeaderView::section:pressed {{
+    QHeaderView::section:horizontal:pressed {{
         background: #1B2F4A;
     }}
 
-    QHeaderView::section:first {{
-        border-top-right-radius: {BorderRadius.MD};
+    QHeaderView::section:horizontal:last {{
+        border-right: none;
     }}
-    QHeaderView::section:last {{
-        border-top-left-radius : {BorderRadius.MD};
-        border-right           : none;
+
+    /* ── Vertical Header (ترقيم الصفوف) — فاتح ومتناسق مع الجدول ─── */
+
+    QHeaderView::section:vertical {{
+        background   : {c["bg_card"]};
+        color        : {c["text_muted"]};
+        border       : none;
+        border-bottom: 1px solid {c["border_subtle"]};
+        border-left  : 2px solid #C9A84C;
+        font-weight  : 600;
+        font-size    : {s["xs"]}px;
+        padding      : 0 6px;
+        min-width    : 28px;
+        max-width    : 36px;
     }}
+
+    QHeaderView::section:vertical:alternate {{
+        background: {c["bg_disabled"]};
+    }}
+
+    /* ── Corner button (تقاطع الـ headers) ──────────────────────────── */
 
     QTableCornerButton::section {{
         background   : #0D1B2A;
         border-bottom: 2px solid #C9A84C;
-        border       : none;
+        border-left  : 2px solid #C9A84C;
+        border-top   : none;
+        border-right : none;
     }}
 
     /* ── Row selection — خط جانبي Gold عند التحديد ──────────────────── */
@@ -375,27 +361,27 @@ def get_styles(theme):
     QPushButton#pagination-btn {{
         background   : {c["bg_main"]};
         color        : {c["text_secondary"]};
-        border       : 1.5px solid {c["border"]};
+        border       : 1px solid {c["border"]};
         border-radius: {BorderRadius.SM};
         font-weight  : 700;
-        font-size    : {s["base"]}px;
+        font-size    : {s["sm"]}px;
         padding      : 0;
     }}
 
     QPushButton#pagination-btn:hover {{
-        background  : {c["bg_hover"]};
+        background  : {c["primary_light"]};
         color       : {c["primary"]};
         border-color: {c["primary"]};
     }}
 
     QPushButton#pagination-btn:pressed {{
-        background: {c["primary_light"]};
-        color     : {c["primary"]};
+        background: {c["primary"]};
+        color     : white;
     }}
 
     QPushButton#pagination-btn:disabled {{
-        background: {c["bg_disabled"]};
-        color     : {c["text_disabled"]};
+        background  : {c["bg_disabled"]};
+        color       : {c["text_disabled"]};
         border-color: {c["border_subtle"]};
     }}
 
@@ -404,11 +390,12 @@ def get_styles(theme):
         font-weight: 600;
         font-size  : {s["sm"]}px;
         background : transparent;
+        padding    : 0 8px;
     }}
 
     QLabel#rows-per-page-lbl {{
         color      : {c["text_muted"]};
-        font-size  : {s["xs"]}px;
+        font-size  : {s["sm"]}px;
         background : transparent;
     }}
     """

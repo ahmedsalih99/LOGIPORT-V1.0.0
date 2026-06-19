@@ -156,27 +156,28 @@ def get_styles(theme):
     /* ========== FILTER BAR ========== */
 
     QWidget#filter-bar {{
-        background  : {c["bg_card"]};
-        border      : 1px solid {c["border_subtle"]};
-        border-radius: 10px;
-        padding     : 2px 0;
+        background   : {c["bg_card"]};
+        border       : none;
+        border-bottom: 1px solid {c["border_subtle"]};
+        border-radius: 0;
+        padding      : 2px 0;
     }}
 
     QWidget#filter-group {{
-        background  : {c["bg_main"]};
-        border      : 1px solid {c["border"]};
-        border-radius: 8px;
+        background   : {c["bg_main"]};
+        border       : 1.5px solid {c["border"]};
+        border-radius: {BorderRadius.MD};
     }}
 
-    /* preset buttons (today / week / month) */
     QPushButton#filter-preset-btn {{
         background   : transparent;
         border       : 1.5px solid {c["border"]};
         border-radius: {BorderRadius.MD};
-        padding      : 0 10px;
+        padding      : 0 12px;
         font-size    : {s["sm"]}px;
         color        : {c["text_secondary"]};
         min-height   : 30px;
+        font-weight  : 500;
     }}
     QPushButton#filter-preset-btn:hover {{
         background   : {c["primary_light"]};
@@ -187,41 +188,37 @@ def get_styles(theme):
         background   : {c["primary"]};
         border-color : {c["primary"]};
         color        : #FFFFFF;
-        font-weight  : 600;
+        font-weight  : 700;
     }}
 
-    /* clear button */
     QPushButton#filter-clear-btn {{
-        background   : transparent;
-        border       : 1.5px solid {c["danger"]}50;
-        border-radius : 6px;
-        font-size    : {s["sm"]}px;
-        color        : {c["danger"]};
-        min-width    : 28px;
-        max-width    : 28px;
-        min-height   : 28px;
-        max-height   : 28px;
-        padding      : 0;
+        background    : transparent;
+        border        : 1.5px solid {c["danger"]}50;
+        border-radius : {BorderRadius.MD};
+        font-size     : {s["sm"]}px;
+        color         : {c["danger"]};
+        min-width     : 30px;
+        max-width     : 30px;
+        min-height    : 30px;
+        max-height    : 30px;
+        padding       : 0;
     }}
     QPushButton#filter-clear-btn:hover {{
         background   : {c["danger"]}12;
         border-color : {c["danger"]};
     }}
 
-    /* vertical separator inside filter-bar */
     QFrame#filter-sep {{
-        color        : {c["border"]};
-        max-width    : 1px;
-        min-width    : 1px;
+        color     : {c["border"]};
+        max-width : 1px;
+        min-width : 1px;
     }}
 
-    /* results count label */
     QLabel#filter-count-lbl {{
-        color        : {c["text_muted"]};
-        font-size    : {s["sm"]}px;
-        padding      : 0 4px;
+        color     : {c["text_muted"]};
+        font-size : {s["sm"]}px;
+        padding   : 0 4px;
     }}
-
     /* ========== SEMANTIC LABELS ========== */
     QLabel#text-muted, QLabel#empty-label, QLabel#form-hint {{
         color        : {c["text_muted"]};
