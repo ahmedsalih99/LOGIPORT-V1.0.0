@@ -582,14 +582,15 @@ class AddTransactionWindow(GeneralTabMixin, PartiesGeoTabMixin, ItemsTabMixin, D
                 entry_ids = []
 
         required_labels = {
-            "delivery_method_id": self._("delivery_method"),
-            "client_id": self._("client"),
+            # delivery_method_id: اختياري — أُزيل من الإلزامي
+            "client_id":           self._("client"),
             "exporter_company_id": self._("exporting_company"),
             "importer_company_id": self._("importing_company"),
         }
         missing = [lbl for k, lbl in required_labels.items() if not data.get(k)]
         if missing:
             self._hide_status()
+            self._reset_save_btn()   # ← إعادة تفعيل الزر عند فشل الـ validation
             QMessageBox.warning(self, self._("invalid_data"),
                                 self._("please_fill_required_fields") + ":\n- " + "\n- ".join(missing))
             return

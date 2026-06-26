@@ -80,6 +80,10 @@ _LOCAL_ONLY_COLS: Dict[str, set] = {
     "users": {
         "created_by", "updated_by",
     },
+    "companies": {
+        # [J2] stamp_image موجود في SQLite — لم يُطبَّق migration في Supabase بعد
+        "stamp_image",
+    },
 
 }
 
@@ -247,15 +251,17 @@ _EPOCH = "1970-01-01T00:00:00+00:00"
 # on_conflict column لكل جدول في Supabase
 # ─────────────────────────────────────────────────────────
 _ON_CONFLICT: Dict[str, str] = {
+    # جداول مرجعية بـ code — لكن Supabase عنده UNIQUE على server_id أيضاً
+    # نستخدم server_id كـ conflict column لتجنب 409 على unique constraint
     "countries":             "code",
     "currencies":            "code",
     "pricing_types":         "code",
     "document_types":        "code",
     "permissions":           "code",
     "company_roles":         "code",
-    "offices":               "code",
-    "materials":             "code",
-    "clients":               "code",
+    "offices":               "server_id",   # [K4] server_id بدل code — Supabase UNIQUE على server_id
+    "materials":             "server_id",   # [K4] server_id بدل code — Supabase UNIQUE على server_id
+    "clients":               "server_id",   # [K4] server_id بدل code — Supabase UNIQUE على server_id
     "material_types":        "id",
     "packaging_types":       "id",
     "delivery_methods":      "id",
@@ -288,6 +294,8 @@ _TABLES_KEEP_ID: set = {
     "clients",         # ← transactions.client_id → clients.id
     "transactions",    # ← transaction_items/transport_details.transaction_id → transactions.id
     "entries",         # ← transaction_items.entry_id / entry_items.entry_id → entries.id
+    "materials",       # ← entry_items/transaction_items.material_id → materials.id
+    "offices",         # ← entries/transactions.office_id → offices.id
 }
 
 
@@ -664,6 +672,7 @@ class SyncService:
 
         remote_dicts = []
         seen_conflict_vals = set()
+        seen_server_ids: set = set()  # [K3] dedup إضافي على server_id
         for d in dicts:
             mapped = _apply_col_mapping_to_remote(local_table, d)
 
@@ -676,6 +685,9 @@ class SyncService:
                     mapped.pop("server_id", None)
                     continue
             else:
+                # [K2] احذف id عند conflict على code/id لتجنب PK conflict في Supabase
+                if local_table not in _TABLES_KEEP_ID:
+                    mapped.pop("id", None)
                 if mapped.get("server_id") is None:
                     mapped.pop("server_id", None)
 
@@ -686,6 +698,17 @@ class SyncService:
             if c_val in seen_conflict_vals:
                 continue
             seen_conflict_vals.add(c_val)
+
+            # [K3] dedup إضافي على server_id لتجنب unique constraint violation
+            # حتى لو conflict_col هو code — Supabase قد يكون عنده unique على server_id أيضاً
+            sid = mapped.get("server_id")
+            if sid is not None and sid in seen_server_ids:
+                logger.warning(
+                    "Sync push_ref %s: server_id مكرر %s — سيُتخطى", local_table, sid
+                )
+                continue
+            if sid is not None:
+                seen_server_ids.add(sid)
 
             remote_dicts.append(mapped)
 
@@ -762,6 +785,7 @@ class SyncService:
 
         cc = _conflict_col(local_table)
         seen = set()
+        seen_sids: set = set()  # [K3] dedup إضافي على server_id
         remote_dicts = []
         for d in dicts:
             mapped = _apply_col_mapping_to_remote(local_table, d)
@@ -774,6 +798,9 @@ class SyncService:
                     mapped.pop("server_id", None)
                     continue
             else:
+                # [K2] احذف id عند conflict على code/id لتجنب PK conflict في Supabase
+                if local_table not in _TABLES_KEEP_ID:
+                    mapped.pop("id", None)
                 if mapped.get("server_id") is None:
                     mapped.pop("server_id", None)
 
@@ -781,6 +808,17 @@ class SyncService:
             if cv is None or cv in seen:
                 continue
             seen.add(cv)
+
+            # [K3] dedup إضافي على server_id
+            sid = mapped.get("server_id")
+            if sid is not None and sid in seen_sids:
+                logger.warning(
+                    "Sync push %s: server_id مكرر %s — سيُتخطى", local_table, sid
+                )
+                continue
+            if sid is not None:
+                seen_sids.add(sid)
+
             remote_dicts.append(mapped)
 
         if not remote_dicts:

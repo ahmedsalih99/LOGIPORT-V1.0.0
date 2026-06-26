@@ -49,15 +49,21 @@ class AddMaterialDialog(FormDialog):
         self.add_section("section_basic_info")
 
         self.code = QLineEdit()
+        # تحويل تلقائي للأحرف الكبيرة أثناء الكتابة
+        self.code.textChanged.connect(lambda t: self.code.setText(t.upper()) if t != t.upper() else None)
         self.add_row("code", self.code, required=True)
 
         self.name_ar = QLineEdit()
-        self.add_row("arabic_name", self.name_ar, required=True)
+        self.add_row("arabic_name", self.name_ar, required=True)  # عربي — لا uppercase
 
         self.name_en = QLineEdit()
+        # تحويل تلقائي للأحرف الكبيرة أثناء الكتابة
+        self.name_en.textChanged.connect(lambda t: self.name_en.setText(t.upper()) if t != t.upper() else None)
         self.add_row("english_name", self.name_en)
 
         self.name_tr = QLineEdit()
+        # تحويل تلقائي للأحرف الكبيرة أثناء الكتابة
+        self.name_tr.textChanged.connect(lambda t: self.name_tr.setText(t.upper()) if t != t.upper() else None)
         self.add_row("turkish_name", self.name_tr)
 
         # ── النوع ────────────────────────────────────────────────────────
@@ -149,10 +155,10 @@ class AddMaterialDialog(FormDialog):
                 price_val = "__invalid__"
 
         return {
-            "code":             (self.code.text() or "").strip(),
-            "name_ar":          (self.name_ar.text() or "").strip(),
-            "name_en":          (self.name_en.text() or "").strip(),
-            "name_tr":          (self.name_tr.text() or "").strip(),
+            "code":             (self.code.text() or "").strip().upper(),
+            "name_ar":          (self.name_ar.text() or "").strip(),          # عربي — لا uppercase
+            "name_en":          (self.name_en.text() or "").strip().upper(),
+            "name_tr":          (self.name_tr.text() or "").strip().upper(),
             "material_type_id": self.cmb_type.currentData(),
             "estimated_price":  price_val,
             "currency_id":      self.cmb_currency.currentData(),

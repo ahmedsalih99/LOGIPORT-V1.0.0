@@ -112,8 +112,7 @@ class ClientsCRUD(BaseCRUD):
         return self.get(client_id)
 
     def list_clients(self, *, order_by=None) -> List[Client]:
-        if order_by is None:
-            order_by = Client.id.asc()  # الأقدم أولاً
+        # الترتيب الافتراضي: الأحدث أولاً — يرثه من base_crud.get_all
         return self.get_all(order_by=order_by)
 
     def update_client(self, client_id: int, data: Dict[str, Any], user_id: Optional[int] = None) -> Optional[Client]:

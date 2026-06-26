@@ -720,7 +720,28 @@ class TransactionsCRUD(BaseCRUD):
             if date_to:
                 q = q.where(Transaction.transaction_date <= date_to)
             if search:
-                q = q.where(Transaction.transaction_no.ilike(f"%{search}%"))
+                from sqlalchemy import or_
+                from database.models.client import Client
+                from database.models.company import Company
+                pat = f"%{search}%"
+                q = q.outerjoin(Client, Transaction.client_id == Client.id)
+                q = q.outerjoin(
+                    Company,
+                    Transaction.exporter_company_id == Company.id
+                )
+                q = q.where(
+                    or_(
+                        Transaction.transaction_no.ilike(pat),
+                        Transaction.transport_ref.ilike(pat),
+                        Transaction.notes.ilike(pat),
+                        Client.name_ar.ilike(pat),
+                        Client.name_en.ilike(pat),
+                        Client.name_tr.ilike(pat),
+                        Company.name_ar.ilike(pat),
+                        Company.name_en.ilike(pat),
+                        Company.name_tr.ilike(pat),
+                    )
+                )
             q = q.order_by(
                 Transaction.transaction_date.desc(),
                 Transaction.id.desc(),
@@ -754,7 +775,28 @@ class TransactionsCRUD(BaseCRUD):
             if date_to:
                 q = q.where(Transaction.transaction_date <= date_to)
             if search:
-                q = q.where(Transaction.transaction_no.ilike(f"%{search}%"))
+                from sqlalchemy import or_
+                from database.models.client import Client
+                from database.models.company import Company
+                pat = f"%{search}%"
+                q = q.outerjoin(Client, Transaction.client_id == Client.id)
+                q = q.outerjoin(
+                    Company,
+                    Transaction.exporter_company_id == Company.id
+                )
+                q = q.where(
+                    or_(
+                        Transaction.transaction_no.ilike(pat),
+                        Transaction.transport_ref.ilike(pat),
+                        Transaction.notes.ilike(pat),
+                        Client.name_ar.ilike(pat),
+                        Client.name_en.ilike(pat),
+                        Client.name_tr.ilike(pat),
+                        Company.name_ar.ilike(pat),
+                        Company.name_en.ilike(pat),
+                        Company.name_tr.ilike(pat),
+                    )
+                )
             return s.execute(q).scalar_one()
 
     def get_with_items(

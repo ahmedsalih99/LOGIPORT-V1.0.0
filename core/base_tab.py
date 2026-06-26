@@ -648,6 +648,13 @@ class BaseTab(QWidget):
         self._update_pagination_label()
 
     def _setup_shortcuts(self):
+        # تبديل لغة الكيبورد تلقائياً عند focus أي QLineEdit في الـ tab
+        try:
+            from ui.utils.field_navigation import setup_field_ux
+            setup_field_ux(self)
+        except Exception:
+            pass
+
         QShortcut(QKeySequence("Ctrl+N"),          self, self.add_new_item)
         QShortcut(QKeySequence("Ctrl+E"),          self, self.edit_selected_item)
         QShortcut(QKeySequence("Ctrl+A"),          self, self.select_all_items)

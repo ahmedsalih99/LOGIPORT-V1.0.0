@@ -410,8 +410,8 @@ class ClientsTab(BaseTab):
                 return sorted(items, key=lambda c: (
                     str(getattr(c, "name_en", "") or getattr(c, "name_ar", "") or getattr(c, "name_tr",
                                                                                           "")).casefold()))
-            # default: created_at desc then id desc
-            return sorted(items, key=lambda c: (getattr(c, "created_at", None) or 0, getattr(c, "id", 0)), reverse=False)
+            # default: الأحدث أولاً — created_at desc ثم id desc
+            return sorted(items, key=lambda c: (getattr(c, "created_at", None) or 0, getattr(c, "id", 0)), reverse=True)
         except Exception:
             return items
     def select_record_by_id(self, record_id: int):

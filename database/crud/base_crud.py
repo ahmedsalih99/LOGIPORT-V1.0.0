@@ -105,10 +105,18 @@ class BaseCRUD:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _get_user_id(self, user) -> Optional[int]:
-        if user is None:
-            return None
+        if user is not None:
+            try:
+                return user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+            except Exception:
+                return None
+        # fallback: جيب المستخدم الحالي من SettingsManager إذا لم يُمرَّر
         try:
-            return user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+            from core.settings_manager import SettingsManager
+            u = SettingsManager.get_instance().get("user")
+            if u is None:
+                return None
+            return u.get("id") if isinstance(u, dict) else getattr(u, "id", None)
         except Exception:
             return None
 
@@ -275,6 +283,9 @@ class BaseCRUD:
             q = session.query(self.model)
             if order_by is not None:
                 q = q.order_by(order_by)
+            elif hasattr(self.model, "id"):
+                # الافتراضي: الأحدث أولاً — موحّد عبر كل التابات
+                q = q.order_by(self.model.id.desc())
             if limit:
                 q = q.limit(limit)
             results = q.all()
@@ -305,6 +316,9 @@ class BaseCRUD:
             total = q.count()
             if order_by is not None:
                 q = q.order_by(order_by)
+            elif hasattr(self.model, "id"):
+                # الافتراضي: الأحدث أولاً
+                q = q.order_by(self.model.id.desc())
             items = q.offset((page - 1) * per_page).limit(per_page).all()
             return {
                 "items": items, "total": total, "page": page, "per_page": per_page,

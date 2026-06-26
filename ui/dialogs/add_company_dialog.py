@@ -111,10 +111,21 @@ class AddCompanyDialog(BaseDialog):
         # Tab 1: Names
         tab1, f1 = self._make_tab()
         self.name_ar = QLineEdit()
+        self.name_ar.setObjectName("name_ar")   # ← keyboard switch: عربي
         self._row(f1, "arabic_name",  self.name_ar,  required=True)
         self.name_en = QLineEdit()
+        self.name_en.setObjectName("name_en")   # ← keyboard switch: إنجليزي
+        # uppercase أثناء الكتابة
+        self.name_en.textChanged.connect(
+            lambda t: self.name_en.setText(t.upper()) if t != t.upper() else None
+        )
         self._row(f1, "english_name", self.name_en)
         self.name_tr = QLineEdit()
+        self.name_tr.setObjectName("name_tr")   # ← keyboard switch: إنجليزي
+        # uppercase أثناء الكتابة
+        self.name_tr.textChanged.connect(
+            lambda t: self.name_tr.setText(t.upper()) if t != t.upper() else None
+        )
         self._row(f1, "turkish_name", self.name_tr)
         self._tabs.addTab(tab1, self._("names"))
 
@@ -139,6 +150,7 @@ class AddCompanyDialog(BaseDialog):
         self._row(f2, "country", self.cmb_country)
 
         self.city = QLineEdit()
+        self.city.setObjectName("city")          # ← keyboard switch: عربي (city في _AR_KEYWORDS)
         self._row(f2, "city", self.city)
 
         self.phone = QLineEdit()
@@ -157,10 +169,13 @@ class AddCompanyDialog(BaseDialog):
         # Tab 3: Addresses
         tab3, f3 = self._make_tab()
         self.address_ar = _AutoTextEdit()
+        self.address_ar.setObjectName("address_ar")   # ← keyboard: عربي
         self._row(f3, "address_ar", self.address_ar)
         self.address_en = _AutoTextEdit()
+        self.address_en.setObjectName("address_en")   # ← keyboard: إنجليزي
         self._row(f3, "address_en", self.address_en)
         self.address_tr = _AutoTextEdit()
+        self.address_tr.setObjectName("address_tr")   # ← keyboard: إنجليزي
         self._row(f3, "address_tr", self.address_tr)
         self._tabs.addTab(tab3, self._("addresses"))
 
@@ -499,7 +514,7 @@ class AddCompanyDialog(BaseDialog):
             owner_val = self.cmb_owner.currentData()
 
         data = {
-            "name_ar":             (self.name_ar.text() or "").strip().upper(),
+            "name_ar":             (self.name_ar.text() or "").strip(),           # عربي — لا uppercase
             "name_en":             (self.name_en.text() or "").strip().upper(),
             "name_tr":             (self.name_tr.text() or "").strip().upper(),
             "owner_client_id":     owner_val,
@@ -565,6 +580,7 @@ class _AutoTextEdit(QTextEdit):
     - حد أدنى: 72px (سطرين تقريباً)
     - حد أقصى: 35% من ارتفاع الشاشة المتاحة
     - يُحدَّث عند كل تغيير في النص
+    - يبدّل لغة الكيبورد عند FocusIn بناءً على objectName
     """
 
     _MIN_H = 72
@@ -574,6 +590,21 @@ class _AutoTextEdit(QTextEdit):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setMinimumHeight(self._MIN_H)
         self.document().contentsChanged.connect(self._adjust)
+
+    def focusInEvent(self, event):
+        """تبديل لغة الكيبورد عند focus بناءً على objectName."""
+        super().focusInEvent(event)
+        try:
+            from ui.utils.field_navigation import (
+                _detect_lang_by_name, _switch_keyboard, _KL_ARABIC, _KL_ENGLISH
+            )
+            lang = _detect_lang_by_name(self.objectName() or "")
+            if lang == "ar":
+                _switch_keyboard(_KL_ARABIC)
+            elif lang == "en":
+                _switch_keyboard(_KL_ENGLISH)
+        except Exception:
+            pass
 
     def _max_h(self) -> int:
         try:

@@ -476,11 +476,9 @@ class AdminDashboardTab(QWidget):
         from services.healthcheck import check_pdf_runtime
         try:
             report = check_pdf_runtime()
+            # QtWebEngine فقط — المحرك الأساسي المستخدم فعلياً
             checks = [
-                ("WeasyPrint (PDF)", report.weasyprint_stack),
-                ("Cairo",            report.cairo),
-                ("Pango",            report.pango),
-                ("GDK Pixbuf",       report.gdk_pixbuf),
+                ("QtWebEngine (PDF)", report.qtwebengine),
             ]
         except Exception:
             checks = [("PDF Runtime", False)]
