@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # لازم تُرفع هاي القيمة +1 كل مرة تُضاف فيها migration أو seed جديد بهذا الملف،
 # وإلا التعديل الجديد لن يُطبَّق على قواعد بيانات المستخدمين الموجودة.
 # =============================================================================
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 
 def _get_schema_version(conn) -> int:
@@ -569,6 +569,21 @@ def _run_migrations(conn) -> None:
             logger.info("Bootstrap: added customs_tariff_code to transaction_items")
     except Exception as _e:
         logger.warning("Bootstrap: customs_tariff_code migration skipped: %s", _e)
+
+    # Migration: failed_login_attempts + locked_until columns on users
+    # — حماية من محاولات تخمين كلمة السر (brute-force lockout)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "failed_login_attempts" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+            logger.info("Bootstrap: added failed_login_attempts to users")
+        if "locked_until" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN locked_until DATETIME")
+            conn.commit()
+            logger.info("Bootstrap: added locked_until to users")
+    except Exception as _e:
+        logger.warning("Bootstrap: login lockout migration skipped: %s", _e)
 
     # =========================================================================
     # Migration SYNC-1: جدول local_sync_cursors

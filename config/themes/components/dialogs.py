@@ -173,6 +173,26 @@ def get_styles(theme):
         color: {c["text_muted"]};
     }}
     
+    /* Remember Me Checkbox */
+    QDialog#LoginDialog QCheckBox {{
+        color: {c["text_secondary"]};
+        font-size: 11px;
+        spacing: 6px;
+    }}
+    
+    QDialog#LoginDialog QCheckBox::indicator {{
+        width: 14px;
+        height: 14px;
+        border: 1px solid {c["border"]};
+        border-radius: 3px;
+        background: {c["bg_card"]};
+    }}
+    
+    QDialog#LoginDialog QCheckBox::indicator:checked {{
+        background: {c["primary"]};
+        border-color: {c["primary"]};
+    }}
+    
     /* ========== SETTINGS DIALOG SPECIFIC ========== */
     
     /* Settings Dialog Container */

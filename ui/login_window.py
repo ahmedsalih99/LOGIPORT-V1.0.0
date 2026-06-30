@@ -8,15 +8,17 @@ Adapts to screen size like modern professional applications.
 
 from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QComboBox, QFrame, QSizePolicy, QApplication
+    QComboBox, QFrame, QSizePolicy, QApplication, QCheckBox,
+    QGraphicsDropShadowEffect
 )
-from PySide6.QtGui import QPixmap, QIcon, QScreen
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QPixmap, QIcon, QScreen, QColor
+from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer
 from core.base_dialog import BaseDialog
 from core.settings_manager import SettingsManager
 from core.translator import TranslationManager
-from database.crud.users_crud import UsersCRUD
+from database.crud.users_crud import UsersCRUD, AccountLockedError
 import os
+import sys
 from ui.utils.wheel_blocker import block_wheel_in
 
 
@@ -71,6 +73,37 @@ class LoginWindow(BaseDialog):
             except Exception:
                 pass
 
+        # ✅ Fade-in animation — مرة وحدة فقط عند أول ظهور
+        if not getattr(self, "_fade_in_played", False):
+            self._fade_in_played = True
+            try:
+                self.setWindowOpacity(0.0)
+                self._fade_anim = QPropertyAnimation(self, b"windowOpacity")
+                self._fade_anim.setDuration(220)
+                self._fade_anim.setStartValue(0.0)
+                self._fade_anim.setEndValue(1.0)
+                self._fade_anim.setEasingCurve(QEasingCurve.OutCubic)
+                self._fade_anim.start()
+            except Exception:
+                self.setWindowOpacity(1.0)
+
+        # ✅ فحص دوري لحالة Caps Lock (يلتقط الحالة حتى لو كانت مفعّلة
+        # من قبل ما يفتح المستخدم النافذة أصلاً)
+        if not getattr(self, "_caps_lock_timer", None):
+            self._caps_lock_timer = QTimer(self)
+            self._caps_lock_timer.setInterval(400)
+            self._caps_lock_timer.timeout.connect(self._poll_caps_lock)
+            self._caps_lock_timer.start()
+            self._poll_caps_lock()  # فحص فوري بدون انتظار أول tick
+
+    def closeEvent(self, event):
+        try:
+            if getattr(self, "_caps_lock_timer", None):
+                self._caps_lock_timer.stop()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     def _set_responsive_size(self):
         """Set dialog initial size based on screen — resizable by user"""
         screen = QApplication.primaryScreen()
@@ -109,11 +142,13 @@ class LoginWindow(BaseDialog):
         # ========== Logo ==========
         logo_label = QLabel()
         logo_label.setObjectName("logo_label")
+        self.logo_label = logo_label
         from core.paths import icons_path
         logo_path = str(icons_path("logo.png"))
 
         # ✅ Logo height = نسبة من dialog height
         logo_max_height = int(dialog_height * 0.3)  # 30% of dialog height
+        self._logo_max_height_ratio = 0.3
         logo_label.setMaximumHeight(logo_max_height)
         logo_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
 
@@ -181,8 +216,27 @@ class LoginWindow(BaseDialog):
         self.edit_user.setPlaceholderText(self._("username"))
         self.edit_user.setClearButtonEnabled(True)
 
+        # أيقونة المستخدم داخل الحقل
+        try:
+            from core.paths import icons_path
+            user_icon_path = str(icons_path("user.png"))
+            if os.path.exists(user_icon_path):
+                self.edit_user.addAction(QIcon(user_icon_path), QLineEdit.LeadingPosition)
+        except Exception:
+            pass
+
+        # تعبئة آخر يوزرنيم محفوظ (إذا كان "تذكرني" مفعّلاً بالمرة السابقة)
+        try:
+            if self.settings.get("login_remember_me", False):
+                last_username = self.settings.get("login_last_username", "") or ""
+                if last_username:
+                    self.edit_user.setText(last_username)
+        except Exception:
+            pass
+
         # ✅ Input height proportional
         input_min_height = max(36, int(dialog_height * 0.07))  # 7% of dialog height
+        self._input_min_height = input_min_height
         self.edit_user.setMinimumHeight(input_min_height)
         self.edit_user.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
@@ -197,6 +251,15 @@ class LoginWindow(BaseDialog):
         self.edit_pass.setClearButtonEnabled(True)
         self.edit_pass.setMinimumHeight(input_min_height)
         self.edit_pass.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        # تحذير Caps Lock — مخفي افتراضياً، يظهر فقط أثناء الكتابة بالباسوورد
+        self.caps_lock_label = QLabel()
+        self.caps_lock_label.setObjectName("caps-lock-warning")
+        self.caps_lock_label.setStyleSheet(
+            "color: #B45309; font-size: 10.5px; font-weight: 600; background: transparent;"
+        )
+        self.caps_lock_label.setVisible(False)
+        self._caps_lock_on = False
 
         # ========== Show/Hide Password Button ==========
         self.btn_show_pass = QPushButton()
@@ -233,10 +296,37 @@ class LoginWindow(BaseDialog):
 
         # ✅ Button height proportional
         button_min_height = max(40, int(dialog_height * 0.08))  # 8% of dialog height
+        self._button_min_height = button_min_height
         self.btn_login.setMinimumHeight(button_min_height)
         self.btn_login.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.btn_login.setCursor(Qt.PointingHandCursor)
         self.btn_login.clicked.connect(self.handle_login)
+
+        # ========== Remember Me + Forgot Password ==========
+        self.chk_remember = QCheckBox()
+        self.chk_remember.setObjectName("chk_remember")
+        self.chk_remember.setCursor(Qt.PointingHandCursor)
+        try:
+            self.chk_remember.setChecked(bool(self.settings.get("login_remember_me", False)))
+        except Exception:
+            pass
+
+        self.btn_forgot = QPushButton()
+        self.btn_forgot.setObjectName("link-btn")
+        self.btn_forgot.setFlat(True)
+        self.btn_forgot.setCursor(Qt.PointingHandCursor)
+        self.btn_forgot.setStyleSheet(
+            "QPushButton#link-btn { border: none; background: transparent;"
+            " color: #0D1B2A; font-size: 11px; text-decoration: underline; }"
+            "QPushButton#link-btn:hover { color: #C9A84C; }"
+        )
+        self.btn_forgot.clicked.connect(self._show_forgot_password)
+
+        remember_row = QHBoxLayout()
+        remember_row.setContentsMargins(0, 0, 0, 0)
+        remember_row.addWidget(self.chk_remember)
+        remember_row.addStretch(1)
+        remember_row.addWidget(self.btn_forgot)
 
         # ========== Password Layout ==========
         pass_layout = QHBoxLayout()
@@ -258,6 +348,18 @@ class LoginWindow(BaseDialog):
         # ========== Card Container ==========
         card_widget = QFrame()
         card_widget.setObjectName("login-card")
+        self.card_widget = card_widget
+
+        # ظل ناعم لإحساس "عائم" بدل لوحة مسطحة
+        try:
+            shadow = QGraphicsDropShadowEffect(card_widget)
+            shadow.setBlurRadius(36)
+            shadow.setXOffset(0)
+            shadow.setYOffset(8)
+            shadow.setColor(QColor(13, 27, 42, 70))  # Navy بشفافية
+            card_widget.setGraphicsEffect(shadow)
+        except Exception:
+            pass
 
         card_layout = QVBoxLayout(card_widget)
 
@@ -305,6 +407,9 @@ class LoginWindow(BaseDialog):
         card_layout.addWidget(self.label_pass)
         card_layout.addSpacing(small_spacing)
         card_layout.addLayout(pass_layout)
+        card_layout.addWidget(self.caps_lock_label)
+        card_layout.addSpacing(small_spacing)
+        card_layout.addLayout(remember_row)
         card_layout.addSpacing(xlarge_spacing)
 
         # Login button
@@ -372,13 +477,40 @@ class LoginWindow(BaseDialog):
             self.edit_pass.setFocus()
             return
 
-        # Authenticate
-        user_crud = UsersCRUD()
-        user = user_crud.authenticate(username, password)
+        # ✅ تعطيل الزر أثناء المعالجة لمنع النقر المزدوج + إظهار حالة تحميل
+        original_btn_text = self.btn_login.text()
+        self.btn_login.setEnabled(False)
+        self.btn_login.setText(self._("logging_in"))
+        QApplication.processEvents()
+
+        try:
+            user_crud = UsersCRUD()
+            user = user_crud.authenticate(username, password)
+        except AccountLockedError as locked:
+            minutes = max(1, (locked.retry_after_seconds + 59) // 60)
+            title = self._("error")
+            message = self._("account_locked_message").format(minutes=minutes)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, title, message)
+            self.log_event(f"Login blocked (account locked): {username}", level="warning")
+            self.edit_pass.clear()
+            self.edit_pass.setFocus()
+            return
+        finally:
+            self.btn_login.setEnabled(True)
+            self.btn_login.setText(original_btn_text)
 
         if user:
             self.user = user
             SettingsManager.get_instance().set("user", user)
+
+            # ── تذكرني: حفظ/مسح آخر يوزرنيم بحسب حالة الـ checkbox ──────────
+            try:
+                remember = self.chk_remember.isChecked()
+                self.settings.set("login_remember_me", remember)
+                self.settings.set("login_last_username", username if remember else "")
+            except Exception:
+                pass
 
             # ── تحميل المكتب وتفعيل OfficeContext ──────────────────────────
             try:
@@ -406,6 +538,69 @@ class LoginWindow(BaseDialog):
             self.log_event(f"User login failed: {username}", level="warning")
             self.edit_pass.clear()
             self.edit_pass.setFocus()
+
+    def _show_forgot_password(self):
+        """رسالة توجيهية بسيطة — لا يوجد إعادة تعيين تلقائي حالياً"""
+        self.show_info("forgot_password_title", "forgot_password_message")
+
+    @staticmethod
+    def _query_caps_lock_state() -> bool:
+        """
+        يفحص الحالة الفعلية لمفتاح Caps Lock من نظام التشغيل مباشرة
+        (وليس فقط عند ضغطه وهو مركّز بحقل معيّن) — يعمل على Windows.
+        على أنظمة أخرى يرجع False دائماً (best-effort).
+        """
+        if sys.platform != "win32":
+            return False
+        try:
+            import ctypes
+            VK_CAPITAL = 0x14
+            return bool(ctypes.windll.user32.GetKeyState(VK_CAPITAL) & 1)
+        except Exception:
+            return False
+
+    def _poll_caps_lock(self):
+        """يُستدعى دورياً (QTimer) لتحديث ظهور تحذير Caps Lock"""
+        try:
+            is_on = self._query_caps_lock_state()
+            if is_on != getattr(self, "_caps_lock_on", False):
+                self._caps_lock_on = is_on
+                self._update_caps_lock_label()
+        except Exception:
+            pass
+
+    def _update_caps_lock_label(self):
+        if getattr(self, "_caps_lock_on", False):
+            self.caps_lock_label.setText("⚠ " + self._("caps_lock_warning"))
+            self.caps_lock_label.setVisible(True)
+        else:
+            self.caps_lock_label.setVisible(False)
+
+    def resizeEvent(self, event):
+        """إعادة ضبط القياسات النسبية الأساسية عند تغيير حجم النافذة يدوياً"""
+        super().resizeEvent(event)
+        if not getattr(self, "_ui_built", False):
+            return
+        try:
+            h = self.height()
+            w = self.width()
+
+            input_h = max(36, int(h * 0.07))
+            if hasattr(self, "edit_user"):
+                self.edit_user.setMinimumHeight(input_h)
+            if hasattr(self, "edit_pass"):
+                self.edit_pass.setMinimumHeight(input_h)
+            if hasattr(self, "btn_show_pass"):
+                self.btn_show_pass.setMinimumSize(input_h, input_h)
+                self.btn_show_pass.setMaximumSize(input_h, input_h)
+
+            if hasattr(self, "btn_login"):
+                self.btn_login.setMinimumHeight(max(40, int(h * 0.08)))
+
+            if hasattr(self, "logo_label"):
+                self.logo_label.setMaximumHeight(int(h * 0.3))
+        except Exception:
+            pass
 
     def retranslate_ui(self):
         """Update UI text when language changes"""
@@ -436,6 +631,16 @@ class LoginWindow(BaseDialog):
         # Login button
         if hasattr(self, "btn_login"):
             self.btn_login.setText(self._("login"))
+
+        # Remember me + Forgot password
+        if hasattr(self, "chk_remember"):
+            self.chk_remember.setText(self._("remember_me"))
+        if hasattr(self, "btn_forgot"):
+            self.btn_forgot.setText(self._("forgot_password"))
+
+        # Caps lock label (إن كان ظاهراً حالياً، حدّث نصه باللغة الجديدة)
+        if hasattr(self, "caps_lock_label"):
+            self._update_caps_lock_label()
 
         # Show/hide password button
         if hasattr(self, "btn_show_pass"):

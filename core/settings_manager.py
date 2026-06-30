@@ -74,6 +74,10 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         "sync_office_id":     "",
         "sync_enabled":       "false",
         "sync_interval_min":  "5",
+
+        # Login — تذكرني
+        "login_remember_me":     False,
+        "login_last_username":   "",
     }
 
     DYNAMIC_PREFIXES = (

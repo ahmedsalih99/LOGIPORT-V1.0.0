@@ -12,6 +12,9 @@ class User(Base):
     office_id = Column(Integer, ForeignKey("offices.id", ondelete="SET NULL"), nullable=True)
     is_active    = Column(Boolean, default=True)
     avatar_path  = Column(String(500), nullable=True)
+    # 🔒 حماية من تخمين كلمة السر (brute-force)
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

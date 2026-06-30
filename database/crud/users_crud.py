@@ -1,4 +1,5 @@
 from typing import Optional, Dict, List, Any
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import joinedload
 from passlib.hash import bcrypt
@@ -6,6 +7,13 @@ from passlib.hash import bcrypt
 from database.models import get_session_local, User, Role
 from database.crud.base_crud import BaseCRUD
 from core.translator import TranslationManager
+
+
+class AccountLockedError(Exception):
+    """يُرفع عندما يكون الحساب مقفلاً مؤقتاً بسبب محاولات دخول فاشلة متكررة."""
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = max(0, int(retry_after_seconds))
+        super().__init__(f"Account locked for {self.retry_after_seconds}s")
 
 
 class UsersCRUD(BaseCRUD):
@@ -54,7 +62,15 @@ class UsersCRUD(BaseCRUD):
                 .first()
             )
 
+    # 🔒 إعدادات الحماية من brute-force
+    MAX_FAILED_ATTEMPTS = 5
+    LOCKOUT_MINUTES = 15
+
     def authenticate(self, username: str, password: str) -> Optional[User]:
+        """
+        يتحقق من بيانات الدخول.
+        يرفع AccountLockedError إذا كان الحساب مقفلاً مؤقتاً بسبب محاولات فاشلة متكررة.
+        """
         with self.get_session() as session:
             user = (
                 session.query(User)
@@ -63,8 +79,29 @@ class UsersCRUD(BaseCRUD):
                 .first()
             )
 
+            now = datetime.utcnow()
+
+            # الحساب مقفل حالياً؟
+            if user and user.locked_until and user.locked_until > now:
+                remaining = (user.locked_until - now).total_seconds()
+                raise AccountLockedError(remaining)
+
             if user and self._check_password(password, user.password) and user.is_active:
+                # دخول ناجح — صفّر عداد المحاولات الفاشلة إن وُجد
+                if user.failed_login_attempts or user.locked_until:
+                    user.failed_login_attempts = 0
+                    user.locked_until = None
+                    session.commit()
+                    session.refresh(user)
                 return user
+
+            # دخول فاشل — زِد العداد واقفل الحساب إن تجاوز الحد المسموح
+            if user:
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                if user.failed_login_attempts >= self.MAX_FAILED_ATTEMPTS:
+                    user.locked_until = now + timedelta(minutes=self.LOCKOUT_MINUTES)
+                    user.failed_login_attempts = 0
+                session.commit()
 
             return None
 
