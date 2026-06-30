@@ -28,7 +28,7 @@ from database.db_utils import format_local_dt
 from database.models import Transaction, Material, Client, AuditLog, Document
 from database.models.entry import Entry
 from sqlalchemy import func, desc
-from datetime import datetime
+from datetime import datetime, timedelta, date
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -63,6 +63,63 @@ _CARD_ACCENTS = {
     "transit":      "#EF4444",
     "tasks":        "#8B5CF6",
 }
+
+
+
+# ─────────────────────── [1] Chart Canvas ─────────────────────────────────────
+
+class _DashChartCanvas(QWidget):
+    """رسم بياني أعمدة بـ QPainter — يتكيّف مع العرض تلقائياً."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._data: list = []
+        self._max_v: int = 1
+        self.setFixedHeight(110)
+        from PySide6.QtWidgets import QSizePolicy as _SP
+        self.setSizePolicy(_SP.Expanding, _SP.Fixed)
+
+    def set_data(self, data: list):
+        self._data  = data
+        self._max_v = max((c for _, c in data), default=1) or 1
+        self.update()
+
+    def paintEvent(self, event):
+        from PySide6.QtGui import QPainter, QPen, QBrush
+        if not self._data:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        W, H = self.width(), self.height()
+        pl, pr, pt, pb = 4, 4, 6, 18
+        cw = W - pl - pr
+        ch = H - pt - pb
+        n   = len(self._data)
+        gap = 2
+        bw  = max(2, (cw - gap * (n - 1)) // n)
+        step = max(1, n // 8)
+        p.setPen(QPen(QColor("#DDDDDD"), 1))
+        p.drawLine(pl, pt + ch, W - pr, pt + ch)
+        fnt = self.font()
+        fnt.setPointSize(7)
+        p.setFont(fnt)
+        for i, (lbl, val) in enumerate(self._data):
+            x  = pl + i * (bw + gap)
+            bh = int(ch * val / self._max_v) if self._max_v else 0
+            y  = pt + ch - bh
+            col = QColor(GOLD) if val == self._max_v else QColor("#4A7EC8")
+            col.setAlphaF(0.85)
+            p.setBrush(QBrush(col))
+            p.setPen(Qt.NoPen)
+            if bh > 0:
+                p.drawRoundedRect(x, y, bw, bh, 2, 2)
+            if bh > 14 and val > 0:
+                p.setPen(QColor("#555555"))
+                p.drawText(x, y - 1, bw, 10, Qt.AlignCenter, str(val))
+            if i % step == 0 or i == n - 1:
+                p.setPen(QColor("#AAAAAA"))
+                p.drawText(x - 3, pt + ch + 2, bw + 6, 14, Qt.AlignCenter, lbl)
+        p.end()
 
 _TYPE_ICONS = {
     "import":  "📥",
@@ -107,9 +164,10 @@ class HeroBanner(QFrame):
         lay.setSpacing(0)
 
         stats = [
-            ("hero_transactions", "stat_transactions"),
-            ("hero_active",       "active_transactions_lbl"),
-            ("hero_clients",      "clients"),
+            ("hero_active",        "active_transactions_lbl"),   # النشطة أولاً — الأهم
+            ("hero_transactions",  "stat_transactions"),
+            ("hero_clients",       "clients"),
+            ("hero_entries",       "dash_hero_entries"),
         ]
 
         for i, (val_key, lbl_key) in enumerate(stats):
@@ -133,8 +191,8 @@ class HeroBanner(QFrame):
             txt_lbl.setStyleSheet("color: rgba(255,255,255,0.55); background: transparent;")
             txt_lbl.setAlignment(Qt.AlignCenter)
 
+            col.addWidget(txt_lbl)   # التسمية أولاً — أوضح بالعربي
             col.addWidget(val_lbl)
-            col.addWidget(txt_lbl)
 
             wrap = QWidget()
             wrap.setStyleSheet("background: transparent;")
@@ -144,12 +202,13 @@ class HeroBanner(QFrame):
             self._labels[val_key] = val_lbl
             self._labels[lbl_key] = txt_lbl
 
-        self.setFixedHeight(90)
+        self.setFixedHeight(100)
 
     def update_stats(self, stats: dict):
         self._labels["hero_transactions"].setText(str(stats.get("total_transactions", 0)))
         self._labels["hero_active"].setText(str(stats.get("active_transactions", 0)))
         self._labels["hero_clients"].setText(str(stats.get("total_clients", 0)))
+        self._labels["hero_entries"].setText(str(stats.get("total_entries", 0)))  # [2]
 
     def retranslate_ui(self, translate):
         try:
@@ -162,6 +221,10 @@ class HeroBanner(QFrame):
             pass
         try:
             self._labels["stat_transactions"].setText(translate("stat_transactions"))
+        except Exception:
+            pass
+        try:
+            self._labels["dash_hero_entries"].setText(translate("dash_hero_entries"))  # [2]
         except Exception:
             pass
 
@@ -252,7 +315,7 @@ class KpiCard(QFrame):
         lay.addLayout(top_row)
 
         self.value_lbl = QLabel(str(value))
-        self.value_lbl.setFont(app_font(XL4, bold=True))
+        self.value_lbl.setFont(app_font(XL3, bold=True))   # توحيد الحجم
         self.value_lbl.setStyleSheet(f"color:{tp}; background:transparent;")
         lay.addWidget(self.value_lbl)
 
@@ -485,6 +548,8 @@ class _DashboardWorker(QThread):
     stats_ready        = _Signal(dict)
     activities_ready   = _Signal(list)
     transactions_ready = _Signal(list)
+    comparison_ready   = _Signal(dict)   # [5]
+    sync_ready         = _Signal(dict)   # [6]
 
     def run(self):
         try:
@@ -553,6 +618,45 @@ class _DashboardWorker(QThread):
             except Exception:
                 pass
             self.transactions_ready.emit(txs)
+
+            # [5] مقارنة هذا الشهر بالشهر الماضي
+            comparison = {"this_month": 0, "last_month": 0}
+            try:
+                from datetime import date
+                today   = date.today()
+                m_start = today.replace(day=1)
+                import calendar
+                prev_last = m_start - timedelta(days=1)
+                prev_start = prev_last.replace(day=1)
+                with get_session_local()() as session:
+                    comparison["this_month"] = session.query(Transaction).filter(
+                        Transaction.transaction_date >= str(m_start)
+                    ).count()
+                    comparison["last_month"] = session.query(Transaction).filter(
+                        Transaction.transaction_date >= str(prev_start),
+                        Transaction.transaction_date <= str(prev_last),
+                    ).count()
+            except Exception:
+                pass
+            self.comparison_ready.emit(comparison)
+
+            # [6] حالة الـ Sync
+            sync_info = {"enabled": False, "state": "disabled",
+                         "last_time": "—", "pushed": 0, "pulled": 0, "errors": 0}
+            try:
+                from services.sync_service import get_sync_service
+                svc = get_sync_service()
+                sync_info["enabled"] = svc.is_enabled()
+                if not svc.is_enabled():
+                    sync_info["state"] = "disabled"
+                elif svc.is_running():
+                    sync_info["state"] = "running"
+                else:
+                    sync_info["state"] = "ok"
+            except Exception:
+                pass
+            self.sync_ready.emit(sync_info)
+
         except Exception:
             pass
 
@@ -600,8 +704,8 @@ class DashboardTab(QWidget):
         container = QWidget()
         container.setObjectName("dashboard-container")
         main = QVBoxLayout(container)
-        main.setContentsMargins(20, 14, 20, 20)
-        main.setSpacing(12)
+        main.setContentsMargins(20, 10, 20, 16)
+        main.setSpacing(8)
 
         # Header
         main.addWidget(self._build_header())
@@ -609,6 +713,12 @@ class DashboardTab(QWidget):
         # Hero Banner
         self._hero = HeroBanner()
         main.addWidget(self._hero)
+
+        # [1+6] Chart + Sync في صف أفقي واحد
+        self._chart_panel = self._build_chart_panel()
+        main.addWidget(self._chart_panel)
+        self._sync_card = self._build_sync_card()
+        main.addWidget(self._sync_card)
 
         # KPI Cards row
         main.addLayout(self._build_kpi_row())
@@ -622,7 +732,6 @@ class DashboardTab(QWidget):
         bottom.addWidget(self._build_activities_panel(), stretch=2)
         bottom.addWidget(self._build_transactions_panel(), stretch=3)
         main.addLayout(bottom)
-        main.addStretch()
 
         scroll.setWidget(container)
         outer = QVBoxLayout(self)
@@ -803,6 +912,83 @@ class DashboardTab(QWidget):
         lay.addWidget(self._tasks_lbl, 1)
         return f
 
+
+    # ── [1] Chart Panel ───────────────────────────────────────────────────────
+
+    def _build_chart_panel(self) -> QFrame:
+        f = QFrame()
+        f.setObjectName("card")
+        lay = QVBoxLayout(f)
+        lay.setContentsMargins(16, 12, 16, 10)
+        lay.setSpacing(6)
+
+        # header
+        top = QHBoxLayout()
+        dot = QFrame(); dot.setFixedSize(4, 16)
+        dot.setStyleSheet(f"background:{GOLD}; border-radius:2px; border:none;")
+        top.addWidget(dot)
+        self._chart_title_lbl = QLabel(self._("dash_chart_title"))
+        self._chart_title_lbl.setFont(app_font(MD, bold=True))
+        self._chart_title_lbl.setObjectName("panel-title")
+        top.addWidget(self._chart_title_lbl, 1)
+
+        # [5] comparison badge
+        lay.addLayout(top)
+
+        self._comparison_lbl = QLabel()
+        self._comparison_lbl.setFont(app_font(SM))
+        self._comparison_lbl.setObjectName("text-muted")
+        self._comparison_lbl.setAlignment(Qt.AlignRight)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setObjectName("separator")
+        lay.addWidget(sep)
+        lay.addWidget(self._comparison_lbl)
+
+        self._chart_canvas = _DashChartCanvas()
+        lay.addWidget(self._chart_canvas, 1)
+        return f
+
+    # ── [6] Sync Card ─────────────────────────────────────────────────────────
+
+    def _build_sync_card(self) -> QFrame:
+        from PySide6.QtWidgets import QSizePolicy as _SP
+        f = QFrame()
+        f.setObjectName("card")
+        f.setFixedHeight(150)
+        f.setSizePolicy(_SP.Preferred, _SP.Fixed)
+        lay = QHBoxLayout(f)
+        lay.setContentsMargins(16, 12, 16, 12)
+        lay.setSpacing(16)
+
+        ico = QLabel("☁️")
+        ico.setFont(QFont("Segoe UI Emoji", 14))
+        ico.setFixedSize(28, 28)
+        ico.setAlignment(Qt.AlignCenter)
+        ico.setStyleSheet(f"background:{GOLD_A}; border-radius:14px; border:1px solid {GOLD_B};")
+        lay.addWidget(ico)
+
+        self._sync_title_lbl = QLabel(self._("dash_sync_title"))
+        self._sync_title_lbl.setFont(app_font(BODY, bold=True))
+        lay.addWidget(self._sync_title_lbl)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.VLine)
+        sep.setStyleSheet(f"color: {GOLD_B};")
+        sep.setFixedHeight(30)
+        lay.addWidget(sep, alignment=Qt.AlignVCenter)
+
+        self._sync_status_lbl = QLabel(self._("dash_sync_disabled"))
+        self._sync_status_lbl.setFont(app_font(SM))
+        lay.addWidget(self._sync_status_lbl, 1)
+
+        self._sync_detail_lbl = QLabel()
+        self._sync_detail_lbl.setFont(app_font(SM))
+        self._sync_detail_lbl.setObjectName("text-muted")
+        self._sync_detail_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        lay.addWidget(self._sync_detail_lbl)
+
+        return f
+
+
     # ── Activities ────────────────────────────────────────────────────────────
 
     def _build_activities_panel(self):
@@ -881,6 +1067,8 @@ class DashboardTab(QWidget):
         self._trans_table.setFont(app_font(SM))
         self._trans_table.setMinimumHeight(280)
         self._update_trans_headers()
+        # [4] double-click يفتح المعاملة
+        self._trans_table.doubleClicked.connect(self._on_transaction_double_clicked)
 
         lay.addWidget(self._trans_table)
         frame.setMinimumHeight(340)
@@ -1041,6 +1229,79 @@ class DashboardTab(QWidget):
         except Exception as e:
             logger.error(f"Dashboard transactions error: {e}")
 
+
+    def _on_comparison_ready(self, data: dict):
+        """[5] تحديث مقارنة هذا الشهر بالشهر الماضي."""
+        this_m = data.get("this_month", 0)
+        last_m = data.get("last_month", 0)
+        if last_m == 0:
+            pct_txt = self._("dash_this_month").format(n=this_m)
+            self._comparison_lbl.setText(pct_txt)
+            self._comparison_lbl.setStyleSheet("")
+            return
+        pct = round((this_m - last_m) / last_m * 100)
+        if pct > 0:
+            txt = self._("dash_trend_up").format(pct=abs(pct))
+            color = "#10B981"
+        elif pct < 0:
+            txt = self._("dash_trend_down").format(pct=abs(pct))
+            color = "#EF4444"
+        else:
+            txt = self._("dash_trend_same")
+            color = "#6B7280"
+        self._comparison_lbl.setText(txt)
+        self._comparison_lbl.setStyleSheet(f"color:{color};")
+
+    def _on_sync_ready(self, info: dict):
+        """[6] تحديث بطاقة حالة المزامنة."""
+        state = info.get("state", "disabled")
+        key_map = {
+            "ok":       ("dash_sync_ok",       "#10B981"),
+            "error":    ("dash_sync_error",     "#EF4444"),
+            "disabled": ("dash_sync_disabled",  "#6B7280"),
+            "running":  ("dash_sync_running",   "#F59E0B"),
+            "offline":  ("dash_sync_offline",   "#6B7280"),
+        }
+        lbl_key, color = key_map.get(state, ("dash_sync_disabled", "#6B7280"))
+        self._sync_status_lbl.setText(self._(lbl_key))
+        self._sync_status_lbl.setStyleSheet(f"color:{color};")
+
+        detail_parts = []
+        if info.get("last_time") and info["last_time"] != "—":
+            detail_parts.append(self._("dash_sync_last").format(time=info["last_time"]))
+        if info.get("pushed"):
+            detail_parts.append(self._("dash_sync_pushed").format(n=info["pushed"]))
+        if info.get("pulled"):
+            detail_parts.append(self._("dash_sync_pulled").format(n=info["pulled"]))
+        self._sync_detail_lbl.setText("  ".join(detail_parts))
+
+    def _load_chart_data(self):
+        """[1] يحمّل بيانات الرسم البياني لآخر 30 يوم."""
+        try:
+            from datetime import date, timedelta
+            today  = date.today()
+            start  = today - timedelta(days=29)
+            with get_session_local()() as session:
+                rows = (
+                    session.query(
+                        func.date(Transaction.transaction_date).label("d"),
+                        func.count(Transaction.id).label("c"),
+                    )
+                    .filter(Transaction.transaction_date >= str(start))
+                    .group_by(func.date(Transaction.transaction_date))
+                    .all()
+                )
+            from datetime import timedelta as _td
+            counts = {str(r.d): r.c for r in rows}
+            data = []
+            for i in range(30):
+                d = start + _td(days=i)
+                data.append((d.strftime("%m/%d"), counts.get(str(d), 0)))
+            self._chart_canvas.set_data(data)
+        except Exception:
+            pass
+
+
     # ── Navigation ────────────────────────────────────────────────────────────
 
     def _navigate_to(self, tab_key: str):
@@ -1060,6 +1321,32 @@ class DashboardTab(QWidget):
                 QTimer.singleShot(80, trx_tab.add_new_item)
         except Exception as e:
             logger.error(f"Dashboard add_transaction error: {e}")
+
+
+    def _on_transaction_double_clicked(self, index):
+        """[4] فتح المعاملة عند double-click على الجدول."""
+        row = index.row()
+        try:
+            trx_no_item = self._trans_table.item(row, 0)
+            if not trx_no_item:
+                return
+            trx_no = trx_no_item.text().strip()
+            if not trx_no or trx_no == "—":
+                return
+            # انتقل لتاب المعاملات وافتح المعاملة
+            self._navigate_to("transactions")
+            main = self.window()
+            trx_tab = getattr(main, "tabs", {}).get("transactions")
+            if trx_tab and hasattr(trx_tab, "open_transaction_by_no"):
+                QTimer.singleShot(100, lambda: trx_tab.open_transaction_by_no(trx_no))
+            elif trx_tab and hasattr(trx_tab, "search_bar"):
+                def _search():
+                    trx_tab.search_bar.setText(trx_no)
+                    trx_tab.search_bar.setFocus()
+                QTimer.singleShot(100, _search)
+        except Exception as e:
+            logger.error(f"Dashboard open transaction error: {e}")
+
 
     def _navigate_to_documents(self):    self._navigate_to("documents")
     def _navigate_to_clients(self):      self._navigate_to("clients")
@@ -1102,6 +1389,8 @@ class DashboardTab(QWidget):
         self._worker.stats_ready.connect(self._on_stats_ready)
         self._worker.activities_ready.connect(self._on_activities_ready)
         self._worker.transactions_ready.connect(self._on_transactions_ready)
+        self._worker.comparison_ready.connect(self._on_comparison_ready)   # [5]
+        self._worker.sync_ready.connect(self._on_sync_ready)               # [6]
         self._worker.finished.connect(self._on_worker_done)
         self._worker.start()
 
@@ -1157,6 +1446,7 @@ class DashboardTab(QWidget):
             pass
 
     def _on_worker_done(self):
+        self._load_chart_data()   # [1] يُحمَّل بعد انتهاء الـ worker
         self._refresh_btn.setEnabled(True)
         self._refresh_btn.setText(self._("refresh"))
 
@@ -1191,6 +1481,12 @@ class DashboardTab(QWidget):
 
         for btn, icon, lkey in self._qa_buttons:
             btn.retranslate(icon, self._(lkey))
+
+        # [1][5][6] ترجمة العناصر الجديدة
+        if hasattr(self, "_chart_title_lbl"):
+            self._chart_title_lbl.setText(self._("dash_chart_title"))
+        if hasattr(self, "_sync_title_lbl"):
+            self._sync_title_lbl.setText(self._("dash_sync_title"))
 
         self._load_activities()
         self._load_transactions()

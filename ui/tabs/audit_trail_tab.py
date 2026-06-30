@@ -28,7 +28,7 @@ from core.translator import TranslationManager
 from core.settings_manager import SettingsManager
 from database.db_utils import format_local_dt
 from database.models import get_session_local, AuditLog, User
-from sqlalchemy import desc, func, or_
+from sqlalchemy import desc, func, or_, String
 from sqlalchemy.orm import joinedload
 from datetime import datetime
 
@@ -516,7 +516,7 @@ class AuditTrailTab(QWidget):
                     q = q.filter(
                         or_(
                             AuditLog.details.ilike(f"%{search}%"),
-                            AuditLog.record_id.cast(str).ilike(f"%{search}%"),
+                            AuditLog.record_id.cast(String).ilike(f"%{search}%"),
                         )
                     )
                 self._total = q.count()
@@ -659,7 +659,7 @@ class AuditTrailTab(QWidget):
                     q = q.filter(
                         or_(
                             AuditLog.details.ilike(f"%{search}%"),
-                            AuditLog.record_id.cast(str).ilike(f"%{search}%"),
+                            AuditLog.record_id.cast(String).ilike(f"%{search}%"),
                         )
                     )
                 all_rows = q.order_by(desc(AuditLog.timestamp)).all()

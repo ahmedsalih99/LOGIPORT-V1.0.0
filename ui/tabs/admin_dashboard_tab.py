@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
     QScrollArea, QGridLayout, QFileDialog, QMessageBox,
-    QLineEdit, QSizePolicy
+    QLineEdit, QSizePolicy, QProgressBar,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
@@ -14,16 +14,18 @@ from core.permissions import is_admin as _is_admin
 from database.db_utils import format_local_dt
 from database.models import get_session_local, User, AuditLog, Transaction, Client, Material, Document
 from sqlalchemy import func, desc
-from datetime import datetime
+from datetime import datetime, timedelta
 
+_DB_WARN_MB  = 80    # تحذير عند تجاوز 80 MB
+_DB_MAX_MB   = 200   # الحد الأقصى للشريط
+_BACKUP_WARN_DAYS = 7  # تحذير إذا آخر نسخة أقدم من 7 أيام
 
-# ── helpers ──────────────────────────────────────────────────────────────────
 
 def _current_user():
     return SettingsManager.get_instance().get("user")
 
 
-# ── StatCard ──────────────────────────────────────────────────────────────────
+# ── _MiniStat ─────────────────────────────────────────────────────────────────
 
 class _MiniStat(QFrame):
     def __init__(self, icon, label, value, color="#4A7EC8", parent=None):
@@ -50,14 +52,6 @@ class _MiniStat(QFrame):
         self._label_lbl.setObjectName("text-muted")
         lay.addWidget(self._label_lbl)
 
-        # DataBus subscriptions
-        try:
-            from core.data_bus import DataBus
-            for entity in ("transactions", "entries", "tasks", "clients"):
-                DataBus.get_instance().subscribe(entity, self._refresh_stats)
-        except Exception:
-            pass
-
     def update_value(self, v):
         self._val_lbl.setText(str(v))
 
@@ -65,15 +59,121 @@ class _MiniStat(QFrame):
         self._label_lbl.setText(label)
 
 
-# ── Main Tab ──────────────────────────────────────────────────────────────────
+# ── _ActivityChart — رسم بياني بـ QPainter ───────────────────────────────────
+
+class _ChartCanvas(QWidget):
+    """Widget داخلي يرسم الأعمدة بـ QPainter — بدون SVG، يتكيّف مع العرض."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._data: list = []
+        self._max_v: int = 1
+        self.setMinimumHeight(110)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+    def set_data(self, data: list):
+        self._data  = data
+        self._max_v = max((c for _, c in data), default=1) or 1
+        self.update()
+
+    def paintEvent(self, event):
+        from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont as QF
+        if not self._data:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        W = self.width()
+        H = self.height()
+        pad_l, pad_r, pad_t, pad_b = 8, 8, 8, 22
+        chart_w = W - pad_l - pad_r
+        chart_h = H - pad_t - pad_b
+
+        n   = len(self._data)
+        gap = 2
+        bar_w = max(3, (chart_w - gap * (n - 1)) // n)
+
+        # baseline
+        p.setPen(QPen(QColor("#DDDDDD"), 1))
+        p.drawLine(pad_l, pad_t + chart_h, W - pad_r, pad_t + chart_h)
+
+        label_font = QF()
+        label_font.setPointSize(7)
+        p.setFont(label_font)
+
+        step = max(1, n // 8)   # عدد التسميات على المحور
+
+        for i, (lbl, val) in enumerate(self._data):
+            x  = pad_l + i * (bar_w + gap)
+            bh = int(chart_h * val / self._max_v) if self._max_v else 0
+            y  = pad_t + chart_h - bh
+
+            color = QColor("#C9A84C") if val == self._max_v else QColor("#4A7EC8")
+            color.setAlphaF(0.85)
+            p.setBrush(QBrush(color))
+            p.setPen(Qt.NoPen)
+            if bh > 0:
+                p.drawRoundedRect(x, y, bar_w, bh, 2, 2)
+
+            # قيمة العمود فوقه
+            if bh > 14 and val > 0:
+                p.setPen(QColor("#555555"))
+                p.drawText(x, y - 1, bar_w, 12, Qt.AlignCenter, str(val))
+
+            # تسمية المحور
+            if i % step == 0 or i == n - 1:
+                p.setPen(QColor("#999999"))
+                p.drawText(x - 4, pad_t + chart_h + 2, bar_w + 8, 18,
+                           Qt.AlignCenter, lbl)
+
+        p.end()
+
+
+class _ActivityChart(QFrame):
+    """إطار الرسم البياني مع header وعنوان."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("card")
+        self.setMinimumHeight(180)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 14, 18, 10)
+        lay.setSpacing(8)
+
+        top = QHBoxLayout()
+        self._title_lbl = QLabel()
+        self._title_lbl.setFont(app_font(LG, bold=True))
+        top.addWidget(self._title_lbl)
+        top.addStretch()
+        self._range_lbl = QLabel()
+        self._range_lbl.setFont(app_font(SM))
+        self._range_lbl.setObjectName("text-muted")
+        top.addWidget(self._range_lbl)
+        lay.addLayout(top)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setObjectName("separator")
+        lay.addWidget(sep)
+
+        self._canvas = _ChartCanvas()
+        lay.addWidget(self._canvas, 1)
+
+    def load(self, days_data: list, title: str, range_label: str):
+        self._title_lbl.setText(title)
+        self._range_lbl.setText(range_label)
+        self._canvas.set_data(days_data if days_data else [])
+
+
+# ── AdminDashboardTab ─────────────────────────────────────────────────────────
 
 class AdminDashboardTab(QWidget):
-    """لوحة تحكم الإدارة الكاملة."""
 
-    # مفاتيح البطاقات الأربع — ثابتة ومستقلة عن اللغة
-    _CARD_KEYS = ["users", "active_users", "transactions", "db_size"]
-    _CARD_ICONS  = ["👥", "✅", "📋", "💾"]
-    _CARD_COLORS = ["#4A7EC8", "#2ECC71", "#9B59B6", "#E67E22"]
+    _CARD_KEYS   = ["users", "active_users", "transactions", "db_size",
+                    "stat_clients", "stat_entries", "stat_materials", "stat_last_backup"]
+    _CARD_ICONS  = ["👥", "✅", "📋", "💾", "🤝", "📥", "🧱", "🕐"]
+    _CARD_COLORS = ["#4A7EC8", "#2ECC71", "#9B59B6", "#E67E22",
+                    "#14B8A6", "#F59E0B", "#8B5CF6", "#6B7280"]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -94,10 +194,8 @@ class AdminDashboardTab(QWidget):
         main.setContentsMargins(28, 24, 28, 24)
         main.setSpacing(20)
 
-        # header
         main.addWidget(self._build_header())
 
-        # permission warning
         user = _current_user()
         if not _is_admin(user):
             warn = QLabel(self._("admin_only_warning"))
@@ -105,30 +203,56 @@ class AdminDashboardTab(QWidget):
             warn.setFont(app_font(BODY))
             main.addWidget(warn)
 
-        # stat cards
+        # [6] تنبيه النسخ الاحتياطية
+        self._backup_warn_lbl = QLabel()
+        self._backup_warn_lbl.setObjectName("text-warning")
+        self._backup_warn_lbl.setFont(app_font(SM))
+        self._backup_warn_lbl.setWordWrap(True)
+        self._backup_warn_lbl.hide()
+        main.addWidget(self._backup_warn_lbl)
+
+        # [1] 8 بطاقات إحصائية (صفان)
         main.addLayout(self._build_stats_row())
 
-        # content: audit log + DB info
+        # [2] رسم بياني
+        self._chart = _ActivityChart()
+        main.addWidget(self._chart)
+
+        # [5] شريط حجم DB
+        main.addWidget(self._build_db_usage_bar())
+
+        # audit + DB info
         row = QHBoxLayout()
         row.setSpacing(18)
         row.addWidget(self._build_audit_panel(), stretch=3)
-        row.addWidget(self._build_db_panel(), stretch=2)
+
+        right_col = QVBoxLayout()
+        right_col.setSpacing(14)
+        right_col.addWidget(self._build_db_panel())
+        # [4] جدول المستخدمين
+        right_col.addWidget(self._build_users_panel())
+        row.addLayout(right_col, stretch=2)
+
         main.addLayout(row, stretch=1)
-
-        # backup actions
         main.addWidget(self._build_backup_panel())
-
         main.addStretch()
-        scroll.setWidget(container)
 
+        scroll.setWidget(container)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
-        # auto-refresh
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._refresh_stats)
         self._timer.start(30000)
+
+        QTimer.singleShot(0,   self._load_audit)
+        QTimer.singleShot(50,  self._load_db_info)
+        QTimer.singleShot(80,  self._load_health)
+        QTimer.singleShot(100, self._load_chart)
+        QTimer.singleShot(120, self._load_users_table)
+        QTimer.singleShot(150, self._refresh_backup_list)
+        QTimer.singleShot(170, self._check_backup_age)
 
     # ── builders ─────────────────────────────────────────────────────────────
 
@@ -156,7 +280,6 @@ class AdminDashboardTab(QWidget):
         self._refresh_btn.setFont(app_font(BODY))
         self._refresh_btn.clicked.connect(self._refresh_all)
         lay.addWidget(self._refresh_btn)
-
         return f
 
     def _build_stats_row(self) -> QGridLayout:
@@ -164,17 +287,18 @@ class AdminDashboardTab(QWidget):
         grid.setSpacing(14)
 
         self._stats = self._query_stats()
-        s = self._stats
-
-        # الربط بمفتاح ثابت (stat_key) بدل نص اللغة
         stat_values = {
-            "users":        s.get("users", 0),
-            "active_users": s.get("active_users", 0),
-            "transactions": s.get("transactions", 0),
-            "db_size":      s.get("db_size", "—"),
+            "users":          self._stats.get("users", 0),
+            "active_users":   self._stats.get("active_users", 0),
+            "transactions":   self._stats.get("transactions", 0),
+            "db_size":        self._stats.get("db_size", "—"),
+            "stat_clients":   self._stats.get("clients", 0),
+            "stat_entries":   self._stats.get("entries", 0),
+            "stat_materials": self._stats.get("materials", 0),
+            "stat_last_backup": self._stats.get("last_backup", "—"),
         }
 
-        self._stat_cards: dict[str, _MiniStat] = {}   # key → card
+        self._stat_cards: dict = {}
         for i, key in enumerate(self._CARD_KEYS):
             card = _MiniStat(
                 self._CARD_ICONS[i],
@@ -182,10 +306,38 @@ class AdminDashboardTab(QWidget):
                 stat_values[key],
                 self._CARD_COLORS[i],
             )
-            self._stat_cards[key] = card      # ← الآن المفتاح ثابت دائماً
-            grid.addWidget(card, 0, i)
+            self._stat_cards[key] = card
+            grid.addWidget(card, i // 4, i % 4)
 
         return grid
+
+    # [5] شريط حجم DB
+    def _build_db_usage_bar(self) -> QFrame:
+        f = QFrame()
+        f.setObjectName("card")
+        lay = QHBoxLayout(f)
+        lay.setContentsMargins(18, 10, 18, 10)
+        lay.setSpacing(12)
+
+        self._db_usage_lbl = QLabel(self._("db_usage_label"))
+        self._db_usage_lbl.setFont(app_font(SM, bold=True))
+        self._db_usage_lbl.setFixedWidth(160)
+        lay.addWidget(self._db_usage_lbl)
+
+        self._db_progress = QProgressBar()
+        self._db_progress.setRange(0, _DB_MAX_MB * 1024)
+        self._db_progress.setValue(0)
+        self._db_progress.setMinimumHeight(18)
+        self._db_progress.setTextVisible(True)
+        self._db_progress.setFormat("%v KB / %m KB")
+        lay.addWidget(self._db_progress, 1)
+
+        self._db_progress_lbl = QLabel("—")
+        self._db_progress_lbl.setFont(app_font(SM))
+        self._db_progress_lbl.setObjectName("text-muted")
+        lay.addWidget(self._db_progress_lbl)
+
+        return f
 
     def _build_audit_panel(self) -> QFrame:
         f = QFrame()
@@ -208,6 +360,15 @@ class AdminDashboardTab(QWidget):
         self._audit_search.textChanged.connect(self._filter_audit)
         top.addWidget(self._audit_search)
 
+        # [3] زر عرض الكل
+        self._view_all_btn = QPushButton(self._("view_all_audit"))
+        self._view_all_btn.setObjectName("topbar-btn")
+        self._view_all_btn.setMinimumHeight(30)
+        self._view_all_btn.setFont(app_font(SM))
+        self._view_all_btn.setCursor(Qt.PointingHandCursor)
+        self._view_all_btn.clicked.connect(self._open_audit_tab)
+        top.addWidget(self._view_all_btn)
+
         lay.addLayout(top)
 
         sep = QFrame()
@@ -227,10 +388,8 @@ class AdminDashboardTab(QWidget):
         self._audit_tbl.setSelectionBehavior(QTableWidget.SelectRows)
         self._audit_tbl.setAlternatingRowColors(True)
         self._audit_tbl.setEditTriggers(QTableWidget.NoEditTriggers)
-
-        QTimer.singleShot(0, self._load_audit)
+        self._audit_tbl.setMaximumHeight(280)
         lay.addWidget(self._audit_tbl)
-
         return f
 
     def _build_db_panel(self) -> QFrame:
@@ -253,7 +412,6 @@ class AdminDashboardTab(QWidget):
         self._db_info_layout = QVBoxLayout(self._db_info_container)
         self._db_info_layout.setSpacing(8)
         self._db_info_layout.setContentsMargins(0, 0, 0, 0)
-        QTimer.singleShot(50, self._load_db_info)
         lay.addWidget(self._db_info_container)
 
         self._sys_title_lbl = QLabel(self._("system_status_title"))
@@ -265,10 +423,43 @@ class AdminDashboardTab(QWidget):
         self._health_layout = QVBoxLayout(self._health_container)
         self._health_layout.setSpacing(6)
         self._health_layout.setContentsMargins(0, 0, 0, 0)
-        QTimer.singleShot(100, self._load_health)
         lay.addWidget(self._health_container)
 
         lay.addStretch()
+        return f
+
+    # [4] جدول المستخدمين
+    def _build_users_panel(self) -> QFrame:
+        f = QFrame()
+        f.setObjectName("card")
+        lay = QVBoxLayout(f)
+        lay.setContentsMargins(18, 14, 18, 14)
+        lay.setSpacing(10)
+
+        self._users_title_lbl = QLabel(self._("active_users_title"))
+        self._users_title_lbl.setFont(app_font(LG, bold=True))
+        lay.addWidget(self._users_title_lbl)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setObjectName("separator")
+        lay.addWidget(sep)
+
+        self._users_tbl = QTableWidget()
+        self._users_tbl.setObjectName("data-table")
+        self._users_tbl.setColumnCount(3)
+        self._users_tbl.setHorizontalHeaderLabels([
+            self._("col_user"),
+            self._("col_last_activity"),
+            self._("col_status"),
+        ])
+        self._users_tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._users_tbl.verticalHeader().setVisible(False)
+        self._users_tbl.setSelectionBehavior(QTableWidget.SelectRows)
+        self._users_tbl.setAlternatingRowColors(True)
+        self._users_tbl.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._users_tbl.setMaximumHeight(200)
+        lay.addWidget(self._users_tbl)
         return f
 
     def _build_backup_panel(self) -> QFrame:
@@ -321,26 +512,98 @@ class AdminDashboardTab(QWidget):
         self._backup_list_lbl.setFont(app_font(SM))
         self._backup_list_lbl.setObjectName("text-muted")
         self._backup_list_lbl.setWordWrap(True)
-        QTimer.singleShot(150, self._refresh_backup_list)
         lay.addWidget(self._backup_list_lbl)
-
         return f
 
     # ── data loaders ─────────────────────────────────────────────────────────
 
     def _query_stats(self) -> dict:
-        s = {"users": 0, "active_users": 0, "transactions": 0, "db_size": "—"}
+        s = {
+            "users": 0, "active_users": 0, "transactions": 0,
+            "clients": 0, "entries": 0, "materials": 0,
+            "db_size": "—", "last_backup": "—",
+        }
         try:
+            from database.models.entry import Entry
             with get_session_local()() as session:
                 s["users"]        = session.query(User).count()
                 s["active_users"] = session.query(User).filter(User.is_active == True).count()
                 s["transactions"] = session.query(Transaction).count()
-            from services.backup_service import get_db_info
+                s["clients"]      = session.query(Client).count()
+                s["entries"]      = session.query(Entry).count()
+                s["materials"]    = session.query(Material).count()
+            from services.backup_service import get_db_info, list_backups
             info = get_db_info()
             s["db_size"] = f"{info.get('size_kb', 0)} KB"
+            bk = list_backups()
+            if bk:
+                ts = datetime.fromtimestamp(bk[0].stat().st_mtime)
+                s["last_backup"] = ts.strftime("%m-%d %H:%M")
         except Exception:
             pass
         return s
+
+    # [2] رسم بياني
+    def _load_chart(self):
+        try:
+            from database.models.transaction import Transaction as Trx
+            from sqlalchemy import cast, Date as SaDate
+            today = datetime.now().date()
+            start = today - timedelta(days=29)
+            with get_session_local()() as s:
+                rows = (
+                    s.query(
+                        func.date(Trx.transaction_date).label("d"),
+                        func.count(Trx.id).label("c"),
+                    )
+                    .filter(Trx.transaction_date >= str(start))
+                    .group_by(func.date(Trx.transaction_date))
+                    .all()
+                )
+            counts = {str(r.d): r.c for r in rows}
+            data = []
+            for i in range(30):
+                d = start + timedelta(days=i)
+                label = d.strftime("%m/%d")
+                data.append((label, counts.get(str(d), 0)))
+
+            self._chart.load(
+                data,
+                self._("chart_title"),
+                self._("chart_last_30"),
+            )
+        except Exception as e:
+            self._chart._canvas.set_data([])
+
+    # [4] جدول المستخدمين
+    def _load_users_table(self):
+        try:
+            with get_session_local()() as s:
+                users = (s.query(User)
+                          .order_by(desc(User.updated_at))
+                          .all())
+            self._users_tbl.setRowCount(len(users))
+            for ri, u in enumerate(users):
+                name = getattr(u, "full_name", None) or getattr(u, "username", None) or "—"
+                upd  = getattr(u, "updated_at", None)
+                ts   = format_local_dt(upd, "%Y-%m-%d %H:%M") if upd else self._("no_activity")
+                is_active = getattr(u, "is_active", False)
+                status_txt = self._("user_active") if is_active else self._("user_inactive")
+                status_col = "#2ECC71" if is_active else "#E74C3C"
+
+                def _cell(txt, color=None):
+                    item = QTableWidgetItem(str(txt))
+                    item.setFont(app_font(SM))
+                    item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+                    if color:
+                        item.setForeground(QColor(color))
+                    return item
+
+                self._users_tbl.setItem(ri, 0, _cell(name))
+                self._users_tbl.setItem(ri, 1, _cell(ts))
+                self._users_tbl.setItem(ri, 2, _cell(status_txt, status_col))
+        except Exception:
+            pass
 
     def _load_audit(self):
         self._audit_tbl.setRowCount(0)
@@ -366,10 +629,8 @@ class AdminDashboardTab(QWidget):
         except Exception:
             _tc = {}
         COLOR_MAP = {
-            "create": _tc.get("success",  "#2ECC71"),
-            "insert": _tc.get("success",  "#2ECC71"),
-            "update": _tc.get("warning",  "#F39C12"),
-            "delete": _tc.get("danger",   "#E74C3C"),
+            "create": _tc.get("success", "#2ECC71"), "insert": _tc.get("success", "#2ECC71"),
+            "update": _tc.get("warning", "#F39C12"), "delete": _tc.get("danger",  "#E74C3C"),
         }
 
         try:
@@ -388,22 +649,19 @@ class AdminDashboardTab(QWidget):
                     uname = (getattr(row.user, "full_name", None) or
                              getattr(row.user, "username", None) or "—")
                 tbl_trans_key = _TABLE_TRANS_KEYS.get(row.table_name or "")
-                tbl    = self._(tbl_trans_key) if tbl_trans_key else (row.table_name or "—")
-                act_trans_key = _ACTION_TRANS_KEYS.get(action)
-                act_label = self._(act_trans_key) if act_trans_key else action
-                act_icon  = _ACTION_ICONS.get(action, "")
-                act    = f"{act_icon} {act_label}".strip() if act_icon else act_label
-                ts     = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
-                rid    = str(row.record_id) if row.record_id else "—"
-                color  = COLOR_MAP.get(action, "#3498DB")
-
+                tbl   = self._(tbl_trans_key) if tbl_trans_key else (row.table_name or "—")
+                ak    = _ACTION_TRANS_KEYS.get(action)
+                act_l = self._(ak) if ak else action
+                icon  = _ACTION_ICONS.get(action, "")
+                act   = f"{icon} {act_l}".strip() if icon else act_l
+                ts    = format_local_dt(row.timestamp, "%Y-%m-%d %H:%M")
+                rid   = str(row.record_id) if row.record_id else "—"
+                color = COLOR_MAP.get(action, "#3498DB")
                 self._audit_rows.append((uname, act, tbl, rid, ts, color))
 
             self._render_audit(self._audit_rows)
-
         except Exception as e:
-            err_row = ("—", f"⚠️ {e}", "—", "—", "—", "#E74C3C")
-            self._audit_rows = [err_row]
+            self._audit_rows = [("—", f"⚠️ {e}", "—", "—", "—", "#E74C3C")]
             self._render_audit(self._audit_rows)
 
     def _render_audit(self, rows):
@@ -434,17 +692,32 @@ class AdminDashboardTab(QWidget):
     def _load_db_info(self):
         while self._db_info_layout.count():
             w = self._db_info_layout.takeAt(0)
-            if w.widget(): w.widget().deleteLater()
-
+            if w.widget():
+                w.widget().deleteLater()
         try:
             from services.backup_service import get_db_info
             info = get_db_info()
             items = [
                 (self._("db_path"),          info.get("path", "—")),
-                (self._("db_size_label"),    f"{info.get('size_kb', '—')} KB"),
-                (self._("db_last_modified"), info.get("modified", "—")),
-                (self._("db_status"),        self._("db_available") if info.get("exists") else self._("db_not_found")),
+                (self._("db_size_label"),     f"{info.get('size_kb', '—')} KB"),
+                (self._("db_last_modified"),  info.get("last_modified", info.get("modified", "—"))),
+                (self._("db_status"),
+                 self._("db_available") if info.get("exists") else self._("db_not_found")),
             ]
+            # [5] حدّث شريط التقدم
+            size_kb = info.get("size_kb", 0) or 0
+            self._db_progress.setValue(int(size_kb))
+            self._db_progress.setFormat(f"{round(size_kb/1024, 1)} MB / {_DB_MAX_MB} MB")
+            pct = size_kb / (_DB_MAX_MB * 1024)
+            if pct >= 0.9:
+                self._db_progress.setStyleSheet("QProgressBar::chunk { background: #E74C3C; }")
+            elif pct >= 0.7:
+                self._db_progress.setStyleSheet("QProgressBar::chunk { background: #F39C12; }")
+            else:
+                self._db_progress.setStyleSheet("")
+            self._db_progress_lbl.setText(
+                f"{round(size_kb / 1024, 1)} {self._('mb_unit')}"
+            )
         except Exception as e:
             items = [(self._("error"), str(e))]
 
@@ -452,34 +725,27 @@ class AdminDashboardTab(QWidget):
             row = QWidget()
             rlay = QHBoxLayout(row)
             rlay.setContentsMargins(0, 0, 0, 0)
-
             lbl = QLabel(label + ":")
             lbl.setFont(app_font(SM, weight=QFont.DemiBold))
             lbl.setFixedWidth(110)
             lbl.setObjectName("info-label")
             rlay.addWidget(lbl)
-
             val = QLabel(value)
             val.setFont(app_font(SM))
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextSelectableByMouse)
             rlay.addWidget(val, 1)
-
             self._db_info_layout.addWidget(row)
 
     def _load_health(self):
         while self._health_layout.count():
             w = self._health_layout.takeAt(0)
-            if w.widget(): w.widget().deleteLater()
-
-        # أسماء المكتبات تقنية وليست واجهة مستخدم — لا تُترجم
+            if w.widget():
+                w.widget().deleteLater()
         from services.healthcheck import check_pdf_runtime
         try:
             report = check_pdf_runtime()
-            # QtWebEngine فقط — المحرك الأساسي المستخدم فعلياً
-            checks = [
-                ("QtWebEngine (PDF)", report.qtwebengine),
-            ]
+            checks = [("QtWebEngine (PDF)", report.qtwebengine)]
         except Exception:
             checks = [("PDF Runtime", False)]
 
@@ -487,17 +753,14 @@ class AdminDashboardTab(QWidget):
             row = QWidget()
             rlay = QHBoxLayout(row)
             rlay.setContentsMargins(0, 0, 0, 0)
-
             dot = QLabel("✅" if ok else "❌")
             dot.setFont(QFont("Segoe UI Emoji", 12))
             dot.setFixedWidth(28)
             rlay.addWidget(dot)
-
             lbl = QLabel(name)
             lbl.setFont(app_font(SM))
             lbl.setObjectName("text-success" if ok else "text-danger")
             rlay.addWidget(lbl, 1)
-
             self._health_layout.addWidget(row)
 
     def _refresh_backup_list(self):
@@ -516,6 +779,38 @@ class AdminDashboardTab(QWidget):
         except Exception as e:
             self._backup_list_lbl.setText(f"⚠️ {e}")
 
+    # [6] تنبيه عمر النسخة الاحتياطية
+    def _check_backup_age(self):
+        try:
+            from services.backup_service import list_backups
+            backups = list_backups()
+            if not backups:
+                self._backup_warn_lbl.setText(self._("backup_age_warning").format(days="∞"))
+                self._backup_warn_lbl.show()
+                return
+            latest_mtime = datetime.fromtimestamp(backups[0].stat().st_mtime)
+            age_days = (datetime.now() - latest_mtime).days
+            if age_days >= _BACKUP_WARN_DAYS:
+                self._backup_warn_lbl.setText(
+                    self._("backup_age_warning").format(days=age_days)
+                )
+                self._backup_warn_lbl.show()
+            else:
+                ts = latest_mtime.strftime("%Y-%m-%d %H:%M")
+                self._backup_warn_lbl.setText(self._("backup_ok").format(ts=ts))
+                self._backup_warn_lbl.setObjectName("text-success")
+                self._backup_warn_lbl.show()
+        except Exception:
+            self._backup_warn_lbl.hide()
+
+    # [3] فتح تاب سجل العمليات
+    def _open_audit_tab(self):
+        try:
+            from core.data_bus import DataBus
+            DataBus.get_instance().publish("navigate_to", "audit_trail")
+        except Exception:
+            pass
+
     # ── actions ──────────────────────────────────────────────────────────────
 
     def _do_backup(self):
@@ -525,23 +820,20 @@ class AdminDashboardTab(QWidget):
             from services.backup_service import backup as do_backup
             path = do_backup()
             sz = round(path.stat().st_size / 1024, 1)
-
-            from services.notification_service import NotificationService
-            NotificationService.get_instance().notify_backup(
-                success=True, path=str(path)
-            )
-
+            try:
+                from services.notification_service import NotificationService
+                NotificationService.get_instance().notify_backup(success=True, path=str(path))
+            except Exception:
+                pass
             QMessageBox.information(self, self._("backup_dialog_title"),
                 self._("backup_success_detail") + f"\n\n📂  {path}\n💾  {sz} KB")
             self._refresh_backup_list()
+            self._check_backup_age()
             QTimer.singleShot(200, self._refresh_stats)
-
         except Exception as e:
             try:
                 from services.notification_service import NotificationService
-                NotificationService.get_instance().notify_backup(
-                    success=False, error=str(e)
-                )
+                NotificationService.get_instance().notify_backup(success=False, error=str(e))
             except Exception:
                 pass
             QMessageBox.critical(self, self._("error"), self._("backup_failed_msg") + f"\n{e}")
@@ -564,13 +856,11 @@ class AdminDashboardTab(QWidget):
             QMessageBox.warning(self, self._("warning"), self._("cannot_open_folder") + f"\n{e}")
 
     def _do_restore(self):
-        # فلتر الملفات: النص التقني لـ Qt — لا يُترجم لأنه معيار نظام الملفات
         path, _ = QFileDialog.getOpenFileName(
             self, self._("select_backup_file"), "", "Database Files (*.db);;All Files (*)"
         )
         if not path:
             return
-
         reply = QMessageBox.warning(
             self, self._("restore_warning_title"),
             self._("restore_warning_msg").format(path=path),
@@ -578,7 +868,6 @@ class AdminDashboardTab(QWidget):
         )
         if reply != QMessageBox.Yes:
             return
-
         try:
             from services.backup_service import restore as do_restore
             dst = do_restore(path)
@@ -592,12 +881,15 @@ class AdminDashboardTab(QWidget):
     def _refresh_stats(self):
         self._set_ts()
         s = self._query_stats()
-        # البحث بالمفتاح الثابت (key) لا بنص اللغة
         values = {
-            "users":        s["users"],
-            "active_users": s["active_users"],
-            "transactions": s["transactions"],
-            "db_size":      s["db_size"],
+            "users":          s["users"],
+            "active_users":   s["active_users"],
+            "transactions":   s["transactions"],
+            "db_size":        s["db_size"],
+            "stat_clients":   s["clients"],
+            "stat_entries":   s["entries"],
+            "stat_materials": s["materials"],
+            "stat_last_backup": s["last_backup"],
         }
         for key, val in values.items():
             card = self._stat_cards.get(key)
@@ -609,7 +901,10 @@ class AdminDashboardTab(QWidget):
         self._load_audit()
         self._load_db_info()
         self._load_health()
+        self._load_chart()
+        self._load_users_table()
         self._refresh_backup_list()
+        self._check_backup_age()
 
     def _set_ts(self):
         self._ts_lbl.setText(
@@ -617,32 +912,35 @@ class AdminDashboardTab(QWidget):
         )
 
     def retranslate_ui(self):
-        """يُستدعى عند تغيير اللغة لتحديث جميع نصوص الواجهة."""
-        # Header
         self._title_lbl.setText(self._("admin_dashboard_title"))
         self._refresh_btn.setText(f"🔄 {self._('refresh')}")
         self._set_ts()
 
-        # Stat cards — نحدّث التسمية فقط، القيمة تبقى كما هي
         for key, card in self._stat_cards.items():
             card.update_label(self._(key))
 
-        # Audit panel
         self._audit_title_lbl.setText(self._("audit_log_title"))
         self._audit_search.setPlaceholderText(self._("search_placeholder"))
+        self._view_all_btn.setText(self._("view_all_audit"))
         self._audit_tbl.setHorizontalHeaderLabels([
             self._("col_user"), self._("col_action"),
             self._("col_table"), self._("col_record"), self._("col_date"),
         ])
-        # أعد تحميل صفوف الـ audit لترجمة أسماء الجداول والأحداث
         self._load_audit()
 
-        # DB panel
         self._db_title_lbl.setText(self._("db_info_title"))
         self._sys_title_lbl.setText(self._("system_status_title"))
+        self._db_usage_lbl.setText(self._("db_usage_label"))
         self._load_db_info()
 
-        # Backup panel
+        self._users_title_lbl.setText(self._("active_users_title"))
+        self._users_tbl.setHorizontalHeaderLabels([
+            self._("col_user"),
+            self._("col_last_activity"),
+            self._("col_status"),
+        ])
+        self._load_users_table()
+
         self._backup_title_lbl.setText(self._("backups_title"))
         self._backup_btn.setText(self._("backup_now_btn"))
         self._open_folder_btn.setText(self._("open_backup_folder_btn"))
