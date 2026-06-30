@@ -247,7 +247,11 @@ class SettingsManager(QObject, QObjectSingletonMixin):
         if not is_transient:
             self._apply_setting_side_effects(key, value)
 
-        logger.info(f"Setting '{key}' changed from {old_value} to {value}")
+        if old_value != value:
+            if is_transient:
+                logger.debug(f"Setting '{key}' changed")
+            else:
+                logger.info(f"Setting '{key}' changed from {old_value} to {value}")
         return True
 
     def get_all(self) -> Dict[str, Any]:
@@ -462,7 +466,7 @@ class SettingsManager(QObject, QObjectSingletonMixin):
 
             self._pending_theme_apply = False
 
-            logger.info("Theme applied successfully")
+            logger.debug("Theme apply request completed")
 
         except Exception as e:
             logger.warning(f"Failed to apply theme: {e}")
@@ -638,7 +642,7 @@ class SettingsManager(QObject, QObjectSingletonMixin):
             if not direction or direction not in ("rtl", "ltr"):
                 logger.warning(f"_apply_direction: invalid value '{direction}', skipping")
                 return
-            logger.info(f"Direction setting stored: {direction}")
+            logger.debug(f"Direction setting stored: {direction}")
         except Exception as e:
             logger.warning(f"Failed to apply direction: {e}")
 

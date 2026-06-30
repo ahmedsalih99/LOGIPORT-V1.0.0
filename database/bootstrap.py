@@ -352,7 +352,7 @@ def _run_migrations(conn) -> None:
             )
         """)
         conn.commit()
-        logger.info("Bootstrap: cmr_counters table ready")
+        logger.debug("Bootstrap: cmr_counters table ready")
     except Exception as _e:
         logger.warning("Bootstrap: cmr_counters migration skipped: %s", _e)
 
@@ -388,7 +388,7 @@ def _run_migrations(conn) -> None:
         except Exception as _ie:
             logger.warning("Bootstrap: index %s skipped: %s", idx_name, _ie)
     conn.commit()
-    logger.info("Bootstrap: performance indexes checked/created")
+    logger.debug("Bootstrap: performance indexes checked/created")
 
     # Migration: جدول container_tracking + container_entry_links
     try:
@@ -436,7 +436,7 @@ def _run_migrations(conn) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_container_no   ON container_tracking(container_no)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_status         ON container_tracking(status)")
         conn.commit()
-        logger.info("Bootstrap: container_tracking جاهز")
+        logger.debug("Bootstrap: container_tracking ready")
     except Exception as _e:
         logger.warning("Bootstrap: container_tracking migration skipped: %s", _e)
 
@@ -487,7 +487,7 @@ def _run_migrations(conn) -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_sc_shipment_id ON shipment_containers(shipment_id)")
         conn.commit()
-        logger.info("Bootstrap: shipment_containers جاهز")
+        logger.debug("Bootstrap: shipment_containers ready")
     except Exception as _e:
         logger.warning("Bootstrap: shipment_containers migration skipped: %s", _e)
 
@@ -514,7 +514,7 @@ def _run_migrations(conn) -> None:
         conn.execute("DROP TRIGGER IF EXISTS trg_companies_require_any_address")
         conn.execute("DROP TRIGGER IF EXISTS trg_companies_require_any_address_update")
         conn.commit()
-        logger.info("Bootstrap: dropped address triggers from companies (address is optional)")
+        logger.debug("Bootstrap: dropped address triggers from companies (address is optional)")
     except Exception as _e:
         logger.warning("Bootstrap: address trigger drop skipped: %s", _e)
 
@@ -550,7 +550,7 @@ def _run_migrations(conn) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_assigned   ON tasks(assigned_to_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_tasks_status_due ON tasks(status, due_date)")
         conn.commit()
-        logger.info("Bootstrap: tasks table created/verified")
+        logger.debug("Bootstrap: tasks table created/verified")
     except Exception as _e:
         logger.warning("Bootstrap: tasks migration skipped: %s", _e)
 
@@ -585,7 +585,7 @@ def _run_migrations(conn) -> None:
             )
         """)
         conn.commit()
-        logger.info("Bootstrap: local_sync_cursors جاهز")
+        logger.debug("Bootstrap: local_sync_cursors ready")
     except Exception as _e:
         logger.warning("Bootstrap: local_sync_cursors migration skipped: %s", _e)
 
@@ -680,7 +680,7 @@ def _run_migrations(conn) -> None:
             logger.warning("Bootstrap: updated_at(%s) skipped: %s", _tbl, _e)
     try:
         conn.commit()
-        logger.info("Bootstrap: sync columns (server_id + updated_at) checked/created")
+        logger.debug("Bootstrap: sync columns (server_id + updated_at) checked/created")
     except Exception:
         pass
 
@@ -703,21 +703,23 @@ def _run_migrations(conn) -> None:
             logger.warning("Bootstrap: index %s skipped: %s", _iname, _ie)
     try:
         conn.commit()
-        logger.info("Bootstrap: sync indexes checked/created")
+        logger.debug("Bootstrap: sync indexes checked/created")
     except Exception:
         pass
 
     conn.commit()
-    logger.info("Bootstrap: migrations تمت بنجاح")
+    logger.debug("Bootstrap: migrations completed")
 
 
 def run_bootstrap() -> bool:
+    import time
+    _t0 = time.monotonic()
 
     try:
         # ① إنشاء الجداول
         from database.models import init_db
         init_db()
-        logger.info("Bootstrap: جداول قاعدة البيانات جاهزة")
+        logger.debug("Bootstrap: database tables ready")
 
         # ① ب) الـ migrations اليدوية (إضافة أعمدة ناقصة في DBs القديمة)
         from database.db_utils import get_db_path
@@ -734,14 +736,15 @@ def run_bootstrap() -> bool:
 
         # ② إدراج البيانات الأساسية
         _seed_all()
-        logger.info("Bootstrap: البيانات الأساسية جاهزة")
+        logger.debug("Bootstrap: base data ready")
 
         # ③ هل يوجد مستخدمون؟
         needs_setup = _no_users_exist()
+        elapsed_ms = (time.monotonic() - _t0) * 1000
         if needs_setup:
-            logger.warning("Bootstrap: لا يوجد أي مستخدم — يجب عرض SetupWizard")
+            logger.warning("Bootstrap: no users found — SetupWizard required (%.0fms)", elapsed_ms)
         else:
-            logger.info("Bootstrap: يوجد مستخدمون، التطبيق جاهز")
+            logger.info("Bootstrap: completed in %.0fms", elapsed_ms)
 
         return needs_setup
 
@@ -1077,7 +1080,7 @@ def _seed_all() -> None:
         _seed_reference_data(cur)
 
         session.commit()
-        logger.info("Bootstrap: seed_all تم بنجاح")
+        logger.debug("Bootstrap: seed_all completed")
 
     except Exception as exc:
         session.rollback()

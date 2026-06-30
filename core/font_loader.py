@@ -116,7 +116,7 @@ def load_app_fonts() -> bool:
     if failed:
         logger.warning(f"Failed to load {len(failed)} font weight(s): {failed}")
 
-    logger.info(
+    logger.debug(
         f"IBM Plex Sans Arabic: {loaded_count}/{len(_FONT_FILES)} weights loaded"
     )
     _loaded = True

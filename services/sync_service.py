@@ -438,7 +438,7 @@ class SyncService:
             logger.info("Sync: disabled — no credentials configured")
             return
         self._schedule_next(delay=self._interval)
-        logger.info("Sync: auto-sync started (interval=%ds)", self._interval)
+        logger.debug("Sync: auto-sync scheduled (interval=%ds)", self._interval)
 
     def stop_auto_sync(self):
         if self._timer:

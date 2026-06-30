@@ -516,7 +516,7 @@ class MainWindow(BaseWindow):
             if settings.get("auto_backup", False):
                 try:
                     backup()
-                    logger.info("Automatic backup completed successfully.")
+                    logger.debug("Automatic backup wrapper completed")
                 except Exception as e:
                     logger.error(f"Automatic backup failed: {e}")
         except Exception as e:

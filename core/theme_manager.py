@@ -94,10 +94,7 @@ class ThemeManager(QObject, QObjectSingletonMixin):
             else:
                 font_size = int(font_size_input)
 
-            logger.info("=" * 60)
-            logger.info("🎨 LOGIPORT THEME SYSTEM v3.0 (NEW ONLY)")
-            logger.info(f"📋 Requested: {theme_name} | {font_family} {font_size}px")
-            logger.info("=" * 60)
+            logger.debug(f"Applying theme: {theme_name} | {font_family} {font_size}px")
 
             theme = ThemeBuilder(
                 theme_name=theme_name,
@@ -125,7 +122,7 @@ class ThemeManager(QObject, QObjectSingletonMixin):
             self.current_font_size = font_size
             self.current_font_family = font_family
 
-            logger.info("✅ Theme applied successfully")
+            logger.info(f"✅ Theme applied: {theme_name} | {font_family} {font_size}px")
             self.theme_changed.emit(theme_name)
             return True
 
