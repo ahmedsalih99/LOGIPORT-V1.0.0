@@ -47,6 +47,10 @@ class TransactionItem(Base):
     # هذا العمود يستخدم لحفظ رقم الكونتينر أو رقم الشاحنة للمواد اليدوية (أو المحدثة يدوياً)
     transport_ref = Column(Text, nullable=True)
 
+    # 🛃 البند الجمركي — تجاوز اختياري لهذا السطر فقط
+    # إذا تُرك فارغاً، يُستخدم materials.code كقيمة افتراضية عند بناء الفواتير
+    customs_tariff_code = Column(String(64), nullable=True)
+
     # Audit
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)

@@ -501,6 +501,7 @@ translations ={
 "expiry_date": "Son kullanma tarihi",
 "unit_price": "Birim fiyatı",
 "total_price": "Toplam",
+"customs_tariff_code": "Gümrük Tarife Kodu",
 "info": "Bilgi",
 "no_entries_found": "Giriş bulunamadı",
 "select_all": "Hepsini seç",

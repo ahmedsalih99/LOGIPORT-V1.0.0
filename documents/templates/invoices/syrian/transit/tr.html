@@ -95,10 +95,11 @@ Ticaret Sicil No: {{ importer.cr_no }}{% endif %}
   <table class="items">
     <thead>
       <tr>
-        <th style="width:36%;">Açıklama</th>
+        <th style="width:30%;">Açıklama</th>
+        <th style="width:10%;">GTİP</th>
         <th style="width:12%;">Miktar<div class="sub">Ambalaj</div></th>
-        <th style="width:16%;">Brüt Ağırlık<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
-        <th style="width:16%;">Net Ağırlık<div class="sub">{{ net_unit_label or "KG" }}</div></th>
+        <th style="width:14%;">Brüt Ağırlık<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
+        <th style="width:14%;">Net Ağırlık<div class="sub">{{ net_unit_label or "KG" }}</div></th>
         <th style="width:10%;">Fiyatlandırma<div class="sub">{{ pricing_type_header or "USD/KG" }}</div></th>
         <th style="width:10%;">Toplam (Tutar)
   <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
@@ -109,6 +110,7 @@ Ticaret Sicil No: {{ importer.cr_no }}{% endif %}
       {% for it in items %}
       <tr>
         <td>{{ it.description or it.description_tr or "" }}</td>
+        <td class="num">{{ it.customs_code or "" }}</td>
         <td class="num">
           <div>{{ it.qty or it.bags or 0 }}</div>
           <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
@@ -132,6 +134,7 @@ Ticaret Sicil No: {{ importer.cr_no }}{% endif %}
     <tfoot>
       <tr>
         <td class="num"><b>Toplamlar</b></td>
+        <td class="num">—</td>
         <td class="num"><b>{{ totals.total_qty or totals.total_bags or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_gross or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_net or 0 }}</b></td>

@@ -138,10 +138,11 @@
   <table class="items{% if _compact %} compact{% endif %}">
     <thead>
       <tr>
-        <th style="width:36%;">Description</th>
+        <th style="width:30%;">Description</th>
+        <th style="width:10%;">HS CODE</th>
         <th style="width:12%;">Quantity<div class="sub">Packaging</div></th>
-        <th style="width:16%;">Gross Weight<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
-        <th style="width:16%;">Net Weight<div class="sub">{{ net_unit_label or "KG" }}</div></th>
+        <th style="width:14%;">Gross Weight<div class="sub">{{ gross_unit_label or "KG" }}</div></th>
+        <th style="width:14%;">Net Weight<div class="sub">{{ net_unit_label or "KG" }}</div></th>
         <th style="width:10%;">Pricing<div class="sub">{{ pricing_type_header or "USD/KG" }}</div></th>
         <th style="width:10%;">Total (Amount)
           <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
@@ -152,6 +153,7 @@
       {% for it in items %}
       <tr>
         <td>{{ it.description or it.description_en or "" }}</td>
+        <td class="num">{{ it.customs_code or "" }}</td>
         <td class="num">
           <div>{{ it.qty or it.bags or 0 }}</div>
           <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
@@ -175,6 +177,7 @@
     <tfoot>
       <tr>
         <td class="num"><b>Totals</b></td>
+        <td class="num">—</td>
         <td class="num"><b>{{ totals.total_qty or totals.qty or totals.total_bags or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_gross or totals.gross or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_net or totals.net or 0 }}</b></td>

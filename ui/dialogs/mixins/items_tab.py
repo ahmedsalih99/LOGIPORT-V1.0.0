@@ -76,6 +76,7 @@ class ItemsTabMixin:
     COL_PTYPE      = 10
     COL_UNIT_PRICE = 11
     COL_TOTAL      = 12
+    COL_CUSTOMS    = 13   # البند الجمركي — تجاوز اختياري (فارغ = استخدام كود المادة)
 
     # نُعرّف خصائص الـ instance هنا لتفادي تحذير "defined outside __init__"
     _updating: bool = False
@@ -156,14 +157,14 @@ class ItemsTabMixin:
         bl.setSpacing(16)
 
         # ================= Table =================
-        self.tbl = _NoHoverTable(0, 13, self.tab_items)
+        self.tbl = _NoHoverTable(0, 14, self.tab_items)
         self.tbl.setObjectName("items-table")
         self.tbl.setHorizontalHeaderLabels([
             self._("source"), self._("truck_or_container_no"), self._("material"), self._("packaging_type"),
             self._("count"), self._("gross_weight_kg"), self._("net_weight_kg"),
             self._("production_date"), self._("expiry_date"),
             self._("currency"), self._("pricing_type"),
-            self._("unit_price"), self._("total_price")
+            self._("unit_price"), self._("total_price"), self._("customs_tariff_code")
         ])
 
         self.tbl.verticalHeader().setVisible(True)
@@ -204,6 +205,7 @@ class ItemsTabMixin:
             self.COL_PTYPE:     140,   # نوع التسعير
             self.COL_UNIT_PRICE: 90,   # سعر الوحدة
             self.COL_TOTAL:      90,   # الإجمالي
+            self.COL_CUSTOMS:    100,  # البند الجمركي
         }
         for col, w in _COL_WIDTHS.items():
             self.tbl.setColumnWidth(col, w)
@@ -389,7 +391,8 @@ class ItemsTabMixin:
 
         # مسح النصوص
         for col in [self.COL_SOURCE, self.COL_TRUCK, self.COL_QTY,
-                    self.COL_GROSS, self.COL_NET, self.COL_UNIT_PRICE, self.COL_TOTAL]:
+                    self.COL_GROSS, self.COL_NET, self.COL_UNIT_PRICE, self.COL_TOTAL,
+                    self.COL_CUSTOMS]:
             item = self.tbl.item(row, col)
             if item:
                 item.setText("")
@@ -487,6 +490,7 @@ class ItemsTabMixin:
         self._set_combo(r, self.COL_PTYPE, self._items_from_cache(self._pricing_types, role="ptype"), None)
         self._set_text(r, self.COL_UNIT_PRICE, "")
         self._set_text(r, self.COL_TOTAL, "0.00")
+        self._set_text(r, self.COL_CUSTOMS, "")
 
     def _delete_selected(self) -> None:
         """حذف الصف المحدد"""
@@ -667,6 +671,7 @@ class ItemsTabMixin:
                 unit_price = get_val("unit_price", 0) or 0
                 self._set_text(r, self.COL_UNIT_PRICE,
                                str(unit_price) if unit_price else "")
+                self._set_text(r, self.COL_CUSTOMS, "")
 
                 self._recalc_row(r)
 
@@ -755,6 +760,7 @@ class ItemsTabMixin:
                 unit_price = _g("unit_price", 0) or 0
                 self._set_text(r, self.COL_UNIT_PRICE,
                                str(unit_price) if unit_price else "")
+                self._set_text(r, self.COL_CUSTOMS, "")
 
                 self._recalc_row(r)
 
@@ -976,6 +982,9 @@ class ItemsTabMixin:
             prod_widget = self.tbl.cellWidget(r, self.COL_PROD)
             exp_widget = self.tbl.cellWidget(r, self.COL_EXP)
 
+            customs_item = self.tbl.item(r, self.COL_CUSTOMS)
+            customs_text = (customs_item.text().strip() if customs_item else "")
+
             rec = {
                 "source_type": source_text,
                 "transport_ref": truck_text,
@@ -993,6 +1002,8 @@ class ItemsTabMixin:
                 # نبقي total_price أيضاً لأن CRUD يقبل كلاهما (line_total, total_price)
                 "total_price": self._num(r, self.COL_TOTAL),
                 "is_manual": (source_text == "manual"),
+                # تجاوز اختياري للبند الجمركي — فارغ يعني استخدام كود المادة افتراضياً
+                "customs_tariff_code": (customs_text or None),
             }
 
             # إضافة entry_id / entry_item_id من الـ UserRole metadata
@@ -1109,6 +1120,10 @@ class ItemsTabMixin:
                 # السعر الوحدوي
                 unit_price = get(it, "unit_price", 0) or 0
                 self._set_text(r, self.COL_UNIT_PRICE, str(float(unit_price)))
+
+                # البند الجمركي (تجاوز اختياري لهذا السطر)
+                customs_code = get(it, "customs_tariff_code", "") or ""
+                self._set_text(r, self.COL_CUSTOMS, customs_code)
 
                 # الإجمالي
                 line_total = get(it, "line_total", None) or get(it, "total_price", None)

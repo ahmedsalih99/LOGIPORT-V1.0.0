@@ -526,6 +526,7 @@ translations ={
 "expiry_date": "تاريخ الانتهاء",
 "unit_price": "سعر الوحدة",
 "total_price": "الإجمالي",
+"customs_tariff_code": "البند الجمركي",
 "info": "معلومة",
 "no_entries_found": "لم يتم العثور على إدخالات",
 "select_all": "تحديد الكل",

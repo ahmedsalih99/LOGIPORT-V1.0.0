@@ -501,6 +501,7 @@ translations ={
 "expiry_date": "Expiry Date",
 "unit_price": "Unit Price",
 "total_price": "Total",
+"customs_tariff_code": "Customs Tariff Code",
 "info": "Info",
 "no_entries_found": "No entries found",
 "select_all": "Select All",

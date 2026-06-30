@@ -4,9 +4,29 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import Optional
-from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Schema Version — يُستخدم لتخطّي كل الـ migrations والـ seeding بالكامل
+# عندما تكون قاعدة البيانات محدّثة أصلاً (بدل فحصها بمئات الاستعلامات بكل تشغيل).
+# لازم تُرفع هاي القيمة +1 كل مرة تُضاف فيها migration أو seed جديد بهذا الملف،
+# وإلا التعديل الجديد لن يُطبَّق على قواعد بيانات المستخدمين الموجودة.
+# =============================================================================
+_SCHEMA_VERSION = 2
+
+
+def _get_schema_version(conn) -> int:
+    try:
+        return int(conn.execute("PRAGMA user_version").fetchone()[0])
+    except Exception:
+        return 0
+
+
+def _set_schema_version(conn, version: int) -> None:
+    # PRAGMA لا يقبل placeholders — القيمة int مضبوطة من كودنا فقط، آمنة
+    conn.execute(f"PRAGMA user_version = {int(version)}")
+    conn.commit()
 
 
 # =============================================================================
@@ -292,7 +312,8 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: office_id (transactions) migration skipped: %s", _e)
 
-    # Migration: origin_country / dest_country / certificate_date في transport_details
+    # Migration: origin_country / dest_country / certificate_date + CMR الثاني (أعمدة + أماكن)
+    # — مجمّعة بفحص واحد لأعمدة transport_details بدل 3 استعلامات PRAGMA منفصلة
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
         for col, typedef in [
@@ -300,35 +321,11 @@ def _run_migrations(conn) -> None:
             ("origin_country",   "VARCHAR(128)"),
             ("dest_country",     "VARCHAR(128)"),
             ("certificate_date", "DATE"),
-        ]:
-            if col not in cols:
-                conn.execute(f"ALTER TABLE transport_details ADD COLUMN {col} {typedef}")
-                logger.info("Bootstrap: added %s to transport_details", col)
-        conn.commit()
-    except Exception as _e:
-        logger.warning("Bootstrap: transport_details migration skipped: %s", _e)
-
-    # Migration: CMR الثاني — أعمدة إضافية في transport_details
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
-        for col, typedef in [
             ("cmr_second_label",     "VARCHAR(128)"),
             ("cmr_no_2",             "VARCHAR(64)"),
             ("carrier_company_id_2", "INTEGER"),
             ("truck_plate_2",        "VARCHAR(32)"),
             ("driver_name_2",        "VARCHAR(128)"),
-        ]:
-            if col not in cols:
-                conn.execute(f"ALTER TABLE transport_details ADD COLUMN {col} {typedef}")
-                logger.info("Bootstrap: added %s to transport_details", col)
-        conn.commit()
-    except Exception as _e:
-        logger.warning("Bootstrap: transport_details cmr2 migration skipped: %s", _e)
-
-    # Migration: CMR الثاني — مكان التحميل/التسليم/تاريخ الشحن
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(transport_details)").fetchall()]
-        for col, typedef in [
             ("loading_place_2",  "VARCHAR(255)"),
             ("delivery_place_2", "VARCHAR(255)"),
             ("shipment_date_2",  "DATE"),
@@ -338,7 +335,7 @@ def _run_migrations(conn) -> None:
                 logger.info("Bootstrap: added %s to transport_details", col)
         conn.commit()
     except Exception as _e:
-        logger.warning("Bootstrap: transport_details cmr2 places migration skipped: %s", _e)
+        logger.warning("Bootstrap: transport_details migration skipped: %s", _e)
 
 
     # Migration: جدول cmr_counters — عداد رقم CMR لكل شركة ناقلة
@@ -440,38 +437,31 @@ def _run_migrations(conn) -> None:
     except Exception as _e:
         logger.warning("Bootstrap: container_tracking migration skipped: %s", _e)
 
-    # Migration: client_id على container_tracking (للـ DBs القديمة التي أُنشئت بدونه)
+    # Migration: client_id + أعمدة v2 على container_tracking (للـ DBs القديمة)
     try:
         _ct_cols = [r[1] for r in conn.execute("PRAGMA table_info(container_tracking)").fetchall()]
-        if _ct_cols and "client_id" not in _ct_cols:
-            conn.execute("ALTER TABLE container_tracking ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL")
-            conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id ON container_tracking(client_id)")
+        if _ct_cols:
+            if "client_id" not in _ct_cols:
+                conn.execute("ALTER TABLE container_tracking ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL")
+                conn.execute("CREATE INDEX IF NOT EXISTS ix_ct_client_id ON container_tracking(client_id)")
+                logger.info("Bootstrap: added client_id to container_tracking")
+            _ct_new = {
+                "cargo_type":         "VARCHAR(128)",
+                "quantity":           "VARCHAR(64)",
+                "origin_country":     "VARCHAR(128)",
+                "containers_count":   "INTEGER",
+                "docs_delivered":     "INTEGER NOT NULL DEFAULT 0",
+                "cargo_tracking":     "TEXT",
+                "docs_received_date": "DATE",
+                "bl_status":          "VARCHAR(64)",
+            }
+            for col, coldef in _ct_new.items():
+                if col not in _ct_cols:
+                    conn.execute(f"ALTER TABLE container_tracking ADD COLUMN {col} {coldef}")
+                    logger.info("Bootstrap: added %s to container_tracking", col)
             conn.commit()
-            logger.info("Bootstrap: added client_id to container_tracking")
     except Exception as _e:
-        logger.warning("Bootstrap: container_tracking client_id migration skipped: %s", _e)
-
-    # Migration v2: أعمدة جديدة لـ container_tracking
-    try:
-        _ct_cols = [r[1] for r in conn.execute("PRAGMA table_info(container_tracking)").fetchall()]
-        _ct_new = {
-            "cargo_type":         "VARCHAR(128)",
-            "quantity":           "VARCHAR(64)",
-            "origin_country":     "VARCHAR(128)",
-            "containers_count":   "INTEGER",
-            "docs_delivered":     "INTEGER NOT NULL DEFAULT 0",
-            "cargo_tracking":     "TEXT",
-            "docs_received_date": "DATE",
-            "bl_status":          "VARCHAR(64)",
-        }
-        for col, coldef in _ct_new.items():
-            if col not in _ct_cols:
-                conn.execute(f"ALTER TABLE container_tracking ADD COLUMN {col} {coldef}")
-                logger.info("Bootstrap: added %s to container_tracking", col)
-        # إعادة تسمية: bl_number كان nullable=True، نتحقق فقط
-        conn.commit()
-    except Exception as _e:
-        logger.warning("Bootstrap: container_tracking v2 migration skipped: %s", _e)
+        logger.warning("Bootstrap: container_tracking columns migration skipped: %s", _e)
 
     # Migration: جدول shipment_containers (كونتينرات البوليصة)
     try:
@@ -568,6 +558,17 @@ def _run_migrations(conn) -> None:
             )
     except Exception as _e:
         logger.warning("Bootstrap: container_no check skipped: %s", _e)
+
+    # Migration: customs_tariff_code column on transaction_items — تجاوز اختياري
+    # للبند الجمركي على مستوى سطر المعاملة (الافتراضي يُؤخذ من materials.code)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(transaction_items)").fetchall()]
+        if "customs_tariff_code" not in cols:
+            conn.execute("ALTER TABLE transaction_items ADD COLUMN customs_tariff_code TEXT")
+            conn.commit()
+            logger.info("Bootstrap: added customs_tariff_code to transaction_items")
+    except Exception as _e:
+        logger.warning("Bootstrap: customs_tariff_code migration skipped: %s", _e)
 
     # =========================================================================
     # Migration SYNC-1: جدول local_sync_cursors
@@ -725,18 +726,30 @@ def run_bootstrap() -> bool:
         from database.db_utils import get_db_path
         import sqlite3 as _sqlite3
         with _sqlite3.connect(get_db_path()) as _conn:
-            _run_migrations(_conn)
+            _current_version = _get_schema_version(_conn)
+            if _current_version >= _SCHEMA_VERSION:
+                logger.debug(
+                    "Bootstrap: schema up to date (v%d) — skipping migrations & seed",
+                    _current_version,
+                )
+            else:
+                _run_migrations(_conn)
 
-        # إعادة تهيئة الـ engine بعد الـ migrations لمسح الـ metadata القديمة
-        try:
-            from database.models.base import get_engine
-            get_engine().dispose()
-        except Exception:
-            pass
+                # إعادة تهيئة الـ engine بعد الـ migrations لمسح الـ metadata القديمة
+                try:
+                    from database.models.base import get_engine
+                    get_engine().dispose()
+                except Exception:
+                    pass
 
-        # ② إدراج البيانات الأساسية
-        _seed_all()
-        logger.debug("Bootstrap: base data ready")
+                # ② إدراج البيانات الأساسية
+                _seed_all()
+                logger.debug("Bootstrap: base data ready")
+
+                _set_schema_version(_conn, _SCHEMA_VERSION)
+                logger.info(
+                    "Bootstrap: schema upgraded %d → %d", _current_version, _SCHEMA_VERSION
+                )
 
         # ③ هل يوجد مستخدمون؟
         needs_setup = _no_users_exist()
@@ -750,8 +763,9 @@ def run_bootstrap() -> bool:
 
     except Exception as exc:
         logger.error(f"Bootstrap فشل: {exc}", exc_info=True)
-        # في حالة الفشل الكامل، نظهر نافذة الدخول العادية بدل التعليق
-        return False
+        # نرفع الاستثناء بدل إخفائه — main.py يلتقطه أصلاً ويعرض رسالة خطأ
+        # واضحة للمستخدم، بدل ما يكمل التطبيق بصمت على قاعدة بيانات غير مهيّأة
+        raise
 
 
 def create_superadmin(username: str, password: str, full_name: str) -> bool:

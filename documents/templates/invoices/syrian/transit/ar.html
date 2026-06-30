@@ -95,10 +95,11 @@
   <table class="items">
     <thead>
       <tr>
-        <th style="width:36%;">الوصف</th>
+        <th style="width:30%;">الوصف</th>
+        <th style="width:10%;">البند الجمركي</th>
         <th style="width:12%;">الكمية<div class="sub">التعبئة</div></th>
-        <th style="width:16%;">الوزن القائم<div class="sub">{{ gross_unit_label or "كغ" }}</div></th>
-        <th style="width:16%;">الوزن الصافي<div class="sub">{{ net_unit_label or "كغ" }}</div></th>
+        <th style="width:14%;">الوزن القائم<div class="sub">{{ gross_unit_label or "كغ" }}</div></th>
+        <th style="width:14%;">الوزن الصافي<div class="sub">{{ net_unit_label or "كغ" }}</div></th>
         <th style="width:10%;">التسعير<div class="sub">{{ pricing_type_header or "دولار/كغ" }}</div></th>
         <th style="width:10%;">الإجمالي (المبلغ)
   <div class="sub">{{ (currency_symbol or currency.symbol or currency.code) }} {{ (currency.code or cur) }}</div>
@@ -109,6 +110,7 @@
       {% for it in items %}
       <tr>
         <td>{{ it.description or it.description_ar or "" }}</td>
+        <td class="num">{{ it.customs_code or "" }}</td>
         <td class="num">
           <div>{{ it.qty or it.bags or 0 }}</div>
           <div class="sub">{{ it.packaging_type or it.unit_display or "" }}</div>
@@ -132,6 +134,7 @@
     <tfoot>
       <tr>
         <td class="num"><b>الإجماليات</b></td>
+        <td class="num">—</td>
         <td class="num"><b>{{ totals.total_qty or totals.total_bags or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_gross or 0 }}</b></td>
         <td class="num"><b>{{ totals.total_net or 0 }}</b></td>

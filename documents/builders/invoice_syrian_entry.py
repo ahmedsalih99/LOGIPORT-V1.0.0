@@ -105,7 +105,8 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
                    pt.name_{lang}      AS pricing_type_name,
                    pt.compute_by       AS pt_compute_by,
                    pt.price_unit       AS pt_price_unit,
-                   pt.divisor          AS pt_divisor
+                   pt.divisor          AS pt_divisor,
+                   COALESCE(ti.customs_tariff_code, m.code, '') AS customs_code
             FROM transaction_items ti
             JOIN materials m             ON m.id = ti.material_id
             LEFT JOIN packaging_types pk ON pk.id = ti.packaging_type_id
@@ -199,6 +200,7 @@ def build_ctx(doc_code: str, transaction_id: int, lang: str) -> Dict[str, Any]:
                 "amount": am,
                 "total": am,
                 "total_usd": am,
+                "customs_code": r.get("customs_code") or "",
                 "pricing_type": {
                     "code": r.get("pricing_type_code"),
                     "name": r.get("pricing_type_name"),
